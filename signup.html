@@ -48,11 +48,11 @@
   <input id="username" type="text" placeholder="Username" /><br>
   <div class="toggle">
     <input id="password" type="password" placeholder="Password" />
-    <span class="eye" onclick="toggleVisibility('password')">👁️</span>
+    <span onclick="toggleVisibility('password', this)">Show</span>
   </div>
   <div class="toggle">
     <input id="confirmPassword" type="password" placeholder="Confirm Password" />
-    <span class="eye" onclick="toggleVisibility('confirmPassword')">👁️</span>
+    <span onclick="toggleVisibility('confirmPassword',this)">Show</span>
   </div>
   <button onclick="createAccount()">Create Account</button><br><br>
   <a href="login.html" style="color: lightblue;">Already have an account? Login</a>
