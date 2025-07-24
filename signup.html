@@ -7,8 +7,8 @@
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
   <style>
     body {
-      font-family: Arial, sans-serif;
-      background: #f5f5f5;
+      font-family: Arial;
+      background: #fdfdfd;
       display: flex;
       justify-content: center;
       align-items: center;
@@ -18,50 +18,41 @@
       background: white;
       padding: 30px;
       border-radius: 8px;
-      box-shadow: 0 0 10px #aaa;
       width: 300px;
+      box-shadow: 0 0 10px #aaa;
     }
-    input {
+    input, button {
       width: 100%;
       padding: 10px;
-      margin: 10px 0;
-    }
-    button {
-      width: 100%;
-      padding: 10px;
-      background: green;
-      color: white;
-      border: none;
-      cursor: pointer;
+      margin-top: 10px;
     }
     .toggle {
+      float: right;
       font-size: 12px;
-      color: blue;
+      margin-top: -30px;
+      margin-right: 10px;
       cursor: pointer;
+      color: blue;
     }
     .error {
       color: red;
       font-size: 13px;
+      margin-top: 5px;
     }
     .switch-link {
       text-align: center;
       margin-top: 10px;
     }
-    .switch-link a {
-      color: blue;
-      text-decoration: none;
-    }
   </style>
 </head>
 <body>
-
 <form id="signupForm">
   <h2>Sign Up</h2>
-  <input type="text" id="username" placeholder="Username" required />
-  <input type="password" id="password" placeholder="Password" required />
-  <span class="toggle" onclick="toggle('password')">Show</span>
-  <input type="password" id="confirmPassword" placeholder="Confirm Password" required />
-  <span class="toggle" onclick="toggle('confirmPassword')">Show</span>
+  <input type="text" id="signupUsername" placeholder="Username" required>
+  <input type="password" id="signupPassword" placeholder="Password" required>
+  <span class="toggle" onclick="togglePassword('signupPassword')">Show</span>
+  <input type="password" id="signupConfirm" placeholder="Confirm Password" required>
+  <span class="toggle" onclick="togglePassword('signupConfirm')">Show</span>
   <div class="error" id="signupError"></div>
   <button type="submit">Create Account</button>
   <div class="switch-link">
@@ -84,34 +75,37 @@
 
   document.getElementById("signupForm").addEventListener("submit", function(e) {
     e.preventDefault();
-    const username = document.getElementById("username").value.trim();
-    const password = document.getElementById("password").value;
-    const confirmPassword = document.getElementById("confirmPassword").value;
-    const errorDiv = document.getElementById("signupError");
+    const username = document.getElementById("signupUsername").value.trim();
+    const password = document.getElementById("signupPassword").value;
+    const confirm = document.getElementById("signupConfirm").value;
+    const err = document.getElementById("signupError");
 
-    if (password !== confirmPassword) {
-      errorDiv.textContent = "Passwords do not match.";
+    if (password !== confirm) {
+      err.textContent = "Passwords do not match.";
       return;
     }
 
     db.ref("users/" + username).once("value").then(snapshot => {
       if (snapshot.exists()) {
-        errorDiv.textContent = "Username already exists.";
+        err.textContent = "Username already exists.";
       } else {
-        db.ref("users/" + username).set({ password, created: new Date().toISOString() })
-          .then(() => {
-            alert("Account created! Redirecting to login...");
-            window.location.href = "index.html";
-          });
+        db.ref("users/" + username).set({
+          password: password,
+          createdAt: new Date().toISOString()
+        }).then(() => {
+          alert("Account created successfully!");
+          window.location.href = "index.html";
+        });
       }
+    }).catch(error => {
+      err.textContent = "Error creating account.";
     });
   });
 
-  function toggle(id) {
+  function togglePassword(id) {
     const input = document.getElementById(id);
     input.type = input.type === "password" ? "text" : "password";
   }
 </script>
-
 </body>
 </html>
