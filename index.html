@@ -1,103 +1,99 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
+  <meta charset="UTF-8">
   <title>Login</title>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
   <style>
     body {
-      font-family: Arial;
-      background: #eef;
+      font-family: Arial, sans-serif;
+      background: #111;
+      color: white;
       display: flex;
-      justify-content: center;
+      flex-direction: column;
       align-items: center;
-      height: 100vh;
+      padding: 50px;
     }
-    form {
-      background: white;
-      padding: 30px;
-      border-radius: 8px;
-      width: 300px;
-      box-shadow: 0 0 10px #aaa;
+    input {
+      padding: 10px;
+      margin: 5px;
+      width: 250px;
     }
-    input, button {
-      width: 100%;
+    button {
       padding: 10px;
       margin-top: 10px;
+      width: 270px;
+      background: blue;
+      color: white;
+      border: none;
     }
     .toggle {
-      float: right;
-      font-size: 12px;
-      margin-top: -30px;
-      margin-right: 10px;
+      position: relative;
+    }
+    .toggle input {
+      width: 230px;
+    }
+    .eye {
+      position: absolute;
+      right: 10px;
+      top: 10px;
       cursor: pointer;
-      color: blue;
-    }
-    .error {
-      color: red;
-      font-size: 13px;
-      margin-top: 5px;
-    }
-    .switch-link {
-      text-align: center;
-      margin-top: 10px;
     }
   </style>
 </head>
 <body>
-<form id="loginForm">
+
   <h2>Login</h2>
-  <input type="text" id="loginUsername" placeholder="Username" required>
-  <input type="password" id="loginPassword" placeholder="Password" required>
-  <span class="toggle" onclick="togglePassword('loginPassword')">Show</span>
-  <div class="error" id="loginError"></div>
-  <button type="submit">Login</button>
-  <div class="switch-link">
-    Don’t have an account? <a href="signup.html">Sign up</a>
+  <input id="username" type="text" placeholder="Username" /><br>
+  <div class="toggle">
+    <input id="password" type="password" placeholder="Password" />
+    <span class="eye" onclick="toggleVisibility('password')">👁️</span>
   </div>
-</form>
+  <button onclick="login()">Login</button><br><br>
+  <a href="signup.html" style="color: lightblue;">Don’t have an account? Sign Up</a>
 
-<script>
-  const firebaseConfig = {
-    apiKey: "AIzaSyBfkUJS81minjxj0DFz4pzNnGzCtb5ZJss",
-    authDomain: "locater-42fb4.firebaseapp.com",
-    databaseURL: "https://locater-42fb4-default-rtdb.firebaseio.com",
-    projectId: "locater-42fb4",
-    storageBucket: "locater-42fb4.appspot.com",
-    messagingSenderId: "250348367998",
-    appId: "1:250348367998:web:d734b2b4c735b5684ae82f"
-  };
-  firebase.initializeApp(firebaseConfig);
-  const db = firebase.database();
+  <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyBfkUJS81minjxj0DFz4pzNnGzCtb5ZJss",
+      authDomain: "locater-42fb4.firebaseapp.com",
+      databaseURL: "https://locater-42fb4-default-rtdb.firebaseio.com",
+      projectId: "locater-42fb4",
+      storageBucket: "locater-42fb4.appspot.com",
+      messagingSenderId: "250348367998",
+      appId: "1:250348367998:web:d734b2b4c735b5684ae82f"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
 
-  document.getElementById("loginForm").addEventListener("submit", function(e) {
-    e.preventDefault();
-    const username = document.getElementById("loginUsername").value.trim();
-    const password = document.getElementById("loginPassword").value;
-    const err = document.getElementById("loginError");
+    function toggleVisibility(id) {
+      const input = document.getElementById(id);
+      input.type = input.type === 'password' ? 'text' : 'password';
+    }
 
-    db.ref("users/" + username).once("value").then(snapshot => {
-      if (!snapshot.exists()) {
-        err.textContent = "Username not found.";
-      } else {
-        const user = snapshot.val();
-        if (user.password === password) {
-          alert("Login successful!");
-          window.location.href = "app.html";
+    function login() {
+      const username = document.getElementById("username").value.trim();
+      const password = document.getElementById("password").value;
+
+      if (!username || !password) return alert("Please fill all fields.");
+
+      db.ref("users/" + username).once("value", snap => {
+        if (!snap.exists()) {
+          alert("Username not found.");
         } else {
-          err.textContent = "Wrong password.";
+          const data = snap.val();
+          if (data.password === password) {
+            alert("Login successful!");
+            window.location.href = "app.html";
+          } else {
+            alert("Wrong password.");
+          }
         }
-      }
-    }).catch(error => {
-      err.textContent = "Error checking credentials.";
-    });
-  });
-
-  function togglePassword(id) {
-    const input = document.getElementById(id);
-    input.type = input.type === "password" ? "text" : "password";
-  }
-</script>
+      }).catch(e => {
+        console.error(e);
+        alert("Error checking credentials.");
+      });
+    }
+  </script>
 </body>
 </html>
