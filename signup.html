@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Sign Up</title>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f5f5f5;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+    }
+    form {
+      background: white;
+      padding: 30px;
+      border-radius: 8px;
+      box-shadow: 0 0 10px #aaa;
+      width: 300px;
+    }
+    input {
+      width: 100%;
+      padding: 10px;
+      margin: 10px 0;
+    }
+    button {
+      width: 100%;
+      padding: 10px;
+      background: green;
+      color: white;
+      border: none;
+      cursor: pointer;
+    }
+    .toggle {
+      font-size: 12px;
+      color: blue;
+      cursor: pointer;
+    }
+    .error {
+      color: red;
+      font-size: 13px;
+    }
+    .switch-link {
+      text-align: center;
+      margin-top: 10px;
+    }
+    .switch-link a {
+      color: blue;
+      text-decoration: none;
+    }
+  </style>
+</head>
+<body>
+
+<form id="signupForm">
+  <h2>Sign Up</h2>
+  <input type="text" id="username" placeholder="Username" required />
+  <input type="password" id="password" placeholder="Password" required />
+  <span class="toggle" onclick="toggle('password')">Show</span>
+  <input type="password" id="confirmPassword" placeholder="Confirm Password" required />
+  <span class="toggle" onclick="toggle('confirmPassword')">Show</span>
+  <div class="error" id="signupError"></div>
+  <button type="submit">Create Account</button>
+  <div class="switch-link">
+    Already have an account? <a href="login.html">Login</a>
+  </div>
+</form>
+
+<script>
+  const firebaseConfig = {
+    apiKey: "AIzaSyBfkUJS81minjxj0DFz4pzNnGzCtb5ZJss",
+    authDomain: "locater-42fb4.firebaseapp.com",
+    databaseURL: "https://locater-42fb4-default-rtdb.firebaseio.com",
+    projectId: "locater-42fb4",
+    storageBucket: "locater-42fb4.appspot.com",
+    messagingSenderId: "250348367998",
+    appId: "1:250348367998:web:d734b2b4c735b5684ae82f"
+  };
+  firebase.initializeApp(firebaseConfig);
+  const db = firebase.database();
+
+  document.getElementById("signupForm").addEventListener("submit", function(e) {
+    e.preventDefault();
+    const username = document.getElementById("username").value.trim();
+    const password = document.getElementById("password").value;
+    const confirmPassword = document.getElementById("confirmPassword").value;
+    const errorDiv = document.getElementById("signupError");
+
+    if (password !== confirmPassword) {
+      errorDiv.textContent = "Passwords do not match.";
+      return;
+    }
+
+    db.ref("users/" + username).once("value").then(snapshot => {
+      if (snapshot.exists()) {
+        errorDiv.textContent = "Username already exists.";
+      } else {
+        db.ref("users/" + username).set({ password, created: new Date().toISOString() })
+          .then(() => {
+            alert("Account created! Redirecting to login...");
+            window.location.href = "index.html";
+          });
+      }
+    });
+  });
+
+  function toggle(id) {
+    const input = document.getElementById(id);
+    input.type = input.type === "password" ? "text" : "password";
+  }
+</script>
+
+</body>
+</html>
