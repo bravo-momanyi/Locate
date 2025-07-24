@@ -136,7 +136,6 @@
     function refreshUserList() {
       let html = '';
 
-      // Users
       html += `<h3 style="margin:10px 0 5px;">Users</h3>`;
       Object.keys(allUsers).forEach(u => {
         if (u !== user && u.toLowerCase().includes(searchBox.value.toLowerCase())) {
@@ -144,11 +143,10 @@
         }
       });
 
-      // Groups
       html += `<h3 style="margin:15px 0 5px;">Groups</h3>`;
       Object.entries(allGroups).forEach(([name, data]) => {
-        const visible = data.public || (data.members && data.members[user]);
-        if (visible && name.toLowerCase().includes(searchBox.value.toLowerCase())) {
+        const isVisible = data.public || (data.members && data.members[user]);
+        if (name.toLowerCase().includes(searchBox.value.toLowerCase()) && isVisible) {
           html += `<button class="group" onclick="openGroup('${name}')"># ${name}</button>`;
         }
       });
@@ -157,10 +155,17 @@
     }
 
     function createGroup() {
-      const name = prompt("Enter group name:");
+      let name = prompt("Enter group name (no special characters):");
       if (!name) return;
+      name = name.trim().replace(/[^a-zA-Z0-9 _-]/g, '').replace(/\s+/g, '_');
 
-      const isPublic = confirm("Should the group be public?");
+      let type = prompt("Group Type: Type 'public' or 'private'").toLowerCase();
+      if (type !== 'public' && type !== 'private') {
+        alert("Invalid group type. Please type 'public' or 'private'.");
+        return;
+      }
+
+      const isPublic = type === 'public';
       let password = null;
 
       if (!isPublic) {
@@ -171,18 +176,22 @@
       const groupData = {
         admin: user,
         public: isPublic,
-        password: password || null,
+        password: isPublic ? null : password,
         members: { [user]: true }
       };
 
-      db.ref('groups/' + name).set(groupData);
-      db.ref('groupChats/' + name).push({
-        from: 'System',
-        text: `${user} created this ${isPublic ? 'public' : 'private'} group.`,
-        ts: Date.now()
+      db.ref('groups/' + name).set(groupData, (err) => {
+        if (err) {
+          alert("Error creating group.");
+        } else {
+          db.ref('groupChats/' + name).push({
+            from: 'System',
+            text: `${user} created this ${type} group.`,
+            ts: Date.now()
+          });
+          alert(`${type.charAt(0).toUpperCase() + type.slice(1)} group created!`);
+        }
       });
-
-      alert(isPublic ? "Public group created!" : `Private group created. Password: ${password}`);
     }
 
     function openChat(other) {
@@ -219,7 +228,6 @@
         document.getElementById('messages').scrollTop = 1e9;
       });
 
-      // Show password if private
       db.ref('groups/' + g).once('value').then(snap => {
         const data = snap.val();
         if (!data.public && data.password) {
