@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" /><meta name="viewport" content="width=device-width,initial-scale=1.0" />
+  <title>Bravo Locator App</title>
+  <style>
+    body { margin:0; padding:0; display:flex; height:100vh; font-family:Arial,sans-serif; }
+    #sidebar { width:300px; border-right:1px solid #ccc; display:flex; flex-direction:column; }
+    #messages { flex:1; padding:10px; overflow-y:auto; list-style:none; margin:0; }
+    #send { display:flex; }
+    #send input { flex:1; padding:10px; }
+    #send button { width:80px; }
+    #map { flex:1; }
+    #topBar { padding:10px; background:#eee; display:flex; justify-content:space-between; }
+    #topBar button { background:#e63946; color:white; border:none; padding:7px 12px; cursor:pointer; border-radius:4px; }
+  </style>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
+  <script src="https://maps.googleapis.com/maps/api/js?key=YOUR_GOOGLE_MAPS_API_KEY"></script>
+</head>
+<body>
+  <div style="flex:1;display:flex;flex-direction:column;">
+    <div id="topBar"><div id="userEmail"></div><button onclick="logout()">Logout</button></div>
+    <div style="flex:1; display:flex;">
+      <div id="sidebar">
+        <ul id="messages"></ul>
+        <form id="send">
+          <input id="msg" placeholder="Type…" autocomplete="off" />
+          <button type="submit">Send</button>
+        </form>
+      </div>
+      <div id="map"></div>
+    </div>
+  </div>
+
+  <script>
+    const cfg = {
+      apiKey: "AIzaSyBfkUJS81minjxj0DFz4pzNnGzCtb5ZJss",
+      authDomain: "locater-42fb4.firebaseapp.com",
+      databaseURL: "https://locater-42fb4-default-rtdb.firebaseio.com",
+      projectId: "locater-42fb4",
+      storageBucket: "locater-42fb4.firebasestorage.app",
+      messagingSenderId: "250348367998",
+      appId: "1:250348367998:web:d734b2b4c735b5684ae82f"
+    };
+    firebase.initializeApp(cfg);
+    const auth = firebase.auth(), db = firebase.database();
+
+    // AUTH
+    auth.onAuthStateChanged(user => {
+      if (!user) return location.href = 'index.html';
+      document.getElementById('userEmail').textContent = user.email;
+      initChat();
+      initMap();
+      startLocationWatch();
+    });
+    function logout() { auth.signOut(); }
+
+    // CHAT
+    const msgs = db.ref('messages');
+    function initChat() {
+      document.getElementById('send').addEventListener('submit', e => {
+        e.preventDefault();
+        const t = document.getElementById('msg');
+        if (t.value.trim()) {
+          msgs.push({ uid: auth.currentUser.uid, text: t.value.trim(), ts: Date.now() });
+          t.value = '';
+        }
+      });
+      msgs.off(); msgs.on('child_added', snap => {
+        const m = snap.val();
+        const li = document.createElement('li');
+        li.textContent = `[${new Date(m.ts).toLocaleTimeString()}] ${m.text}`;
+        document.getElementById('messages').appendChild(li);
+        li.scrollIntoView();
+      });
+    }
+
+    // MAP
+    let map, markers = {};
+    function initMap() {
+      map = new google.maps.Map(document.getElementById('map'), { center:{ lat:0,lng:0 }, zoom:2 });
+      db.ref('locations').on('value', snap => {
+        const locs = snap.val()||{};
+        for (let id in locs) {
+          const { lat, lng } = locs[id];
+          if (!markers[id]) markers[id] = new google.maps.Marker({ map });
+          markers[id].setPosition({ lat, lng });
+        }
+      });
+    }
+
+    // GEOLOCATION
+    function startLocationWatch() {
+      navigator.geolocation.watchPosition(pos => {
+        db.ref(`locations/${auth.currentUser.uid}`).set({
+          lat: pos.coords.latitude,
+          lng: pos.coords.longitude,
+          ts: Date.now()
+        });
+      }, err => console.error(err), { enableHighAccuracy: true });
+    }
+  </script>
+</body>
+</html>
