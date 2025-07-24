@@ -31,14 +31,14 @@
     .toggle {
       position: relative;
     }
-    .toggle input {
-      width: 230px;
-    }
-    .eye {
+    .toggle span {
       position: absolute;
       right: 10px;
       top: 10px;
+      font-size: 12px;
+      color: lightblue;
       cursor: pointer;
+      user-select: none;
     }
   </style>
 </head>
@@ -46,10 +46,12 @@
 
   <h2>Login</h2>
   <input id="username" type="text" placeholder="Username" /><br>
+
   <div class="toggle">
     <input id="password" type="password" placeholder="Password" />
-    <span class="eye" onclick="toggleVisibility('password')">👁️</span>
+    <span onclick="toggleVisibility('password', this)">Show</span>
   </div>
+
   <button onclick="login()">Login</button><br><br>
   <a href="signup.html" style="color: lightblue;">Don’t have an account? Sign Up</a>
 
@@ -66,9 +68,11 @@
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
 
-    function toggleVisibility(id) {
-      const input = document.getElementById(id);
-      input.type = input.type === 'password' ? 'text' : 'password';
+    function toggleVisibility(inputId, toggleEl) {
+      const input = document.getElementById(inputId);
+      const isHidden = input.type === "password";
+      input.type = isHidden ? "text" : "password";
+      toggleEl.textContent = isHidden ? "Hide" : "Show";
     }
 
     function login() {
@@ -89,8 +93,7 @@
             alert("Wrong password.");
           }
         }
-      }).catch(e => {
-        console.error(e);
+      }).catch(() => {
         alert("Error checking credentials.");
       });
     }
