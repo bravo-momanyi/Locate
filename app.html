@@ -5,7 +5,7 @@
   <title>Bravo Chat & Map</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
   <style>
-    /* [Same styles as before] */
+    /* [Same layout and styling from your current version] */
   </style>
 </head>
 <body>
@@ -23,131 +23,95 @@
 <div id="mapContent" class="content active"><div id="map"></div></div>
 
 <div id="chatContent" class="content">
-  <div id="sidebar"> …[Same sidebar UI]… </div>
+  <div id="sidebar">
+    <div class="sidebar-header">
+      <button onclick="refreshAll()">Start Chat</button>
+      <button onclick="openGroupDialog()">Create Group</button>
+    </div>
+    <input id="searchInput" placeholder="Search users/groups…" oninput="filterAll()"/>
+    <div id="allList"></div>
+    <hr>
+    <div><strong>Active Chats</strong></div>
+    <div id="activeList"></div>
+  </div>
 
   <div id="chatWindow">
     <div id="chatHeader">
-      <span id="chatWith" onclick="viewGroupMembers()" style="cursor:pointer;"></span>
+      <span id="chatWith"></span>
       <div>
-        <button onclick="initiateCall('voice')">Voice</button>
-        <button onclick="initiateCall('video')">Video</button>
+        <button onclick="startCall('video')">📹 Call</button>
+        <button onclick="startCall('voice')">🎧 Call</button>
       </div>
     </div>
     <div id="messages"></div>
-    <div id="sendBar"> …[Same send UI]… </div>
+    <div id="sendBar">
+      <input id="msgInput" placeholder="Type message...">
+      <button onclick="sendMsg()">Send</button>
+    </div>
+    <div id="rtcContainer" style="display:none;">
+      <video id="localVideo" autoplay muted playsinline style="width:45%;"></video>
+      <video id="remoteVideo" autoplay playsinline style="width:45%;"></video>
+      <button onclick="hangup()">Hang Up</button>
+    </div>
   </div>
 </div>
 
-<div id="groupDialog">…</div>
+<div id="groupDialog" style="display:none;">…</div>
 
 <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
-
 <script>
-const config = { /* … */ };
+const config = { /* your Firebase config */ };
 firebase.initializeApp(config);
 const db = firebase.database();
 
-const user = localStorage.getItem('username');
-document.getElementById('currentUser').textContent = user;
-db.ref('users/' + user).set(true);
+let pc, localStream, remoteStream, roomRef;
+const servers = { iceServers: [{ urls: ['stun:stun.l.google.com:19302'] }] };
 
-let allUsers = [], allGroups = [], activeChats = [];
-let currentChat = null, currentIsGroup = false;
+function startWebRTC(isCaller) {
+  pc = new RTCPeerConnection(servers);
+  pc.onicecandidate = e => { e.candidate && roomRef.child(isCaller ? 'offerCandidates' : 'answerCandidates').push(e.candidate.toJSON()); };
+  pc.ontrack = e => remoteVideo.srcObject = e.streams[0];
 
-function refreshAll() {
-  db.ref('users').once('value', us => {
-    allUsers = Object.keys(us.val() || {}).filter(u => u !== user);
-    db.ref('groups').once('value', gs => {
-      allGroups = [];
-      gs.forEach(c => allGroups.push({ id: c.key, ...c.val() }));
-      renderAllList();
-    });
-  });
-}
+  navigator.mediaDevices.getUserMedia({ video:true, audio:true }).then(stream => {
+    localStream = stream;
+    localVideo.srcObject = localStream;
+    localStream.getTracks().forEach(track => pc.addTrack(track, localStream));
 
-// call start chat, renderAllList, filters, etc. [unchanged]
-
-// Subscription to activeChats
-db.ref('activeChats/' + user).on('value', s => {
-  activeChats = s.val() ? Object.keys(s.val()) : [];
-  renderActive();
-});
-
-// Opening a chat
-function openChat(id, isGroup) {
-  currentChat = id;
-  currentIsGroup = isGroup;
-  document.getElementById('chatWindow').style.display = 'flex';
-  const header = document.getElementById('chatWith');
-  header.textContent = isGroup
-    ? (allGroups.find(g => g.id === id)?.name || id)
-    : id;
-  header.style.cursor = isGroup ? 'pointer' : 'default';
-  
-  listenMessages();
-  db.ref(`activeChats/${user}/${id}`).set(true);
-}
-
-function listenMessages() {
-  const path = currentIsGroup
-    ? `groupChats/${currentChat}`
-    : `privateChats/${[user, currentChat].sort().join('_')}`;
-  
-  db.ref(path).off();
-  db.ref(path).on('child_added', snap => {
-    const msg = snap.val();
-    // Only show messages sent by this chat or by you to ensure isolation
-    appendMessage(msg, msg.from === user || (!currentIsGroup && [user, currentChat].includes(msg.from)));
-  });
-}
-
-function appendMessage(m, toDisplay) {
-  if (!toDisplay) return;
-  const div = document.createElement('div');
-  div.className = 'msg ' + (m.from === user ? 'you' : 'them');
-  div.innerHTML = (currentIsGroup ? `<div class="senderSmall">${m.from}</div>` : '') + m.text;
-  document.getElementById('messages').appendChild(div);
-  document.getElementById('messages').scrollTop = 1e9;
-}
-
-// Sending message [unchanged]
-
-// Simulated call feature
-function initiateCall(type) {
-  if (!currentChat) return alert('Open a chat to call.');
-  const callRef = db.ref('calls').push();
-  callRef.set({
-    from: user,
-    to: currentChat,
-    isGroup: currentIsGroup,
-    type: type,
-    ts: Date.now()
-  });
-  alert(`Calling ${currentChat} (${type})…`);
-}
-
-// Listening incoming calls
-db.ref('calls').on('child_added', snap => {
-  const c = snap.val();
-  if (c.to === user) {
-    if (confirm(`${c.from} is calling you (${c.type}). Accept?`)) {
-      alert('Starting call…');
-    } else {
-      alert('Call declined.');
+    if (isCaller) {
+      pc.createOffer().then(offer => {
+        pc.setLocalDescription(offer);
+        roomRef = db.ref('rooms').push({ offer: offer.toJSON() });
+        setupCallListeners();
+      });
     }
-    snap.ref.remove();
-  }
-});
+  });
+}
 
-// Group creation and members list [unchanged]
+function setupCallListeners() {
+  roomRef.on('value', snap => {
+    const data = snap.val();
+    if (data.answer && !pc.currentRemoteDescription) pc.setRemoteDescription(new RTCSessionDescription(data.answer));
+  });
 
-// Tabs and logout [unchanged]
+  roomRef.child('offerCandidates').on('child_added', snap => pc.addIceCandidate(snap.val()));
+  roomRef.child('answerCandidates').on('child_added', snap => pc.addIceCandidate(snap.val()));
+}
 
-refreshAll();
+function startCall(type) {
+  const isCaller = confirm("Start a " + type + " call?");
+  document.getElementById('rtcContainer').style.display = 'flex';
+  startWebRTC(isCaller);
+}
 
-// Map integration (unchanged)
+function hangup() {
+  pc.close();
+  roomRef.remove();
+  rtcContainer.style.display = 'none';
+}
+
+// [Keep previous chat, group, messaging, and map code here—unchanged]
 </script>
 </body>
 </html>
