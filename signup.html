@@ -1,111 +1,102 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
+  <meta charset="UTF-8">
   <title>Sign Up</title>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
   <style>
     body {
-      font-family: Arial;
-      background: #fdfdfd;
+      font-family: Arial, sans-serif;
+      background: #111;
+      color: white;
       display: flex;
-      justify-content: center;
+      flex-direction: column;
       align-items: center;
-      height: 100vh;
+      padding: 50px;
     }
-    form {
-      background: white;
-      padding: 30px;
-      border-radius: 8px;
-      width: 300px;
-      box-shadow: 0 0 10px #aaa;
+    input {
+      padding: 10px;
+      margin: 5px;
+      width: 250px;
     }
-    input, button {
-      width: 100%;
+    button {
       padding: 10px;
       margin-top: 10px;
+      width: 270px;
+      background: green;
+      color: white;
+      border: none;
     }
     .toggle {
-      float: right;
-      font-size: 12px;
-      margin-top: -30px;
-      margin-right: 10px;
+      position: relative;
+    }
+    .toggle input {
+      width: 230px;
+    }
+    .eye {
+      position: absolute;
+      right: 10px;
+      top: 10px;
       cursor: pointer;
-      color: blue;
-    }
-    .error {
-      color: red;
-      font-size: 13px;
-      margin-top: 5px;
-    }
-    .switch-link {
-      text-align: center;
-      margin-top: 10px;
     }
   </style>
 </head>
 <body>
-<form id="signupForm">
-  <h2>Sign Up</h2>
-  <input type="text" id="signupUsername" placeholder="Username" required>
-  <input type="password" id="signupPassword" placeholder="Password" required>
-  <span class="toggle" onclick="togglePassword('signupPassword')">Show</span>
-  <input type="password" id="signupConfirm" placeholder="Confirm Password" required>
-  <span class="toggle" onclick="togglePassword('signupConfirm')">Show</span>
-  <div class="error" id="signupError"></div>
-  <button type="submit">Create Account</button>
-  <div class="switch-link">
-    Already have an account? <a href="login.html">Login</a>
+
+  <h2>Create Account</h2>
+  <input id="username" type="text" placeholder="Username" /><br>
+  <div class="toggle">
+    <input id="password" type="password" placeholder="Password" />
+    <span class="eye" onclick="toggleVisibility('password')">👁️</span>
   </div>
-</form>
+  <div class="toggle">
+    <input id="confirmPassword" type="password" placeholder="Confirm Password" />
+    <span class="eye" onclick="toggleVisibility('confirmPassword')">👁️</span>
+  </div>
+  <button onclick="createAccount()">Create Account</button><br><br>
+  <a href="login.html" style="color: lightblue;">Already have an account? Login</a>
 
-<script>
-  const firebaseConfig = {
-    apiKey: "AIzaSyBfkUJS81minjxj0DFz4pzNnGzCtb5ZJss",
-    authDomain: "locater-42fb4.firebaseapp.com",
-    databaseURL: "https://locater-42fb4-default-rtdb.firebaseio.com",
-    projectId: "locater-42fb4",
-    storageBucket: "locater-42fb4.appspot.com",
-    messagingSenderId: "250348367998",
-    appId: "1:250348367998:web:d734b2b4c735b5684ae82f"
-  };
-  firebase.initializeApp(firebaseConfig);
-  const db = firebase.database();
+  <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyBfkUJS81minjxj0DFz4pzNnGzCtb5ZJss",
+      authDomain: "locater-42fb4.firebaseapp.com",
+      databaseURL: "https://locater-42fb4-default-rtdb.firebaseio.com",
+      projectId: "locater-42fb4",
+      storageBucket: "locater-42fb4.appspot.com",
+      messagingSenderId: "250348367998",
+      appId: "1:250348367998:web:d734b2b4c735b5684ae82f"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
 
-  document.getElementById("signupForm").addEventListener("submit", function(e) {
-    e.preventDefault();
-    const username = document.getElementById("signupUsername").value.trim();
-    const password = document.getElementById("signupPassword").value;
-    const confirm = document.getElementById("signupConfirm").value;
-    const err = document.getElementById("signupError");
-
-    if (password !== confirm) {
-      err.textContent = "Passwords do not match.";
-      return;
+    function toggleVisibility(id) {
+      const input = document.getElementById(id);
+      input.type = input.type === 'password' ? 'text' : 'password';
     }
 
-    db.ref("users/" + username).once("value").then(snapshot => {
-      if (snapshot.exists()) {
-        err.textContent = "Username already exists.";
-      } else {
-        db.ref("users/" + username).set({
-          password: password,
-          createdAt: new Date().toISOString()
-        }).then(() => {
-          alert("Account created successfully!");
-          window.location.href = "index.html";
-        });
-      }
-    }).catch(error => {
-      err.textContent = "Error creating account.";
-    });
-  });
+    function createAccount() {
+      const username = document.getElementById("username").value.trim();
+      const password = document.getElementById("password").value;
+      const confirmPassword = document.getElementById("confirmPassword").value;
 
-  function togglePassword(id) {
-    const input = document.getElementById(id);
-    input.type = input.type === "password" ? "text" : "password";
-  }
-</script>
+      if (!username || !password) return alert("Please fill all fields.");
+      if (password !== confirmPassword) return alert("Passwords do not match.");
+
+      db.ref("users/" + username).once("value", snap => {
+        if (snap.exists()) {
+          alert("Username already taken.");
+        } else {
+          db.ref("users/" + username).set({ password }).then(() => {
+            alert("Account created!");
+            window.location.href = "index.html";
+          }).catch(e => {
+            console.error(e);
+            alert("Error creating account.");
+          });
+        }
+      });
+    }
+  </script>
 </body>
 </html>
