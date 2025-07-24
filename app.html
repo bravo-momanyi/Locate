@@ -1,97 +1,71 @@
-<!DOCTYPE html>
-<html>
-<head>
-  <title>Live Location, Chat & Calls</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
-  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
-  <style>
-    body, html { margin:0; padding:0; height:100%; font-family:Arial,sans-serif; }
-    #map { position:absolute; top:0; bottom:0; left:0; right:33%; }
-    .sidebar {
-      position:absolute; top:0; bottom:0; right:0; width:33%;
-      display:flex; flex-direction:column; background:#111; color:white;
-    }
-    .header {
-      background:#222; padding:10px; text-align:center; position:relative;
-    }
-    .header button {
-      position:absolute; right:10px; top:10px;
-      background:red; border:none; padding:6px 10px; color:white; cursor:pointer;
-      border-radius:4px;
-    }
-    .tabs { display:flex; }
-    .tabs button {
-      flex:1; padding:10px; border:none; background:#333; color:white; cursor:pointer;
-    }
-    .tabs button.active { background:green; }
-    .content {
-      flex:1; overflow:auto; padding:10px;
-    }
-    .input-area {
-      padding:10px; background:#222; display:flex; flex-direction:column;
-    }
-    .input-area input, .input-area textarea {
-      border:none; border-radius:4px; padding:8px; margin-bottom:8px;
-    }
-    .input-area button {
-      background:green; border:none; padding:10px; color:white; cursor:pointer;
-      border-radius:4px;
-    }
-    .message { margin-bottom:6px; }
-    .message span { color:#0f0; }
-    #videoSection { display:none; padding:10px; background:#111; flex:1;
-      display:flex; flex-direction:column; justify-content:center; align-items:center;
-    }
-    video { width:48%; margin:1%; background:#000; }
-    #videoControls { margin-top:10px; }
-    #videoControls input {
-      padding:6px; width:200px; margin-right:8px; border:none; border-radius:4px;
-    }
-    #videoControls button {
-      padding:8px 12px; margin-right:8px; border:none; border-radius:4px; cursor:pointer;
-    }
-  </style>
-</head>
-<body>
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/><title>Chat • Map • Calls</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
+<style>
+  body,html{margin:0;padding:0;height:100%;font-family:Arial,sans-serif;}
+  header{background:#222;color:white;padding:10px;display:flex;align-items:center;justify-content:space-between;}
+  .tabs{display:flex;background:#333;}
+  .tabs button{flex:1;padding:12px;border:none;background:#333;color:white;cursor:pointer;}
+  .tabs button.active{background:#555;}
+  .tabContent{height:calc(100% - 92px); display:none; overflow:auto;}
+  #chatTab, #mapTab, #callTab{padding:10px;}
+  #mapTab{position:relative;}
+  #map{position:absolute;top:0;bottom:0;left:0;right:0;}
+  .chatArea{flex:1;overflow:auto;margin-bottom:10px;}
+  .msg{margin:5px 0;}
+  .msg.you{color:blue;}
+  .msg.them{color:green;}
+  .chatInput{display:flex;}
+  .chatInput input{flex:1;padding:8px;}
+  .chatInput button{padding:8px;}
+  .groupList, .userList{margin-bottom:10px;}
+  .groupList div, .userList div{cursor:pointer;padding:5px;border-bottom:1px solid #444;}
+  #callTab video{width:48%;margin:1%;background:black;}
+  #videoControls{margin-top:10px;}
+  #videoControls input{padding:6px;width:200px;margin-right:8px;}
+  #videoControls button{padding:6px 12px;margin-right:8px;}
+</style>
+</head><body>
 
-<div id="map"></div>
-<div class="sidebar">
-  <div class="header">
-    📍 Chat & Calls
-    <button onclick="logout()">Logout</button>
+<header>
+  <div id="currentUser">User123</div>
+  <button onclick="logout()">Logout</button>
+</header>
+
+<div class="tabs">
+  <button class="active" onclick="openTab('chatTab')">Chats</button>
+  <button onclick="openTab('mapTab')">Map</button>
+  <button onclick="openTab('callTab')">Calls</button>
+</div>
+
+<div id="chatTab" class="tabContent" style="display:block;display:flex;flex-direction:column;">
+  <div class="userList" id="userList"><strong>Users</strong></div>
+  <div class="groupList" id="groupList"><strong>Groups</strong><button onclick="newGroup()">+New Group</button></div>
+  <div class="chatArea" id="chatArea"></div>
+  <div class="chatInput">
+    <input id="msgInput" placeholder="Message..."/>
+    <button onclick="sendMsg()">Send</button>
   </div>
-  <div class="tabs">
-    <button class="active" onclick="switchTab('public')">Public Chat</button>
-    <button onclick="switchTab('private')">Private Msg</button>
-    <button onclick="switchTab('video')">Audio/Video Call</button>
-  </div>
-  <div class="content" id="chatContent">
-    <div id="chatMessages"></div>
-  </div>
-  <div class="input-area" id="chatInput">
-    <div id="receiverArea" style="display:none;">
-      <input type="text" id="receiver" placeholder="Receiver Username" />
-    </div>
-    <textarea id="messageInput" placeholder="Type a message..."></textarea>
-    <button onclick="sendMessage()">Send</button>
-  </div>
-  <div id="videoSection">
-    <video id="localVideo" autoplay muted></video>
-    <video id="remoteVideo" autoplay></video>
-    <div id="videoControls">
-      <input type="text" id="callIdInput" placeholder="Call ID (e.g., user_12345)" />
-      <button onclick="startCall()">Start Call</button>
-      <button onclick="answerCall()">Answer Call</button>
-      <button onclick="hangUp()">Hang Up</button>
-    </div>
+</div>
+
+<div id="mapTab" class="tabContent">
+  <div id="map"></div>
+</div>
+
+<div id="callTab" class="tabContent" style="display:flex;flex-direction:column;align-items:center;">
+  <video id="localVideo" autoplay muted></video>
+  <video id="remoteVideo" autoplay></video>
+  <div id="videoControls">
+    <input id="callIdInput" placeholder="Call or Group ID"/>
+    <button onclick="startCall()">Call User/Group</button>
+    <button onclick="answerCall()">Answer</button>
+    <button onclick="hangUp()">Hang Up</button>
   </div>
 </div>
 
 <script>
-  // Firebase config
   const firebaseConfig = {
     apiKey: "AIzaSyBfkUJS81minjxj0DFz4pzNnGzCtb5ZJss",
     authDomain: "locater-42fb4.firebaseapp.com",
@@ -104,86 +78,102 @@
   firebase.initializeApp(firebaseConfig);
   const db = firebase.database();
 
-  // Username
   const username = localStorage.getItem("username") || prompt("Enter username");
-  localStorage.setItem("username", username);
+  document.getElementById("currentUser").textContent = username;
 
-  // Map setup
-  const map = L.map('map').setView([0.02,37.91],6);
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{ attribution:'&copy; OpenStreetMap contributors' }).addTo(map);
-  const markers = {};
+  const chatRef = db.ref("chats");
+  const privateRef = db.ref("privateChats");
+  const groupRef = db.ref("groups");
 
-  function shareLocation(){
-    if(!navigator.geolocation){ alert("Geolocation not supported."); return; }
-    navigator.geolocation.watchPosition(p=>{
-      db.ref("locations/"+username).set({lat:p.coords.latitude, lng:p.coords.longitude});
+  let currentChat = null;
+
+  // Build user & group lists
+  db.ref("users").on("value", snap=>{
+    let html = "";
+    snap.forEach(c=> {
+      const u = c.key;
+      if(u!==username) html += `<div onclick="selectChat('user', '${u}')">${u}</div>`;
     });
-  }
-  shareLocation();
-
-  db.ref("locations").on("value", snap => {
-    const data = snap.val();
-    for(const user in data){
-      const {lat, lng} = data[user];
-      if(markers[user]){
-        markers[user].setLatLng([lat,lng]);
-      } else {
-        markers[user] = L.marker([lat,lng]).addTo(map).bindPopup(user);
-      }
-    }
+    document.getElementById("userList").innerHTML = html;
   });
 
-  // Chat functionality
-  let currentTab="public";
-  switchTab('public');
+  db.ref("groups").on("value", snap=>{
+    let html="<button onclick=\"newGroup()\">+New Group</button>";
+    snap.forEach(c=>{
+      html += `<div onclick="selectChat('group','${c.key}')">${c.key}</div>`;
+    });
+    document.getElementById("groupList").innerHTML = html;
+  });
 
-  function switchTab(tab){
-    currentTab=tab;
-    document.querySelectorAll('.tabs button').forEach((b,i)=>b.classList.toggle('active', ['public','private','video'][i]===tab));
-    document.getElementById('chatContent').style.display = (tab==='video'? 'none' : 'block');
-    document.getElementById('chatInput').style.display = (tab==='video'? 'none' : 'flex');
-    document.getElementById('videoSection').style.display = (tab==='video'? 'flex' : 'none');
-    document.getElementById('receiverArea').style.display = (tab==='private'? 'block' : 'none');
+  function newGroup(){
+    const name=prompt("Group name:");
+    if(name) db.ref("groups/"+name).set({members:{[username]:true}});
+  }
+
+  function selectChat(type,id){
+    currentChat={type,id};
+    document.getElementById("chatArea").innerHTML="";
     loadMessages();
   }
 
   function loadMessages(){
-    document.getElementById('chatMessages').innerHTML='';
-    const ref = currentTab==='public'? db.ref('chat') : db.ref('private');
+    const area=document.getElementById("chatArea");
+    area.innerHTML="";
+    const ref = currentChat.type==="user"? privateRef.child(`${currentChat.id}_${username}`) : groupRef.child(currentChat.id).child("messages");
     ref.off();
-    ref.on('child_added', snap=>{
-      const msg = snap.val();
-      if(currentTab==='public' || msg.from===username || msg.to===username){
-        const div=document.createElement('div'); div.classList.add('message');
-        const sender = currentTab==='private'? `${msg.from}→${msg.to}` : msg.name;
-        div.innerHTML=`<span>${sender}:</span> ${msg.text}`;
-        document.getElementById('chatMessages').appendChild(div);
-        document.getElementById('chatMessages').scrollTop = 1e9;
-      }
+    ref.on("child_added",snap=>{
+      const m=snap.val();
+      const div=document.createElement("div");
+      div.classList.add("msg", m.from===username?"you":"them");
+      div.textContent = `${m.from}: ${m.text}`;
+      area.appendChild(div);
+      area.scrollTop = 1e9;
     });
   }
 
-  function sendMessage(){
-    const txt=document.getElementById('messageInput').value.trim(); if(!txt) return;
-    if(currentTab==='public'){
-      db.ref('chat').push({name:username,text:txt});
+  function sendMsg(){
+    if(!currentChat) return alert("Pick a chat/user or group first.");
+    const text=document.getElementById("msgInput").value.trim(); if(!text)return;
+    const msg={from:username,text,timestamp:Date.now()};
+    if(currentChat.type==="user"){
+      const a = [username,currentChat.id].sort().join("_");
+      const ref=privateRef.child(a);
+      ref.push(msg);
     } else {
-      const to=document.getElementById('receiver').value.trim();
-      if(!to) return alert('Enter receiver');
-      db.ref('private').push({from:username,to,text:txt});
+      groupRef.child(currentChat.id).child("messages").push(msg);
     }
-    document.getElementById('messageInput').value='';
+    document.getElementById("msgInput").value="";
   }
 
-  // Audio/video calling: WebRTC with Firebase signaling
+  // Map: share/realtime update
+  const map = L.map('map').setView([1.29,36.82],12);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'&copy; OSM'}).addTo(map);
+  const markers={};
+
+  if(navigator.geolocation){
+    navigator.geolocation.watchPosition(p=>{
+      db.ref("locations/"+username).set({lat:p.coords.latitude,lng:p.coords.longitude});
+    });
+  }
+
+  db.ref("locations").on("value",snap=>{
+    const locs=snap.val();
+    for(let u in locs){
+      const {lat,lng}=locs[u];
+      if(markers[u]) markers[u].setLatLng([lat,lng]);
+      else markers[u]=L.marker([lat,lng]).addTo(map).bindPopup(u);
+    }
+  });
+
+  // WebRTC for calls
   let pc, localStream, remoteStream;
-  const rtcConfig = { iceServers:[{urls:"stun:stun1.l.google.com:19302"}] };
+  const rtcConfig={iceServers:[{urls:"stun:stun1.l.google.com:19302"}]};
 
   async function setupMedia(){
     localStream = await navigator.mediaDevices.getUserMedia({video:true,audio:true});
     remoteStream = new MediaStream();
-    document.getElementById('localVideo').srcObject=localStream;
-    document.getElementById('remoteVideo').srcObject=remoteStream;
+    localVideo.srcObject = localStream;
+    remoteVideo.srcObject = remoteStream;
   }
 
   async function startCall(){
@@ -191,60 +181,49 @@
     pc = new RTCPeerConnection(rtcConfig);
     localStream.getTracks().forEach(t=>pc.addTrack(t,localStream));
     pc.ontrack = e=> e.streams[0].getTracks().forEach(t=>remoteStream.addTrack(t));
-
-    const callId = username + "_" + Date.now();
-    document.getElementById('callIdInput').value=callId;
-    const cRef = db.ref('calls/'+callId);
-    const offerC = cRef.child('offerCandidates');
-    const answerC = cRef.child('answerCandidates');
-
-    pc.onicecandidate = e=> e.candidate && offerC.push(e.candidate.toJSON());
+    const target = document.getElementById("callIdInput").value.trim();
+    if(!target) return alert("Enter user/group to call.");
+    const callId = `${username}_to_${target}_${Date.now()}`;
+    document.getElementById("callIdInput").value = callId;
+    const cRef = db.ref("calls/"+callId);
+    const offerC = cRef.child("offerCandidates"), answerC=cRef.child("answerCandidates");
+    pc.onicecandidate = e=>e.candidate && offerC.push(e.candidate.toJSON());
     const offer = await pc.createOffer();
     await pc.setLocalDescription(offer);
-    await cRef.child('offer').set(offer);
-
-    answerC.on('child_added', snap=> pc.addIceCandidate(new RTCIceCandidate(snap.val())));
-    cRef.child('answer').on('value', async snap=>{
-      const ans = snap.val();
-      if(ans && !pc.currentRemoteDescription) await pc.setRemoteDescription(ans);
+    await cRef.child("offer").set(offer);
+    answerC.on("child_added",snap=>pc.addIceCandidate(snap.val()));
+    cRef.child("answer").on("value",snap=>{
+      if(snap.val() && !pc.currentRemoteDescription) pc.setRemoteDescription(snap.val());
     });
-
-    alert(`Share this Call ID: ${callId}`);
+    alert("Call started. Share ID with receiver.");
   }
 
   async function answerCall(){
-    const callId = document.getElementById('callIdInput').value.trim();
-    if(!callId) return alert('Enter Call ID');
+    const callId=document.getElementById("callIdInput").value.trim();
+    if(!callId) return alert("Enter call ID.");
     await setupMedia();
-
-    const cRef = db.ref('calls/'+callId);
-    const offer = (await cRef.child('offer').once('value')).val();
+    const cRef = db.ref("calls/"+callId);
     pc = new RTCPeerConnection(rtcConfig);
     localStream.getTracks().forEach(t=>pc.addTrack(t,localStream));
-    pc.ontrack = e=> e.streams[0].getTracks().forEach(t=>remoteStream.addTrack(t));
-
-    const answerC = cRef.child('answerCandidates');
-    const offerC = cRef.child('offerCandidates');
-
-    pc.onicecandidate = e=> e.candidate && answerC.push(e.candidate.toJSON());
-    await pc.setRemoteDescription(offer);
+    pc.ontrack=e=> e.streams[0].getTracks().forEach(t=>remoteStream.addTrack(t));
+    const answerC=cRef.child("answerCandidates"), offerC=cRef.child("offerCandidates");
+    pc.onicecandidate = e=>e.candidate && answerC.push(e.candidate.toJSON());
+    const offerSnap=await cRef.child("offer").once("value");
+    await pc.setRemoteDescription(offerSnap.val());
     const answer = await pc.createAnswer();
     await pc.setLocalDescription(answer);
-    await cRef.child('answer').set(answer);
-
-    offerC.on('child_added', snap=> pc.addIceCandidate(new RTCIceCandidate(snap.val())));
+    await cRef.child("answer").set(answer);
+    offerC.on("child_added",snap=>pc.addIceCandidate(snap.val()));
   }
 
-  function hangUp(){
-    if(pc){ pc.close(); pc=null; }
-    location.reload();
-  }
+  function hangUp(){if(pc){pc.close();pc=null;}location.reload();}
 
-  function logout(){
-    localStorage.removeItem('username');
-    window.location.href='index.html';
-  }
+  function logout(){localStorage.removeItem("username");window.location.href="index.html";}
 
+  function openTab(id){
+    document.querySelectorAll('.tabContent').forEach(t=>t.style.display='none');
+    document.getElementById(id).style.display='block';
+    document.querySelectorAll('.tabs button').forEach(b=>b.classList.toggle('active', b.textContent===id.replace('Tab','')));
+  }
 </script>
-</body>
-</html>
+</body></html>
