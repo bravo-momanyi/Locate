@@ -18,6 +18,7 @@
     #userList { width:30%; border-right:1px solid #ddd; overflow-y:auto; padding:10px;}
     #userList input, #userList button { width:100%; margin-bottom:5px; padding:8px; border:none; }
     #userList button { background:#f1f1f1; cursor:pointer; }
+    #userList button.group { background:#e1f5fe; font-weight:bold; }
     #chatWindow { flex:1; display:none; flex-direction:column; position:relative; }
     #chatHeader { padding:10px; background:#128C7E; color:white; display:flex; align-items:center; justify-content:space-between;}
     #messages { flex:1; padding:10px; overflow-y:auto; background:#e5ddd5;}
@@ -134,18 +135,24 @@
 
     function refreshUserList() {
       let html = '';
+
+      // Users
+      html += `<h3 style="margin:10px 0 5px;">Users</h3>`;
       Object.keys(allUsers).forEach(u => {
         if (u !== user && u.toLowerCase().includes(searchBox.value.toLowerCase())) {
           html += `<button onclick="openChat('${u}')">${u}</button>`;
         }
       });
+
+      // Groups
+      html += `<h3 style="margin:15px 0 5px;">Groups</h3>`;
       Object.entries(allGroups).forEach(([name, data]) => {
-        if (data.public || (data.members && data.members[user])) {
-          if (name.toLowerCase().includes(searchBox.value.toLowerCase())) {
-            html += `<button onclick="openGroup('${name}')"># ${name}</button>`;
-          }
+        const visible = data.public || (data.members && data.members[user]);
+        if (visible && name.toLowerCase().includes(searchBox.value.toLowerCase())) {
+          html += `<button class="group" onclick="openGroup('${name}')"># ${name}</button>`;
         }
       });
+
       userList.innerHTML = html;
     }
 
@@ -154,12 +161,17 @@
       if (!name) return;
 
       const isPublic = confirm("Should the group be public?");
-      const code = Math.random().toString(36).substring(2, 8).toUpperCase();
+      let password = null;
+
+      if (!isPublic) {
+        password = prompt("Enter a password for this private group:");
+        if (!password) return alert("Private group must have a password.");
+      }
 
       const groupData = {
         admin: user,
         public: isPublic,
-        inviteCode: isPublic ? null : code,
+        password: password || null,
         members: { [user]: true }
       };
 
@@ -170,7 +182,7 @@
         ts: Date.now()
       });
 
-      alert(isPublic ? "Public group created!" : `Private group created. Invite Code: ${code}`);
+      alert(isPublic ? "Public group created!" : `Private group created. Password: ${password}`);
     }
 
     function openChat(other) {
@@ -205,6 +217,17 @@
         div.textContent = m.from + ': ' + m.text;
         document.getElementById('messages').appendChild(div);
         document.getElementById('messages').scrollTop = 1e9;
+      });
+
+      // Show password if private
+      db.ref('groups/' + g).once('value').then(snap => {
+        const data = snap.val();
+        if (!data.public && data.password) {
+          const passDiv = document.createElement('div');
+          passDiv.textContent = `🔒 Group Password: ${data.password}`;
+          passDiv.style = "padding: 5px 10px; background: #ffe0b2; color: #bf360c; font-weight: bold; border-radius: 5px; margin: 5px;";
+          document.getElementById('messages').prepend(passDiv);
+        }
       });
     }
 
