@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" /><meta name="viewport" content="width=device-width,initial-scale=1.0" />
+  <title>Bravo Locator – Login</title>
+  <style>
+    body {
+      margin: 0; padding: 0;
+      background: url('A.jpeg') center/cover fixed;
+      display: flex; align-items: center; justify-content: center;
+      height: 100vh; font-family: Arial, sans-serif;
+    }
+    .box {
+      background: rgba(0,0,0,0.5);
+      padding: 30px;
+      width: 300px;
+      border-radius: 8px;
+      color: white;
+      text-align: center;
+    }
+    .box h1 { font-size: 40px; margin: 0 0 10px; }
+    input { width: 100%; padding: 10px; margin:10px 0; border:1px solid white; border-radius:5px; background:transparent; color:white; }
+    button { width: 100%; padding:10px; margin-top:10px; border:none; border-radius:5px; background:#3897f0; color:white; font-weight:bold; cursor:pointer; }
+    .toggle { margin-top:15px; display:inline-block; color:#a8cdf8; cursor:pointer; font-size:14px; }
+  </style>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
+  <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyBfkUJS81minjxj0DFz4pzNnGzCtb5ZJss",
+      authDomain: "locater-42fb4.firebaseapp.com",
+      databaseURL: "https://locater-42fb4-default-rtdb.firebaseio.com",
+      projectId: "locater-42fb4",
+      storageBucket: "locater-42fb4.firebasestorage.app",
+      messagingSenderId: "250348367998",
+      appId: "1:250348367998:web:d734b2b4c735b5684ae82f"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const auth = firebase.auth();
+
+    let isSignup = false;
+    function toggleMode() {
+      isSignup = !isSignup;
+      document.getElementById('actionBtn').textContent = isSignup ? 'Sign Up' : 'Log In';
+      document.getElementById('toggleText').textContent = isSignup ? 'Already have an account? Log In' : 'Don’t have an account? Sign Up';
+    }
+
+    function handleAuth() {
+      const email = document.getElementById('email').value.trim();
+      const password = document.getElementById('password').value.trim();
+      if (!email || !password) return alert('Please fill all fields.');
+
+      const method = isSignup ? auth.createUserWithEmailAndPassword : auth.signInWithEmailAndPassword;
+      method.call(auth, email, password)
+        .then(() => window.location.href = 'app.html')
+        .catch(err => alert(err.message));
+    }
+
+    auth.onAuthStateChanged(user => {
+      if (user) window.location.href = 'app.html';
+    });
+  </script>
+</head>
+<body>
+  <div class="box">
+    <h1>Bravo</h1>
+    <input id="email" type="email" placeholder="Email" />
+    <input id="password" type="password" placeholder="Password" />
+    <button id="actionBtn" onclick="handleAuth()">Log In</button>
+    <div class="toggle" id="toggleText" onclick="toggleMode()">Don’t have an account? Sign Up</div>
+  </div>
+</body>
+</html>
