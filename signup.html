@@ -31,14 +31,14 @@
     .toggle {
       position: relative;
     }
-    .toggle input {
-      width: 230px;
-    }
-    .eye {
+    .toggle span {
       position: absolute;
       right: 10px;
       top: 10px;
+      font-size: 12px;
+      color: lightblue;
       cursor: pointer;
+      user-select: none;
     }
   </style>
 </head>
@@ -46,14 +46,17 @@
 
   <h2>Create Account</h2>
   <input id="username" type="text" placeholder="Username" /><br>
+  
   <div class="toggle">
     <input id="password" type="password" placeholder="Password" />
     <span onclick="toggleVisibility('password', this)">Show</span>
   </div>
+
   <div class="toggle">
     <input id="confirmPassword" type="password" placeholder="Confirm Password" />
-    <span onclick="toggleVisibility('confirmPassword',this)">Show</span>
+    <span onclick="toggleVisibility('confirmPassword', this)">Show</span>
   </div>
+
   <button onclick="createAccount()">Create Account</button><br><br>
   <a href="login.html" style="color: lightblue;">Already have an account? Login</a>
 
@@ -70,9 +73,11 @@
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
 
-    function toggleVisibility(id) {
-      const input = document.getElementById(id);
-      input.type = input.type === 'password' ? 'text' : 'password';
+    function toggleVisibility(inputId, toggleEl) {
+      const input = document.getElementById(inputId);
+      const isHidden = input.type === "password";
+      input.type = isHidden ? "text" : "password";
+      toggleEl.textContent = isHidden ? "Hide" : "Show";
     }
 
     function createAccount() {
@@ -90,8 +95,7 @@
           db.ref("users/" + username).set({ password }).then(() => {
             alert("Account created!");
             window.location.href = "index.html";
-          }).catch(e => {
-            console.error(e);
+          }).catch(() => {
             alert("Error creating account.");
           });
         }
