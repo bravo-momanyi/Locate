@@ -1,18 +1,44 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>Bravo Chat & Map</title>
-<link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
-<style>
-  /* Same overall styles as before... */
-  /* Add group sidebar styling */
-  .sidebar-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;}
-  .chatItem { padding:6px; cursor:pointer; border-bottom:1px solid #ccc;}
-  .chatItem.active { background:#ddd; }
-  .searchInput { width:100%; padding:6px; margin-bottom:8px; }
-  .groupMembers { font-size:12px; color:#555; margin-left:10px; }
-  .adminLabel { font-size:10px; color:red; margin-left:5px; }
-</style>
-</head><body>
-<header><div id="currentUser"></div><button onclick="logout()">Logout</button></header>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" /><meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Bravo Chat & Map</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
+  <style>
+    body,html{margin:0;padding:0;height:100%;font-family:Arial,sans-serif;}
+    header{display:flex;justify-content:space-between;padding:10px;background:#075E54;color:#fff;}
+    .tabs{display:flex;background:#128C7E;}
+    .tabs button{flex:1;padding:12px;border:none;background:#128C7E;color:#fff;cursor:pointer;}
+    .tabs button.active{background:#25D366;}
+    .content{display:none;height:calc(100% - 92px);}
+    .content.active{display:flex;}
+    #mapContent,#chatContent{width:100%;}
+    #map{width:100%;height:100%;}
+    #chatContent{display:flex;}
+    #sidebar{width:30%;border-right:1px solid #ccc;padding:10px;box-sizing:border-box;}
+    .sidebar-header{display:flex;justify-content:space-between;margin-bottom:10px;}
+    .searchInput{width:100%;padding:6px;margin-bottom:8px;border-radius:4px;border:1px solid #ccc;}
+    .chatItem{padding:8px;cursor:pointer;border-bottom:1px solid #ddd;}
+    .chatItem.active{background:#e2f7e2;}
+    #chatWindow{flex:1;display:none;flex-direction:column;}
+    #chatHeader{background:#128C7E;color:#fff;padding:10px;display:flex;justify-content:space-between;}
+    #messages{flex:1;overflow:auto;padding:10px;background:#e5ddd5;}
+    .msg{padding:6px;margin:4px;max-width:70%;border-radius:6px;}
+    .you{background:#dcf8c6;align-self:flex-end;}
+    .them{background:#fff;align-self:flex-start;}
+    .senderSmall{font-size:10px;color:#555;margin-bottom:2px;}
+    #sendBar{display:flex;padding:10px;border-top:1px solid #ccc;}
+    #sendBar input{flex:1;padding:8px;border-radius:20px;border:1px solid #ccc;}
+    #sendBar button{padding:8px 12px;background:#25D366;border:none;color:#fff;margin-left:5px;border-radius:20px;}
+  </style>
+</head>
+<body>
+
+<header>
+  <div id="currentUser"></div>
+  <button onclick="logout()">Logout</button>
+</header>
+
 <div class="tabs">
   <button class="active" onclick="openTab('mapContent')">Map</button>
   <button onclick="openTab('chatContent')">Chats</button>
@@ -21,38 +47,37 @@
 <div id="mapContent" class="content active"><div id="map"></div></div>
 
 <div id="chatContent" class="content">
-  <div id="userList" style="width:30%; padding:10px; border-right:1px solid #ccc">
-    <input class="searchInput" id="searchAll" placeholder="Search users/groups…" oninput="filterAll()"/>
+  <div id="sidebar">
     <div class="sidebar-header">
       <button onclick="refreshAll()">Start Chat</button>
-      <button onclick="openGroupDialog()">New Group</button>
+      <button onclick="openGroupDialog()">Create Group</button>
     </div>
+    <input id="searchInput" class="searchInput" placeholder="Search users/groups…" oninput="filterAll()"/>
     <div id="allList"></div>
     <hr>
     <div><strong>Active Chats</strong></div>
     <div id="activeList"></div>
   </div>
 
-  <div id="chatWindow" style="flex:1; display:none; flex-direction:column;">
-    <div id="chatHeader" style="padding:10px;background:#128C7E;color:white;display:flex;justify-content:space-between;align-items:center;">
-      <span id="chatWith"></span>
-      <div class="callGroup">
-        <button class="voice" onclick="startCall('voice')">Voice</button>
-        <button class="video" onclick="startCall('video')">Video</button>
+  <div id="chatWindow">
+    <div id="chatHeader">
+      <span id="chatWith" onclick="viewGroupMembers()" style="cursor:pointer;"></span>
+      <div>
+        <button onclick="startCall('voice')">Voice</button>
+        <button onclick="startCall('video')">Video</button>
       </div>
     </div>
-    <div id="messages" style="flex:1;overflow:auto;padding:10px;background:#e5ddd5;"></div>
-    <div id="sendBar" style="display:flex;padding:10px;border-top:1px solid #ccc;">
-      <input id="msgInput" style="flex:1;padding:8px;border-radius:20px;border:1px solid #ccc;" placeholder="Message…">
-      <button onclick="sendMsg()" style="padding:8px 12px;background:#25D366;border:none;color:white;margin-left:5px;border-radius:20px;">Send</button>
-      <button onclick="viewGroupMembers()" id="viewMembersBtn" style="display:none;margin-left:5px;">Members</button>
+    <div id="messages"></div>
+    <div id="sendBar">
+      <input id="msgInput" placeholder="Type message...">
+      <button onclick="sendMsg()">Send</button>
     </div>
   </div>
 </div>
 
-<!-- Create/Join Group Modal -->
-<div id="groupDialog" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);justify-content:center;align-items:center;">
-  <div style="background:white;padding:20px;border-radius:8px;width:90%;max-width:400px;">
+<!-- Group Creation Dialog -->
+<div id="groupDialog" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);justify-content:center;align-items:center;">
+  <div style="background:#fff;padding:20px;border-radius:8px;width:90%;max-width:400px;">
     <h3>Create Group</h3>
     <input id="gName" placeholder="Group name" style="width:100%;padding:8px;margin-bottom:8px;">
     <div id="memberCheckboxes" style="max-height:200px;overflow:auto;"></div>
@@ -67,148 +92,140 @@
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
 <script>
-const config={/*your firebaseConfig*/};
+const config = {
+  apiKey: "AIzaSy...Bfk...", /* truncated */
+  authDomain: "locater-42fb4.firebaseapp.com",
+  databaseURL: "https://locater-42fb4-default-rtdb.firebaseio.com",
+  projectId: "locater-42fb4",
+  storageBucket: "...",
+  messagingSenderId: "...",
+  appId: "1:..."
+};
 firebase.initializeApp(config);
-const db=firebase.database();
-const user=localStorage.getItem('username'), allList=document.getElementById('allList'), activeList=document.getElementById('activeList');
-document.getElementById('currentUser').textContent=user;
-db.ref('users/'+user).set(true);
-let allUsers=[], allGroups=[], activeChats=[];
-let currentChat='', currentIsGroup=false;
+const db = firebase.database();
 
-// load all users/groups
+const user = localStorage.getItem('username') || prompt('Name?') || 'anonymous';
+document.getElementById('currentUser').textContent = user;
+db.ref('users/'+user).set(true);
+
+let allUsers=[], allGroups=[], activeChats=[];
+let currentChat = null, currentIsGroup = false;
+
 function refreshAll(){
   db.ref('users').once('value',uS=>{
-    allUsers=Object.keys(uS.val()||{}).filter(u=>u!==user);
+    allUsers = Object.keys(uS.val()||{}).filter(u=>u!==user);
     db.ref('groups').once('value',gS=>{
-      allGroups=[];
-      gS.forEach(c=>allGroups.push({id:c.key, ...c.val()}));
+      allGroups = []; gS.forEach(c=>allGroups.push({id:c.key, ...c.val()}));
       renderAllList();
     });
   });
 }
-
-// filter list
 function filterAll(){
-  const term=document.getElementById('searchAll').value.toLowerCase();
+  const term = document.getElementById('searchInput').value.toLowerCase();
   renderAllList(term);
 }
-
-// show start chat and group in allList
-function renderAllList(filter=''){
-  let html='';
-  allUsers.forEach(u=>{ if(u.includes(filter)) html+=`<div class="chatItem" onclick="openChat('${u}',false)">${u}</div>`;});
-  allGroups.forEach(g=>{ if(g.name.toLowerCase().includes(filter)) html+=`<div class="chatItem" onclick="openChat('${g.id}',true)">${g.name}</div>`;});
-  allList.innerHTML=html;
+function renderAllList(f=''){
+  const list = document.getElementById('allList');
+  let html = '';
+  allUsers.filter(u=>u.toLowerCase().includes(f)).forEach(u=>html+=`<div class="chatItem" onclick="openChat('${u}',false)">${u}</div>`);
+  allGroups.filter(g=>g.name.toLowerCase().includes(f)).forEach(g=>html+=`<div class="chatItem" onclick="openChat('${g.id}',true)">${g.name}</div>`);
+  list.innerHTML = html;
 }
 
-// load active chats
 db.ref('activeChats/'+user).on('value',s=>{
-  activeChats=s.val()?Object.entries(s.val()).filter(e=>e[1]).map(e=>e[0]):[];
+  activeChats = s.val()?Object.keys(s.val()) : [];
   renderActive();
 });
 function renderActive(){
   let html='';
   activeChats.forEach(id=>{
-    const isGroup=id.startsWith('grp_');
-    const label=isGroup?allGroups.find(g=>g.id===id)?.name:id;
-    html+=`<div class="chatItem" onclick="openChat('${id}',${isGroup})">${label}</div>`;
+    const isGr = id.startsWith('grp_');
+    const label = isGr? (allGroups.find(g=>g.id===id)?.name || id) : id;
+    html += `<div class="chatItem" onclick="openChat('${id}',${isGr})">${label}</div>`;
   });
-  activeList.innerHTML=html;
+  document.getElementById('activeList').innerHTML = html;
 }
 
-// open chat logic
-function openChat(id,isGroup){
+function openChat(id, isGroup){
   currentChat=id; currentIsGroup=isGroup;
-  document.getElementById('chatWindow').style.display='flex';
-  document.getElementById('viewMembersBtn').style.display=isGroup?'inline-block':'none';
-  document.getElementById('chatWith').textContent=isGroup?'Group: '+allGroups.find(g=>g.id===id).name:id;
-  markAsActive(id);
-  listenMessages(id,isGroup);
+  document.getElementById('chatWindow').style.display = 'flex';
+  document.getElementById('chatWith').textContent = isGroup 
+    ? allGroups.find(g=>g.id===id).name 
+    : id;
+  document.getElementById('chatWith').style.cursor = isGroup ? 'pointer' : 'default';
+  listenMessages();
+  db.ref(`activeChats/${user}/${id}`).set(true);
+}
+function listenMessages(){
+  const path = currentIsGroup ? `groupChats/${currentChat}` : `privateChats/${[user,currentChat].sort().join('_')}`;
+  db.ref(path).off();
+  db.ref(path).on('child_added', snap => appendMessage(snap.val()));
 }
 
-// listen to messages
-function listenMessages(id,isGroup){
-  const ref=isGroup?db.ref('groupChats/'+id):db.ref('privateChats/'+[user,id].sort().join('_'));
-  ref.off();
-  ref.on('child_added',snap=>{
-    const m=snap.val();
-    appendMessage(m);
-  });
-  // mark active chat
-  db.ref('activeChats/'+user+'/'+id).set(true);
-  if(isGroup){
-    db.ref('groups/'+id+'/members/'+user+'/pendingApproval').set(false);
-    db.ref('groups/'+id+'/members/'+user+'/approved').set(true);
-  }
-}
-
-// append message to view
 function appendMessage(m){
-  const div=document.createElement('div');
-  div.className='msg '+(m.from===user?'you':'them');
-  div.innerHTML=(m.from===user?'':'<div style="font-size:10px;color:#555;">'+m.from+'</div>')+m.text;
+  const div = document.createElement('div');
+  div.className = 'msg ' + (m.from===user?'you':'them');
+  div.innerHTML = (currentIsGroup ? `<div class="senderSmall">${m.from}</div>` : '') + m.text;
   document.getElementById('messages').appendChild(div);
-  document.getElementById('messages').scrollTop=1e9;
+  document.getElementById('messages').scrollTop = 1e9;
 }
 
-// send message
 function sendMsg(){
-  const text=document.getElementById('msgInput').value.trim();
-  if(!text||!currentChat) return;
-  const destRef = currentIsGroup?
-    db.ref('groupChats/'+currentChat):
-    db.ref('privateChats/'+[user,currentChat].sort().join('_'));
-  destRef.push({from:user,text,ts:Date.now()});
+  const txt = document.getElementById('msgInput').value.trim();
+  if(!txt || !currentChat) return;
+  const path = currentIsGroup ? `groupChats/${currentChat}` : `privateChats/${[user,currentChat].sort().join('_')}`;
+  db.ref(path).push({from:user, text:txt, ts:Date.now()});
   document.getElementById('msgInput').value='';
 }
 
-// create group UI
 function openGroupDialog(){
-  document.getElementById('memberCheckboxes').innerHTML=allUsers.map(u=>`
-    <label><input type="checkbox" value="${u}"/>${u}</label><br>
-  `).join('');
+  let cbhtml = allUsers.map(u=>`<label><input type="checkbox" value="${u}"/>${u}</label><br>`).join('');
+  document.getElementById('memberCheckboxes').innerHTML = cbhtml;
   document.getElementById('groupDialog').style.display='flex';
 }
 function closeGroupDialog(){document.getElementById('groupDialog').style.display='none';}
 function createGroup(){
-  const name=document.getElementById('gName').value.trim();
-  const mems=[...document.querySelectorAll('#memberCheckboxes input:checked')].map(i=>i.value);
-  if(!name||mems.length<1) return alert('Provide name and at least one member.');
-  const gid='grp_'+Date.now();
-  const membersObj={};membersObj[user]={approved:true,admin:true};
-  mems.forEach(m=>membersObj[m]={approved:false,admin:false,pendingApproval:true});
-  db.ref('groups/'+gid).set({name,creator:user,members:membersObj});
+  const name = document.getElementById('gName').value.trim();
+  const mems = [...document.querySelectorAll('#memberCheckboxes input:checked')].map(i=>i.value);
+  if(!name||mems.length<1){alert('Enter name and members');return;}
+  const gid = 'grp_' + Date.now();
+  const members = {}; members[user] = {admin:true,approved:true};
+  mems.forEach(u=>members[u] = {admin:false,pending:true,approved:false});
+  db.ref('groups/'+gid).set({name,creator:user,members});
   closeGroupDialog();
   refreshAll();
 }
 
-// View/deletion for group members
 function viewGroupMembers(){
-  db.ref('groups/'+currentChat+'/members').once('value',s=>{
-    const mems=[];
-    s.forEach(c=>{
-      const d=c.val();
-      let info=c.key+(d.admin?'<span class="adminLabel">(admin)</span>'):'';
-      if((d.admin||currentIsGroup) && d.approved && user===allGroups.find(g=>g.id===currentChat).creator){
-        info+=` <button onclick="removeMember('${currentChat}','${c.key}')">X</button>`;
+  if(!currentIsGroup) return;
+  db.ref(`groups/${currentChat}/members`).once('value',s=>{
+    let info = ''; s.forEach(c=>{
+      const d = c.val();
+      info += c.key + (d.admin?' (admin)':'') + (user===allGroups.find(g=>g.id===currentChat).creator && !d.admin
+        ? ` [<a href="#" onclick="removeMember('${currentChat}','${c.key}')">Remove</a>]`:'') + '\n';
+      if(d.pending && user===c.key){
+        if(confirm(`Join group "${allGroups.find(g=>g.id===currentChat).name}"?`)){
+          db.ref(`groups/${currentChat}/members/${user}`).update({approved:true,pending:false});
+        }
       }
-      mems.push('<div>'+info+'</div>');
     });
-    alert('Members:\n'+mems.join('\n'));
+    alert(info);
   });
 }
-function removeMember(gid,u2){
-  db.ref('groups/'+gid+'/members/'+u2).remove();
+function removeMember(gid,usr){
+  db.ref(`groups/${gid}/members/${usr}`).set(null);
 }
 
-// Utility
-function markAsActive(id){
-  document.querySelectorAll('#activeList .chatItem').forEach(el=>el.classList.toggle('active',el.textContent===id||el.innerText===id));
+function startCall(t){
+  if(!currentChat) return alert('Open a chat!');
+  alert(`Simulated ${t} call with ${currentChat}`);
 }
 
-function logout(){localStorage.removeItem('username'); location='index.html';}
-function startCall(type){ if(!currentChat) return alert('No chat open'); alert('Pretend '+type+' call to '+currentChat); }
+function logout(){
+  localStorage.removeItem('username');
+  location='index.html';
+}
+
 function openTab(id){
   document.querySelectorAll('.tabs button').forEach(b=>b.classList.toggle('active',b.textContent+'Content'===id));
   document.querySelectorAll('.content').forEach(c=>c.classList.remove('active'));
@@ -216,9 +233,9 @@ function openTab(id){
   if(id==='chatContent') document.getElementById('chatWindow').style.display='none';
 }
 
-// initial fetch
+// Initialize
 refreshAll();
-
-// map code same as before...
+// Map as before...
 </script>
-</body></html>
+</body>
+</html>
