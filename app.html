@@ -1,229 +1,217 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" /><meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Bravo Chat & Map</title>
-  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
-  <style>
-    body, html { margin:0; padding:0; height:100%; font-family:Arial,sans-serif; }
-    header { display:flex; justify-content:space-between; align-items:center; background:#075E54; color:white; padding:10px;}
-    .tabs { display:flex; background:#128C7E; }
-    .tabs button { flex:1; padding:12px; border:none; background:#128C7E; color:white; cursor:pointer;}
-    .tabs button.active { background:#25D366;}
-    .content { display:none; height:calc(100% - 92px); overflow:hidden; }
-    .content.active { display:flex; }
-    #mapContent { position:relative; }
-    #map { width:100%; height:100%; }
-    /* Chat layout */
-    #chatContent { display:flex; width:100%; }
-    #userList { width:30%; border-right:1px solid #ddd; overflow-y:auto; padding:10px;}
-    #userList input, #userList button { width:100%; margin-bottom:5px; padding:8px; border:none; }
-    #userList button { background:#f1f1f1; cursor:pointer; }
-    #chatWindow { flex:1; display:none; flex-direction:column; }
-    #chatHeader { padding:10px; background:#128C7E; color:white; display:flex; align-items:center; justify-content:space-between;}
-    #messages { flex:1; padding:10px; overflow-y:auto; background:#e5ddd5;}
-    .msg { padding:8px; margin:5px; border-radius:7px; max-width:70%; }
-    .you { background:#dcf8c6; align-self:flex-end; }
-    .them { background:white; align-self:flex-start; }
-    #sendBar { display:flex; padding:10px; border-top:1px solid #ccc; }
-    #sendBar input { flex:1; padding:8px; border-radius:20px; border:1px solid #ccc; }
-    #sendBar button { padding:8px 12px; background:#25D366; border:none; color:white; margin-left:5px; border-radius:20px; }
-    .callGroup button { margin-left:5px; padding:6px 10px; border:none; border-radius:5px; color:white; }
-    .voice { background:#075E54; }
-    .video { background:#128C7E; }
-    @media(max-width:600px){
-      #userList { width:40%; }
-      #chatWindow { position:absolute; top:50px; left:0; width:100%; height:calc(100% - 50px); }
-    }
-  </style>
+<meta charset="UTF-8" /><meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Bravo Chat & Map</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
+<style>
+  /* [same CSS as before] */
+  body, html { margin:0; padding:0; height:100%; font-family:Arial,sans-serif; }
+  header { display:flex; justify-content:space-between; align-items:center; background:#075E54; color:white; padding:10px;}
+  .tabs { display:flex; background:#128C7E; }
+  .tabs button { flex:1; padding:12px; border:none; background:#128C7E; color:white; cursor:pointer;}
+  .tabs button.active { background:#25D366;}
+  .content { display:none; height:calc(100% - 92px); overflow:hidden; }
+  .content.active { display:flex; }
+  #mapContent { position:relative; }
+  #map { width:100%; height:100%; }
+  #chatContent { display:flex; width:100%; }
+  #userList { width:30%; border-right:1px solid #ddd; overflow-y:auto; padding:10px;}
+  #userList input { width:100%; margin-bottom:5px; padding:8px; border:none; }
+  #userList .userBtn { width:100%; margin-bottom:5px; padding:8px; text-align:left; cursor:pointer; border:none; background:#f1f1f1; }
+  .status { font-size:12px; color:lightgray; }
+  #chatWindow { flex:1; display:none; flex-direction:column; }
+  #chatHeader { padding:10px; background:#128C7E; color:white; display:flex; align-items:center; justify-content:space-between;}
+  #messages { flex:1; padding:10px; overflow-y:auto; background:#e5ddd5;}
+  .msg { padding:8px; margin:5px; border-radius:7px; max-width:70%; position:relative; }
+  .msg:hover .deleteBtn { display:block; }
+  .you { background:#dcf8c6; align-self:flex-end; }
+  .them { background:white; align-self:flex-start; }
+  .deleteBtn { display:none; position:absolute; top:3px; right:3px; background:red; color:white; border:none; border-radius:50%; width:20px; height:20px; cursor:pointer; }
+  #sendBar { display:flex; padding:10px; border-top:1px solid #ccc; }
+  #sendBar input { flex:1; padding:8px; border-radius:20px; border:1px solid #ccc; }
+  #sendBar button { padding:8px 12px; background:#25D366; border:none; color:white; margin-left:5px; border-radius:20px; }
+  .callGroup button { margin-left:5px; padding:6px 10px; border:none; border-radius:5px; color:white; }
+  .voice { background:#075E54; }
+  .video { background:#128C7E; }
+  .typing { font-size:12px; color:gray; margin-left:10px; }
+  @media(max-width:600px){
+    #userList { width:40%; }
+    #chatWindow { position:absolute; top:50px; left:0; width:100%; height:calc(100% - 50px); }
+  }
+</style>
 </head>
 <body>
-  <header>
-    <div id="currentUser"></div>
-    <button onclick="logout()">Logout</button>
-  </header>
-  <div class="tabs">
-    <button class="active" onclick="openTab('mapContent')">Map</button>
-    <button onclick="openTab('chatContent')">Chats</button>
+<header>
+  <div id="currentUser"></div>
+  <button onclick="logout()">Logout</button>
+</header>
+<div class="tabs">
+  <button class="active" onclick="openTab('mapContent')">Map</button>
+  <button onclick="openTab('chatContent')">Chats</button>
+</div>
+<div id="mapContent" class="content active"><div id="map"></div></div>
+<div id="chatContent" class="content">
+  <div id="userList">
+    <input id="searchBox" placeholder="Search users..." />
+    <div id="users"></div>
   </div>
-  <div id="mapContent" class="content active"><div id="map"></div></div>
-  <div id="chatContent" class="content">
-    <div id="userList">
-      <input id="searchBox" placeholder="Search users/groups..." />
-      <button onclick="showStartChat()">Start Chat</button>
-      <button onclick="createGroup()">Create Group</button>
-      <div id="users"></div>
-    </div>
-    <div id="chatWindow">
-      <div id="chatHeader">
-        <span id="chatWith">---</span>
-        <div class="callGroup">
-          <button class="voice" onclick="startCall('voice')">Voice Call</button>
-          <button class="video" onclick="startCall('video')">Video Call</button>
-        </div>
-      </div>
-      <div id="messages"></div>
-      <div id="sendBar">
-        <input id="msgInput" placeholder="Type message..."/>
-        <button onclick="sendMsg()">Send</button>
+  <div id="chatWindow">
+    <div id="chatHeader">
+      <span id="chatWith">---</span><span class="status" id="chatStatus"></span>
+      <div class="callGroup">
+        <button class="voice" onclick="startCall('voice')">Voice Call</button>
+        <button class="video" onclick="startCall('video')">Video Call</button>
       </div>
     </div>
+    <div id="messages"></div>
+    <div id="sendBar">
+      <input id="msgInput" placeholder="Type message..." oninput="notifyTyping()" />
+      <button onclick="sendMsg()">Send</button>
+    </div>
   </div>
+</div>
 
-  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
-  <script>
-    const config = {
-      apiKey: "AIzaSyBfkUJS81minjxj0DFz4pzNnGzCtb5ZJss",
-      authDomain: "locater-42fb4.firebaseapp.com",
-      databaseURL: "https://locater-42fb4-default-rtdb.firebaseio.com",
-      projectId: "locater-42fb4",
-      storageBucket: "locater-42fb4.appspot.com",
-      messagingSenderId: "250348367998",
-      appId: "1:250348367998:web:d734b2b4c735b5684ae82f"
-    };
-    firebase.initializeApp(config);
-    const db = firebase.database();
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
+<script>
+const config = {
+  apiKey: "...", authDomain: "...",
+  databaseURL: "...", projectId: "...",
+  storageBucket: "...", messagingSenderId: "...", appId: "..."
+};
+firebase.initializeApp(config);
+const db = firebase.database();
 
-    const user = localStorage.getItem('username') || prompt('Enter username');
-    localStorage.setItem('username', user);
-    document.getElementById('currentUser').textContent = user;
-    db.ref('users/' + user).set(true);
+const user = localStorage.getItem('username') || prompt('Username?');
+localStorage.setItem('username', user);
+document.getElementById('currentUser').textContent = user;
+db.ref('users/' + user).set({ online: true, lastSeen: Date.now() });
+db.ref('users/' + user).onDisconnect().set({ online: false, lastSeen: Date.now() });
 
-    const map = L.map('map').setView([1.29,36.82],12);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
-    const markers={};
-    if(navigator.geolocation){
-      navigator.geolocation.watchPosition(pos => {
-        db.ref('locations/' + user).set({ lat: pos.coords.latitude, lng: pos.coords.longitude });
-      });
+const map = L.map('map').setView([1.29,36.82],12);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+const markers = {};
+
+navigator.geolocation && setInterval(() => {
+  navigator.geolocation.getCurrentPosition(pos => {
+    db.ref('locations/' + user).set({ lat: pos.coords.latitude, lng: pos.coords.longitude, ts: Date.now() });
+  });
+}, 5000);
+
+db.ref('locations').on('value', snap => {
+  const locs = snap.val() || {};
+  Object.entries(locs).forEach(([u, loc]) => {
+    if(markers[u]) markers[u].setLatLng([loc.lat, loc.lng]);
+    else markers[u] = L.marker([loc.lat, loc.lng]).addTo(map).bindPopup(u);
+  });
+});
+
+let allUsers = {}, currentChat = '', convoRef = null, typingTimeout;
+const usersDiv = document.getElementById('users'), searchBox = document.getElementById('searchBox');
+
+db.ref('users').on('value', snap => {
+  allUsers = snap.val() || {};
+  renderUserList();
+});
+
+searchBox.addEventListener('input', renderUserList);
+
+function renderUserList(){
+  const filter = searchBox.value.toLowerCase();
+  usersDiv.innerHTML = '';
+  Object.entries(allUsers).forEach(([u, data]) => {
+    if(u === user) return;
+    if(u.toLowerCase().includes(filter)){
+      const btn = document.createElement('button');
+      btn.className = 'userBtn';
+      btn.innerHTML = `${u} <span class="status">${data.online ? '● online' : new Date(data.lastSeen || 0).toLocaleString()}</span>`;
+      btn.onclick = () => openChat(u);
+      usersDiv.appendChild(btn);
     }
-    db.ref('locations').on('value', snap => {
-      const locs = snap.val()||{};
-      Object.entries(locs).forEach(([u,loc])=>{
-        if(markers[u]) markers[u].setLatLng([loc.lat,loc.lng]);
-        else markers[u] = L.marker([loc.lat,loc.lng]).addTo(map).bindPopup(u);
-      });
-    });
+  });
+}
 
-    let allUsers={}, allGroups={}, currentChat='', convoRef=null;
-    const userList = document.getElementById('users');
-    const searchBox = document.getElementById('searchBox');
+function openChat(other){
+  currentChat = other;
+  document.getElementById('chatWith').textContent = other;
+  document.getElementById('chatWindow').style.display = 'flex';
+  document.getElementById('messages').innerHTML = '';
+  document.getElementById('chatStatus').textContent = '';
 
-    db.ref('users').on('value', snap => {
-      allUsers = snap.val()||{};
-      showStartChat();
-    });
-    db.ref('groups').on('value', snap => {
-      allGroups = {};
-      snap.forEach(c=>allGroups[c.key]=c.val());
-      showStartChat();
-    });
+  if(convoRef) convoRef.off();
+  const convo = [user, other].sort().join('_');
+  convoRef = db.ref('privateChats/' + convo);
+  convoRef.on('child_added', snap => {
+    const m = snap.val();
+    const div = document.createElement('div');
+    div.className = 'msg ' + (m.from === user ? 'you' : 'them');
+    div.textContent = m.text;
+    div.oncontextmenu = e => { e.preventDefault(); confirmDelete(snap.key); };
+    document.getElementById('messages').appendChild(div);
+    document.getElementById('messages').scrollTop = 1e9;
+  });
 
-    searchBox.addEventListener('input', showStartChat);
+  db.ref('typing/' + other + '/' + convo).on('value', snap => {
+    document.getElementById('chatStatus').textContent = snap.val() ? 'typing...' : '';
+  });
+}
 
-    function showStartChat(){
-      let html='';
-      for(let u in allUsers){
-        if(u===user) continue;
-        if(u.toLowerCase().includes(searchBox.value.toLowerCase())){
-          html += `<button onclick="openChat('${u}')">${u}</button>`;
-        }
-      }
-      for(let g in allGroups){
-        if(g.toLowerCase().includes(searchBox.value.toLowerCase())){
-          html += `<button onclick="openGroup('${g}')"># ${g}</button>`;
-        }
-      }
-      userList.innerHTML = html;
-    }
+function sendMsg(){
+  const txt = document.getElementById('msgInput').value.trim();
+  if(!txt || !currentChat) return;
+  const convo = [user, currentChat].sort().join('_');
+  db.ref('typing/' + user + '/' + convo).set(false);
+  db.ref('privateChats/' + convo).push({ from: user, text: txt, ts: Date.now() });
+  document.getElementById('msgInput').value = '';
+}
 
-    function createGroup(){
-      const name = prompt("New group name:");
-      if(!name) return;
-      db.ref('groups/'+name).set({ admin:user, members:{ [user]:true } });
-      db.ref('groupChats/'+name).push({ from:'System', text:`${user} created the group`, ts:Date.now() });
-      alert("Group created!");
-    }
+function notifyTyping(){
+  if(!currentChat) return;
+  const convo = [user, currentChat].sort().join('_');
+  db.ref('typing/' + user + '/' + convo).set(true);
+  clearTimeout(typingTimeout);
+  typingTimeout = setTimeout(() => {
+    db.ref('typing/' + user + '/' + convo).set(false);
+  }, 1500);
+}
 
-    function openChat(other){
-      currentChat = other;
-      document.getElementById('chatWith').textContent = other;
-      document.getElementById('chatWindow').style.display='flex';
-      document.getElementById('messages').innerHTML='';
-      if(convoRef) convoRef.off();
-      const convo = [user,other].sort().join('_');
-      convoRef = db.ref('privateChats/'+convo);
-      convoRef.on('child_added', snap=>{
-        const m=snap.val();
-        const div=document.createElement('div');
-        div.className='msg '+(m.from===user?'you':'them');
-        div.textContent=m.text;
-        document.getElementById('messages').appendChild(div);
-        document.getElementById('messages').scrollTop=1e9;
-      });
-    }
+function confirmDelete(msgKey){
+  if(confirm('Delete this message?')){
+    const convo = [user, currentChat].sort().join('_');
+    db.ref('privateChats/' + convo + '/' + msgKey).remove();
+  }
+}
 
-    function openGroup(g){
-      currentChat = 'group__'+g;
-      document.getElementById('chatWith').textContent='#'+g;
-      document.getElementById('chatWindow').style.display='flex';
-      document.getElementById('messages').innerHTML='';
-      if(convoRef) convoRef.off();
-      convoRef = db.ref('groupChats/'+g);
-      convoRef.on('child_added', snap=>{
-        const m=snap.val();
-        const div=document.createElement('div');
-        div.className='msg '+(m.from===user?'you':'them');
-        div.textContent=m.from+': '+m.text;
-        document.getElementById('messages').appendChild(div);
-        document.getElementById('messages').scrollTop=1e9;
-      });
-    }
+function startCall(type){
+  if(!currentChat) return alert('Open a chat first.');
+  const room = `https://YOUR_DAILY_DOMAIN.daily.co/${[user, currentChat].sort().join('-')}`;
+  db.ref('calls/' + currentChat + '/incoming').set({ from: user, type, room, ts: Date.now() });
+  window.open(room, '_blank');
+}
 
-    function sendMsg(){
-      const txt=document.getElementById('msgInput').value.trim();
-      if(!txt || !currentChat) return;
-      const obj = { from:user, text:txt, ts:Date.now() };
-      if(currentChat.startsWith('group__')){
-        const g = currentChat.split('__')[1];
-        db.ref('groupChats/'+g).push(obj);
-      } else {
-        const convo = [user,currentChat].sort().join('_');
-        db.ref('privateChats/'+convo).push(obj);
-      }
-      document.getElementById('msgInput').value='';
-    }
+db.ref('calls/' + user + '/incoming').on('value', snap => {
+  const c = snap.val();
+  if(c){
+    const ok = confirm(`${c.from} calls (${c.type}). Accept?`);
+    db.ref('calls/' + user + '/incoming').remove();
+    if(ok) window.open(c.room, '_blank');
+  }
+});
 
-    function startCall(type){
-      if(!currentChat || currentChat.startsWith('group__')) return alert('Open a private chat.');
-      const room = `https://YOUR_DAILY_DOMAIN.daily.co/${[user,currentChat].sort().join('-')}`;
-      db.ref('calls/'+currentChat+'/incoming').set({ from:user, type, room });
-      window.open(room, '_blank');
-      alert('Calling '+currentChat+' ...');
-    }
+function logout(){
+  db.ref('users/' + user).update({ online: false, lastSeen: Date.now() });
+  localStorage.removeItem('username');
+  window.location.href = 'index.html';
+}
 
-    db.ref('calls/'+user+'/incoming').on('value', snap=>{
-      const c = snap.val();
-      if(c){
-        const ok = confirm(`${c.from} (${c.type}) call. Accept?`);
-        db.ref('calls/'+user+'/incoming').remove();
-        if(ok) window.open(c.room, '_blank');
-      }
-    });
-
-    function logout(){
-      localStorage.removeItem('username');
-      window.location.href='index.html';
-    }
-
-    function openTab(id){
-      document.querySelectorAll('.tabs button').forEach(b=>b.classList.toggle('active', b.textContent+'Content'===id));
-      document.querySelectorAll('.content').forEach(c=>c.classList.remove('active'));
-      document.getElementById(id).classList.add('active');
-      if(id==='chatContent') document.getElementById('chatWindow').style.display='none';
-    }
-  </script>
+function openTab(id){
+  document.querySelectorAll('.tabs button').forEach(b => b.classList.toggle('active', b.textContent + 'Content' === id));
+  document.querySelectorAll('.content').forEach(c => c.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  if(id === 'chatContent') document.getElementById('chatWindow').style.display = 'none';
+}
+</script>
 </body>
 </html>
