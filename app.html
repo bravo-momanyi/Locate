@@ -1,97 +1,105 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/><title>Bravo Chat</title>
-<style>
-  *{margin:0;padding:0;box-sizing:border-box;}
-  body,html{height:100%;font-family:Arial,sans-serif;}
-  header{display:flex;justify-content:space-between;padding:10px;background:#075E54;color:white;}
-  .container{display:grid;grid-template-columns:1fr 3fr;height:calc(100% - 50px);}
-  #userList{border-right:1px solid #ddd;overflow-y:auto;padding:10px;}
-  #chatWindow{display:flex;flex-direction:column;}
-  #messages{flex:1;overflow-y:auto;padding:10px;}
-  .msg.you{align-self:flex-end;background:#dcf8c6;}
-  .msg.they{align-self:flex-start;background:white;}
-  .msg{text-align:left;padding:8px;border-radius:7px;margin:5px;max-width:70%;}
-  #sendForm{display:flex;padding:10px;border-top:1px solid #ddd;}
-  #sendForm input{flex:1;padding:8px;border-radius:20px;border:1px solid #ccc;}
-  #sendForm button{margin-left:5px;padding:9px 15px;background:#25D366;border:none;color:white;border-radius:20px;}
-  .callBtns{margin:5px;}
-  button.call{margin-right:5px;padding:6px 12px;border:none;border-radius:5px;color:white;}
-  button.call.voice{background:#128C7E;}
-  button.call.video{background:#075E54;}
-  @media (max-width:600px){.container{display:block;} #chatWindow{position:absolute;top:50px;left:0;width:100%;display:none;}}
-</style>
-</head><body>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" /><meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Bravo App</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
+  <style>
+    body, html { margin:0; padding:0; height:100%; font-family:Arial,sans-serif; }
+    header { display:flex; justify-content:space-between; align-items:center; background:#222; color:white; padding:10px; }
+    .tabs { display:flex; background:#333; }
+    .tabs button { flex:1; padding:12px; border:none; background:#333; color:white; cursor:pointer; }
+    .tabs button.active { background:#555'; }
+    .tabContent { display:none; height:calc(100% - 92px); overflow:auto; }
+    .tabContent.active { display:block; }
+    #map { width:100%; height:100%; }
+    @media (max-width:600px) { .tabs { flex-direction:column; } }
+  </style>
+</head>
+<body>
+
 <header>
-  <div id="currentUser">Username</div>
+  <div id="currentUser">User123</div>
   <button onclick="logout()">Logout</button>
 </header>
-<div class="container">
-  <div id="userList"><button onclick="refreshUsers()">Start Chat</button><div id="users"></div></div>
-  <div id="chatWindow">
-    <div><strong id="chatWith"></strong>
-      <button class="call voice" onclick="startCall('voice')">Voice</button>
-      <button class="call video" onclick="startCall('video')">Video</button>
-    </div>
-    <div id="messages"></div>
-    <form id="sendForm" onsubmit="sendMsg(event)"><input id="textMsg" placeholder="Type a message"/><button>Send</button></form>
-  </div>
+
+<div class="tabs">
+  <button class="active" onclick="openTab('mapTab')">Map</button>
+  <button onclick="openTab('chatTab')">Chats</button>
 </div>
+
+<div id="mapTab" class="tabContent active">
+  <div id="map"></div>
+</div>
+
+<div id="chatTab" class="tabContent">
+  <!-- Chat UI, omitted for brevity -->
+</div>
+
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
+
 <script>
-  const config = { /* your firebaseConfig */ };
-  firebase.initializeApp(config); const db = firebase.database();
-  const user = localStorage.getItem('username') || prompt('Enter username');
-  document.getElementById('currentUser').textContent = user;
+  // --- Firebase setup ---
+  const firebaseConfig = {
+    apiKey: "...", authDomain: "...",
+    databaseURL: "https://locater-42fb4-default-rtdb.firebaseio.com",
+    projectId: "...", storageBucket: "...",
+    messagingSenderId: "...", appId: "..."
+  };
+  firebase.initializeApp(firebaseConfig);
+  const db = firebase.database();
 
-  function refreshUsers(){
-    db.ref('users').on('value',snap=>{
-      let html='';
-      snap.forEach(c=> {if(c.key!==user) html += `<div onclick="openChat('${c.key}')">${c.key}</div>`;});
-      document.getElementById('users').innerHTML = html;
+  const username = localStorage.getItem('username') || prompt('Enter your username');
+  document.getElementById('currentUser').textContent = username;
+
+  // --- Initialize map ---
+  const map = L.map('map').setView([1.29,36.82],12);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'&copy; OpenStreetMap'}).addTo(map);
+
+  const markers = {};
+
+  // --- Share own location ---
+  if (navigator.geolocation) {
+    navigator.geolocation.watchPosition(pos => {
+      const { latitude, longitude } = pos.coords;
+      db.ref("locations/" + username).set({ lat: latitude, lng: longitude });
     });
   }
-  function openChat(other){
-    document.getElementById('chatWindow').style.display='flex';
-    document.getElementById('chatWith').textContent = other;
-    const convoId = [user,other].sort().join('_');
-    const ref = db.ref('privateChats/' + convoId);
-    ref.off();
-    document.getElementById('messages').innerHTML='';
-    ref.on('child_added',snap=>{
-      const m = snap.val();
-      const div=document.createElement('div');
-      div.className = m.from===user?'msg you':'msg they';
-      div.textContent = m.text;
-      document.getElementById('messages').appendChild(div);
-      document.getElementById('messages').scrollTop = 1e9;
-    });
-  }
-  function sendMsg(e){
-    e.preventDefault();
-    const txt = document.getElementById('textMsg').value.trim(); if(!txt)return;
-    const other = document.getElementById('chatWith').textContent;
-    const convo = [user,other].sort().join('_');
-    db.ref('privateChats/' + convo).push({from:user,text:txt,ts:Date.now()});
-    document.getElementById('textMsg').value='';
-  }
 
-  // Simplified call with ringing using a "calls" node
-  function startCall(type){
-    const other = document.getElementById('chatWith').textContent;
-    db.ref('calls/' + other + '/incoming').set({from:user,type});
-    alert('Calling ' + other);
-  }
-  // Listen for calls to this user
-  db.ref('calls/' + user + '/incoming').on('value',snap=>{
-    const call = snap.val(); if(call){
-      const ans = confirm(`${call.from} is calling (${call.type}). Answer?`);
-      if(ans){
-        db.ref('calls/' + user + '/incoming').remove();
-        alert('Call connected (mock)');
-      } else db.ref('calls/' + user + '/incoming').remove();
-    }
+  // --- Listen for all user locations ---
+  db.ref("locations").on("value", snapshot => {
+    const locs = snapshot.val() || {};
+    Object.keys(locs).forEach(userKey => {
+      const { lat, lng } = locs[userKey];
+      if (markers[userKey]) {
+        markers[userKey].setLatLng([lat, lng]);
+      } else {
+        markers[userKey] = L.marker([lat, lng]).addTo(map).bindPopup(userKey);
+      }
+    });
   });
 
-  function logout(){ localStorage.removeItem('username'); window.location.href='index.html'; }
+  // --- Load users list for chat (only usernames) ---
+  db.ref("users").on("value", snap => {
+    const users = snap.val() || {};
+    console.log("Loaded users:", Object.keys(users)); // Debug
+    // You can build a user list here...
+  });
+
+  function openTab(tabId) {
+    document.querySelectorAll('.tabContent').forEach(el => el.classList.remove('active'));
+    document.getElementById(tabId).classList.add('active');
+    document.querySelectorAll('.tabs button').forEach(btn => {
+      btn.classList.toggle('active', btn.textContent.replace(/s$/, '') === tabId.replace('Tab',''));
+    });
+  }
+
+  function logout(){
+    localStorage.removeItem('username');
+    window.location.href = 'index.html';
+  }
 </script>
-</body></html>
+</body>
+</html>
