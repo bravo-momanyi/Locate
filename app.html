@@ -1,4 +1,13 @@
 <!DOCTYPE html>
+<script>
+  // If not logged in via index.html, force logout
+  if (sessionStorage.getItem('loggedIn') !== 'yes' || !sessionStorage.getItem('username')) {
+    location.href = 'index.html';
+  }
+
+  // Assign the logged in user
+  const user = sessionStorage.getItem('username');
+</script>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
@@ -1170,5 +1179,12 @@ db.ref(`calls/${currentChat}/signal/answer`).on('value', snap => {
 window.addEventListener('unload', function () {
   localStorage.removeItem('username');
 });
+</script>
+<script>
+  // Clear login session on reload or exit
+  window.addEventListener('beforeunload', function () {
+    sessionStorage.removeItem('loggedIn');
+    sessionStorage.removeItem('username');
+  });
 </script>
 </html>
