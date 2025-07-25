@@ -126,15 +126,16 @@
     });
 
     db.ref('groups').on('value', snap => {
-      allGroups = {};
-      snap.forEach(c => allGroups[c.key] = c.val());
+      allGroups = snap.val() || {};
       refreshUserList();
     });
 
     searchBox.addEventListener('input', refreshUserList);
 
     function refreshUserList() {
-      let html = `<h3 style="margin:10px 0 5px;">Users</h3>`;
+      let html = '';
+
+      html += `<h3 style="margin:10px 0 5px;">Users</h3>`;
       Object.keys(allUsers).forEach(u => {
         if (u !== user && u.toLowerCase().includes(searchBox.value.toLowerCase())) {
           html += `<button onclick="openChat('${u}')">${u}</button>`;
@@ -142,10 +143,11 @@
       });
 
       html += `<h3 style="margin:15px 0 5px;">Groups</h3>`;
-      Object.entries(allGroups).forEach(([name, data]) => {
-        if (name.toLowerCase().includes(searchBox.value.toLowerCase())) {
-          const label = data.public ? `# ${name}` : `🔒 ${name}`;
-          html += `<button class="group" onclick="openGroup('${name}')">${label}</button>`;
+      Object.entries(allGroups).forEach(([groupId, data]) => {
+        if (!data.name) return;
+        if (data.name.toLowerCase().includes(searchBox.value.toLowerCase())) {
+          const label = data.public ? `# ${data.name}` : `🔒 ${data.name}`;
+          html += `<button class="group" onclick="openGroup('${groupId}', '${data.name}')">${label}</button>`;
         }
       });
 
@@ -172,15 +174,17 @@
       }
 
       const groupData = {
+        name: name,
         admin: user,
         public: isPublic,
         password: isPublic ? null : password,
         members: { [user]: true }
       };
 
-      db.ref('groups/' + name).set(groupData, err => {
+      const newRef = db.ref('groups').push();
+      newRef.set(groupData, err => {
         if (!err) {
-          db.ref('groupChats/' + name).push({
+          db.ref('groupChats/' + newRef.key).push({
             from: 'System',
             text: `${user} created this ${type} group.`,
             ts: Date.now()
@@ -208,39 +212,27 @@
       });
     }
 
-    function openGroup(g) {
-      currentChat = 'group__' + g;
-      document.getElementById('chatWith').textContent = '#' + g;
+    function openGroup(groupId, displayName) {
+      currentChat = 'group__' + groupId;
+      document.getElementById('chatWith').textContent = '#' + displayName;
       document.getElementById('chatWindow').style.display = 'flex';
       document.getElementById('messages').innerHTML = '';
       if (convoRef) convoRef.off();
+      convoRef = db.ref('groupChats/' + groupId);
+      convoRef.on('child_added', snap => {
+        const m = snap.val();
+        const div = document.createElement('div');
+        div.className = 'msg ' + (m.from === user ? 'you' : 'them');
+        div.textContent = m.from + ': ' + m.text;
+        document.getElementById('messages').appendChild(div);
+        document.getElementById('messages').scrollTop = 1e9;
+      });
 
-      db.ref('groups/' + g).once('value').then(snap => {
+      db.ref('groups/' + groupId).once('value').then(snap => {
         const data = snap.val();
-
-        if (!data.public && !(data.members && data.members[user])) {
-          const entered = prompt(`🔒 Enter password for group "${g}":`);
-          if (entered !== data.password) {
-            alert("Wrong password. Access denied.");
-            document.getElementById('chatWindow').style.display = 'none';
-            return;
-          }
-          db.ref('groups/' + g + '/members/' + user).set(true);
-        }
-
-        convoRef = db.ref('groupChats/' + g);
-        convoRef.on('child_added', snap => {
-          const m = snap.val();
-          const div = document.createElement('div');
-          div.className = 'msg ' + (m.from === user ? 'you' : 'them');
-          div.textContent = m.from + ': ' + m.text;
-          document.getElementById('messages').appendChild(div);
-          document.getElementById('messages').scrollTop = 1e9;
-        });
-
         if (!data.public && data.password) {
           const passDiv = document.createElement('div');
-          passDiv.textContent = `🔒 Private Group`;
+          passDiv.textContent = `🔒 Group Password: ${data.password}`;
           passDiv.style = "padding: 5px 10px; background: #ffe0b2; color: #bf360c; font-weight: bold; border-radius: 5px; margin: 5px;";
           document.getElementById('messages').prepend(passDiv);
         }
