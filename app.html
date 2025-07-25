@@ -1096,6 +1096,8 @@ function endCall() {
     db.ref(`calls/${currentChat}/ice`).remove();
   }
 }
+  window.startCall = startCall;
+  window.endCall = endCall;
 
 // Handle incoming call offer
 db.ref(`calls/${user}/signal`).on('value', snap => {
