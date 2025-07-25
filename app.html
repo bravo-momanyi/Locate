@@ -34,13 +34,29 @@
     .voice { background:#075E54; }
     .video { background:#128C7E; }
     #backBtn {
-      display:none; position:absolute; top:10px; left:10px; background:white; color:#128C7E;
-      border:none; padding:5px 10px; border-radius:5px; z-index:999;
+  display: none;
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  background: white;
+  color: #128C7E;
+  border: none;
+  padding: 5px 10px;
+  border-radius: 5px;
+  z-index: 1000; /* Make it above the header */
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
     }
     @media(max-width:600px){
-      #userList { width:100%; }
-      #chatWindow { position:absolute; top:0; left:0; width:100%; height:100%; background:white; }
-      #backBtn { display:block; }
+  #userList { width:100%; }
+  #chatWindow { 
+    position:absolute; 
+    top:0; left:0; 
+    width:100%; height:100%; 
+    background:white; 
+    display: flex; 
+    flex-direction: column;
+  }
+  #backBtn { display:block; }
     }
     #chatHeader {
   background: #128C7E;
@@ -52,6 +68,9 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
+    }
+    #chatHeader {
+  padding: 10px 10px 10px 50px; /* leave space for Back button on left */
     }
 
 #messages {
