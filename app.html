@@ -94,6 +94,7 @@
       display: none;
       flex-direction: column;
       position: relative;
+      background: white;
     }
 
     #chatHeader {
@@ -103,11 +104,31 @@
       display: flex;
       align-items: center;
       justify-content: space-between;
+      position: relative;
+    }
+
+    #chatHeader .chatTitleWrapper {
+      flex: 1;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      position: absolute;
+      left: 0;
+      right: 0;
+      pointer-events: none;
     }
 
     #chatWith {
+      pointer-events: auto;
       cursor: pointer;
       text-decoration: underline;
+      font-weight: bold;
+    }
+
+    .callGroup {
+      display: flex;
+      align-items: center;
+      z-index: 1;
     }
 
     .callGroup button {
@@ -174,16 +195,12 @@
 
     #backBtn {
       display: none;
-      position: absolute;
-      top: 10px;
-      left: 10px;
       background: white;
       color: #128C7E;
       border: none;
       padding: 5px 10px;
       border-radius: 5px;
-      z-index: 1000;
-      box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+      margin-right: 10px;
     }
 
     @media (max-width: 600px) {
@@ -203,7 +220,7 @@
       }
 
       #backBtn {
-        display: block;
+        display: inline-block;
       }
     }
   </style>
@@ -233,8 +250,8 @@
 
   <div id="chatWindow">
     <div id="chatHeader">
-      <div style="display: flex; align-items: center; gap: 10px;">
-        <button id="backBtn" onclick="closeChat()">⬅</button>
+      <button id="backBtn" onclick="closeChat()">⬅</button>
+      <div class="chatTitleWrapper">
         <span id="chatWith" onclick="openChatOptions()">---</span>
       </div>
       <div class="callGroup">
