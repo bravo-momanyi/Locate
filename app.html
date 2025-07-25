@@ -252,26 +252,31 @@
 <body>
 
   <header>
-    <div>Bravo Chat</div>
+    <div id="currentUser">Bravo</div>
+    <button>Logout</button>
   </header>
 
   <div class="tabs">
-    <button class="active">Chat</button>
-    <button>Map</button>
+    <button class="active">Map</button>
+    <button>Chats</button>
   </div>
 
-  <div id="chatContent" class="content active">
+  <div id="mapContent" class="content active">
+    <div id="map">Map Here</div>
+  </div>
+
+  <div id="chatContent" class="content">
     <div id="userList">
-      <!-- Users -->
-      <input type="text" placeholder="Search" />
-      <button class="group">Group Chat</button>
+      <input placeholder="Search users/groups..." />
+      <button>Create Group</button>
+      <button class="group"># DevGroup</button>
     </div>
 
     <div id="chatWindow">
       <div id="chatHeader">
-        <button id="backBtn">Back</button>
+        <button id="backBtn">⬅</button>
         <div class="chatTitleWrapper">
-          <span id="chatWith">Chatting with Bravo</span>
+          <span id="chatWith">Bravo</span>
         </div>
         <div class="callGroup">
           <button class="voice">📞</button>
@@ -280,23 +285,19 @@
       </div>
 
       <div id="messages">
-        <div class="msg you">Hello Bravo!</div>
-        <div class="msg them">Hey there!</div>
+        <div class="msg you">Hi there!</div>
+        <div class="msg them">Hey Bravo!</div>
       </div>
 
       <div id="sendBar">
-        <input type="text" placeholder="Type a message" />
+        <input placeholder="Type message..." />
         <button>Send</button>
       </div>
     </div>
   </div>
 
-  <div id="mapContent" class="content">
-    <div id="map">Map Here</div>
-  </div>
-
 </body>
-  </html>
+</html>
 <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
