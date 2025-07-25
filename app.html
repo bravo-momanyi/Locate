@@ -1162,4 +1162,13 @@ db.ref(`calls/${currentChat}/signal/answer`).on('value', snap => {
   }
 });
 </script>
+<script>
+  window.addEventListener('beforeunload', function () {
+  localStorage.removeItem('username');
+});
+
+window.addEventListener('unload', function () {
+  localStorage.removeItem('username');
+});
+</script>
 </html>
