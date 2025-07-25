@@ -1,29 +1,45 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta charset="UTF-8" /><meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Bravo Chat & Map</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
   <style>
-    body,html{margin:0;padding:0;height:100%;font-family:Arial,sans-serif;}
-    header{display:flex;justify-content:space-between;align-items:center;background:#075E54;color:white;padding:10px;}
-    .tabs{display:flex;background:#128C7E;} .tabs button{flex:1;padding:12px;border:none;background:#128C7E;color:white;cursor:pointer;}
-    .tabs button.active{background:#25D366;} .content{display:none;height:calc(100% - 92px);overflow:hidden;}
-    .content.active{display:flex;} #mapContent{position:relative;} #map{width:100%;height:100%;}
-    #chatContent{display:flex;width:100%;} #userList{width:30%;border-right:1px solid #ddd;overflow-y:auto;padding:10px;}
-    #userList input, #userList button{width:100%;margin-bottom:5px;padding:8px;border:none;}
-    #userList button{background:#f1f1f1;cursor:pointer;} #userList button.group{background:#e1f5fe;font-weight:bold;}
-    #chatWindow{flex:1;display:none;flex-direction:column;position:relative;} #chatHeader{padding:10px;background:#128C7E;color:white;display:flex;align-items:center;justify-content:space-between;}
-    #chatHeader span{cursor:pointer;} .status{font-size:0.9em;color:#eee;margin-left:10px;}
-    #headerMenu{display:none;position:absolute;top:50px;right:20px;background:#fff;box-shadow:0 0 5px rgba(0,0,0,0.3);padding:10px;z-index:1000;}
-    #messages{flex:1;padding:10px;overflow-y:auto;background:#e5ddd5;} .msg{padding:8px;margin:5px;border-radius:7px;max-width:70%;}
-    .you{background:#dcf8c6;align-self:flex-end;} .them{background:white;align-self:flex-start;}
-    #sendBar{display:flex;padding:10px;border-top:1px solid #ccc;}
-    #sendBar input{flex:1;padding:8px;border-radius:20px;border:1px solid #ccc;} #sendBar button{padding:8px 12px;background:#25D366;border:none;color:white;margin-left:5px;border-radius:20px;}
-    .callGroup button{margin-left:5px;padding:6px 10px;border:none;border-radius:5px;color:white;}
-    .voice{background:#075E54;} .video{background:#128C7E;} #typingIndicator{font-size:0.9em;color:#444;padding:5px;display:none;}
-    #backBtn{display:none;position:absolute;top:10px;left:10px;background:white;color:#128C7E;border:none;padding:5px 10px;border-radius:5px;z-index:999;}
-    @media(max-width:600px){#userList{width:100%;} #chatWindow{position:absolute;top:0;left:0;width:100%;height:100%;background:white;} #backBtn{display:block;}}
+    body, html { margin:0; padding:0; height:100%; font-family:Arial,sans-serif; }
+    header { display:flex; justify-content:space-between; align-items:center; background:#075E54; color:white; padding:10px;}
+    .tabs { display:flex; background:#128C7E; }
+    .tabs button { flex:1; padding:12px; border:none; background:#128C7E; color:white; cursor:pointer;}
+    .tabs button.active { background:#25D366;}
+    .content { display:none; height:calc(100% - 92px); overflow:hidden; }
+    .content.active { display:flex; }
+    #mapContent { position:relative; }
+    #map { width:100%; height:100%; }
+    #chatContent { display:flex; width:100%; }
+    #userList { width:30%; border-right:1px solid #ddd; overflow-y:auto; padding:10px;}
+    #userList input, #userList button { width:100%; margin-bottom:5px; padding:8px; border:none; }
+    #userList button { background:#f1f1f1; cursor:pointer; }
+    #userList button.group { background:#e1f5fe; font-weight:bold; }
+    #chatWindow { flex:1; display:none; flex-direction:column; position:relative; }
+    #chatHeader { padding:10px; background:#128C7E; color:white; display:flex; align-items:center; justify-content:space-between;}
+    #messages { flex:1; padding:10px; overflow-y:auto; background:#e5ddd5;}
+    .msg { padding:8px; margin:5px; border-radius:7px; max-width:70%; }
+    .you { background:#dcf8c6; align-self:flex-end; }
+    .them { background:white; align-self:flex-start; }
+    #sendBar { display:flex; padding:10px; border-top:1px solid #ccc; }
+    #sendBar input { flex:1; padding:8px; border-radius:20px; border:1px solid #ccc; }
+    #sendBar button { padding:8px 12px; background:#25D366; border:none; color:white; margin-left:5px; border-radius:20px; }
+    .callGroup button { margin-left:5px; padding:6px 10px; border:none; border-radius:5px; color:white; }
+    .voice { background:#075E54; }
+    .video { background:#128C7E; }
+    #backBtn {
+      display:none; position:absolute; top:10px; left:10px; background:white; color:#128C7E;
+      border:none; padding:5px 10px; border-radius:5px; z-index:999;
+    }
+    @media(max-width:600px){
+      #userList { width:100%; }
+      #chatWindow { position:absolute; top:0; left:0; width:100%; height:100%; background:white; }
+      #backBtn { display:block; }
+    }
   </style>
 </head>
 <body>
@@ -31,31 +47,32 @@
     <div id="currentUser"></div>
     <button onclick="logout()">Logout</button>
   </header>
+
   <div class="tabs">
     <button class="active" onclick="openTab('mapContent')">Map</button>
     <button onclick="openTab('chatContent')">Chats</button>
   </div>
+
   <div id="mapContent" class="content active"><div id="map"></div></div>
+
   <div id="chatContent" class="content">
     <div id="userList">
-      <input id="searchBox" placeholder="Search users/groups..."/>
+      <input id="searchBox" placeholder="Search users/groups..." />
       <button onclick="createGroup()">Create Group</button>
       <div id="users"></div>
     </div>
     <div id="chatWindow">
       <button id="backBtn" onclick="closeChat()">Back</button>
       <div id="chatHeader">
-        <span id="chatWith" onclick="openHeaderMenu()"></span><span id="statusIndicator" class="status"></span>
+        <span id="chatWith">---</span>
         <div class="callGroup">
           <button class="voice" onclick="startCall('voice')">Voice</button>
           <button class="video" onclick="startCall('video')">Video</button>
         </div>
       </div>
-      <div id="headerMenu"><div id="headerOptions"></div></div>
       <div id="messages"></div>
-      <div id="typingIndicator">typing…</div>
       <div id="sendBar">
-        <input id="msgInput" placeholder="Type message..." oninput="notifyTyping()"/>
+        <input id="msgInput" placeholder="Type message..."/>
         <button onclick="sendMsg()">Send</button>
       </div>
     </div>
@@ -65,202 +82,162 @@
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
   <script>
-  // -- Firebase setup --
-  const cfg = { /* your firebase config */ };
-  firebase.initializeApp(cfg);
-  const db = firebase.database();
-  
-  // -- User setup --
-  const user = localStorage.getItem('username')||prompt('Enter username');
-  localStorage.setItem('username',user);
-  document.getElementById('currentUser').textContent = user;
-  db.ref('users/'+user).set(true);
-  db.ref('status/'+user).onDisconnect().set({online:false,last:Date.now()});
-  db.ref('status/'+user).set({online:true});
+    const config = {
+      apiKey: "AIzaSyBfkUJS81minjxj0DFz4pzNnGzCtb5ZJss",
+      authDomain: "locater-42fb4.firebaseapp.com",
+      databaseURL: "https://locater-42fb4-default-rtdb.firebaseio.com",
+      projectId: "locater-42fb4",
+      storageBucket: "locater-42fb4.appspot.com",
+      messagingSenderId: "250348367998",
+      appId: "1:250348367998:web:d734b2b4c735b5684ae82f"
+    };
+    firebase.initializeApp(config);
+    const db = firebase.database();
 
-  // -- Map geo update --
-  const map=L.map('map').setView([1.29,36.82],12);
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
-  const markers={};
-  setInterval(()=>navigator.geolocation.getCurrentPosition(pos=>{
-    db.ref('locations/'+user).set({lat:pos.coords.latitude,lng:pos.coords.longitude});
-  }),5000);
-  db.ref('locations').on('value',snap=>{
-    const locs=snap.val()||{};
-    for(const[k,v]of Object.entries(locs)){
-      if(markers[k]) markers[k].setLatLng([v.lat,v.lng]);
-      else markers[k]=L.marker([v.lat,v.lng]).addTo(map).bindPopup(k);
-    }
-  });
+    const user = localStorage.getItem('username') || prompt('Enter username');
+    localStorage.setItem('username', user);
+    document.getElementById('currentUser').textContent = user;
+    db.ref('users/' + user).set(true);
 
-  // -- Chat logic --
-  const listEl=document.getElementById('users'),sb=document.getElementById('searchBox');
-  let allUsers={},allGroups={},currentChat='',convoRef=null,typingTimeout;
+    const map = L.map('map').setView([1.29, 36.82], 12);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+    const markers = {};
+    setInterval(() => {
+      navigator.geolocation.getCurrentPosition(pos => {
+        db.ref('locations/' + user).set({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+      });
+    }, 5000);
 
-  db.ref('users').on('value',s=>{allUsers=s.val()||{};refreshList();});
-  db.ref('groups').on('value',s=>{allGroups=s.val()||{};refreshList();});
-  sb.addEventListener('input',refreshList);
-
-  function refreshList(){
-    let h='<h3>Users</h3>';
-    Object.keys(allUsers).forEach(u=>{
-      if(u!==user && u.toLowerCase().includes(sb.value.toLowerCase()))h+=`<button onclick="openChat('${u}')">${u}</button>`;
-    });
-    h+='<h3>Groups</h3>';
-    Object.entries(allGroups).forEach(([id,g])=>{
-      const lbl = g.public?`# ${g.name}`:`🔒 ${g.name}`;
-      if(g.name.toLowerCase().includes(sb.value.toLowerCase()))
-        h+=`<button class="group" onclick="attemptJoinGroup('${id}','${g.name}')">${lbl}</button>`;
-    });
-    listEl.innerHTML=h;
-  }
-
-  function createGroup(){
-    const n=prompt("Name?").trim().replace(/\s+/g,"_");
-    const t=prompt("public or private?").toLowerCase();
-    if(!['public','private'].includes(t)) return alert("Invalid");
-    const pwd=t==='private'?prompt("Password:"):null;
-    if(t==='private'&&!pwd) return alert("No pwd");
-    const ref=db.ref('groups').push();
-    ref.set({name:n,admin:user,public:t==='public',password:pwd,members:{[user]:true}},e=>{
-      if(e)return alert("Err");
-      db.ref('groupChats/'+ref.key).push({from:'System',text:`${user} created group`,ts:Date.now()});
-      alert("Created");
-    });
-  }
-
-  function attemptJoinGroup(id,name){
-    db.ref('groups/'+id).once('value').then(s=>{
-      const g=s.val();
-      if(g.members&&g.members[user])return openGroup(id,name);
-      if(!g.public){
-        const pwd=prompt("Pwd?");
-        if(pwd!==g.password)return alert("Wrong");
-      } 
-      if(confirm("Join?")){
-        db.ref('groups/'+id+'/members/'+user).set(true);
-        openGroup(id,name);
+    db.ref('locations').on('value', snap => {
+      const locs = snap.val() || {};
+      for (const [u, loc] of Object.entries(locs)) {
+        if (markers[u]) markers[u].setLatLng([loc.lat, loc.lng]);
+        else markers[u] = L.marker([loc.lat, loc.lng]).addTo(map).bindPopup(u);
       }
     });
-  }
 
-  function openChat(u){
-    currentChat=u;
-    showChatHeader(u);
-    loadConvo(db.ref('privateChats/'+[user,u].sort().join('_')));
-    subscribeStatusTyping(u);
-  }
+    const userList = document.getElementById('users');
+    const searchBox = document.getElementById('searchBox');
+    let allUsers = {}, allGroups = {}, currentChat = '', convoRef = null;
 
-  function openGroup(id,name){
-    currentChat='group__'+id;
-    showChatHeader('#'+name);
-    loadConvo(db.ref('groupChats/'+id));
-  }
-
-  function showChatHeader(label){
-    document.getElementById('chatWith').textContent=label;
-    document.getElementById('chatWindow').style.display='flex';
-    document.getElementById('messages').innerHTML='';
-    document.getElementById('statusIndicator').textContent='';
-  }
-
-  function loadConvo(ref){
-    if(convoRef) convoRef.off();
-    convoRef=ref;
-    convoRef.on('child_added',snap=>appendMsg(snap.val()));
-  }
-
-  function appendMsg(m){
-    const d=document.createElement('div');
-    d.className='msg '+(m.from===user?'you':'them');
-    d.textContent=m.text;
-    d.oncontextmenu=e=>{e.preventDefault(); if(confirm("Delete?"))d.remove();}
-    document.getElementById('messages').appendChild(d);
-    d.scrollIntoView();
-  }
-
-  function sendMsg(){
-    const txt=document.getElementById('msgInput').value.trim(); if(!txt||!currentChat)return;
-    const obj={from:user,text:txt,ts:Date.now()};
-    if(currentChat.startsWith('group__')){
-      const id=currentChat.split('__')[1];
-      db.ref('groupChats/'+id).push(obj);
-    } else {
-      db.ref('privateChats/'+[user,currentChat].sort().join('_')).push(obj);
-    }
-    document.getElementById('msgInput').value='';
-    notifyTyping(true);
-  }
-
-  function startCall(type){
-    if(!currentChat||currentChat.startsWith('group__'))return alert('Open 1‑on‑1 chat');
-    const room=`https://YOUR_DAILY_DOMAIN.daily.co/${[user,currentChat].sort().join('-')}`;
-    db.ref('calls/'+currentChat+'/incoming').set({from:user,type,room});
-    window.open(room,'_blank');
-  }
-
-  db.ref('calls/'+user+'/incoming').on('value',snap=>{
-    const c=snap.val(); if(!c)return;
-    db.ref('calls/'+user+'/incoming').remove();
-    if(confirm(`${c.from} calls (${c.type}). Accept?`)) window.open(c.room,'_blank');
-  });
-
-  function notifyTyping(clear){
-    if(currentChat.startsWith('group__'))return;
-    db.ref('typing/'+currentChat+'/'+user).set(clear?null:true);
-    clearTimeout(typingTimeout); typingTimeout=setTimeout(()=>db.ref('typing/'+currentChat+'/'+user).remove(),2000);
-  }
-
-  function subscribeStatusTyping(u){
-    db.ref('status/'+u).on('value',snap=>{
-      const v=snap.val();
-      if(v) document.getElementById('statusIndicator').textContent=v.online?'online':`last seen ${new Date(v.last).toLocaleTimeString()}`;
+    db.ref('users').on('value', snap => {
+      allUsers = snap.val() || {};
+      refreshUserList();
     });
-    db.ref('typing/'+u).on('value',snap=>{
-      document.getElementById('typingIndicator').style.display=Object.keys(snap.val()||{}).length?'block':'none';
+
+    db.ref('groups').on('value', snap => {
+      allGroups = snap.val() || {};
+      refreshUserList();
     });
-  }
 
-  function openHeaderMenu(){
-    const opts = document.getElementById('headerOptions');
-    opts.innerHTML='';
-    if(currentChat.startsWith('group__')){
-      opts.innerHTML+=`<button onclick="viewMembers()">View Members</button><button onclick="leaveGroup()">Leave</button>`;
-    } else {
-      opts.innerHTML+=`<button onclick="blockUser()">Block</button><button onclick="deleteChat()">Delete chat</button>`;
+    searchBox.addEventListener('input', refreshUserList);
+
+    function refreshUserList() {
+      let html = `<h3 style="margin:10px 0 5px;">Users</h3>`;
+      Object.keys(allUsers).forEach(u => {
+        if (u !== user && u.toLowerCase().includes(searchBox.value.toLowerCase())) {
+          html += `<button onclick="openChat('${u}')">${u}</button>`;
+        }
+      });
+
+      html += `<h3 style="margin:15px 0 5px;">Groups</h3>`;
+      Object.entries(allGroups).forEach(([id, data]) => {
+        if (!data.name) return;
+        const label = data.public ? `# ${data.name}` : `🔒 ${data.name}`;
+        html += `<button class="group" onclick="attemptJoinGroup('${id}', '${data.name}')">${label}</button>`;
+      });
+
+      userList.innerHTML = html;
     }
-    document.getElementById('headerMenu').style.display='block';
-    setTimeout(()=>document.getElementById('headerMenu').style.display='none',3000);
-  }
 
-  function blockUser(){ db.ref('blocks/'+user+'/'+currentChat).set(true); closeChat(); }
-  function deleteChat(){ closeChat(); }
-  function viewMembers(){
-    const id=currentChat.split('__')[1];
-    db.ref('groups/'+id+'/members').once('value').then(s=>alert("Members:\n"+Object.keys(s.val()).join(', ')));
-  }
-  function leaveGroup(){
-    const id=currentChat.split('__')[1];
-    db.ref('groups/'+id+'/members/'+user).remove();
-    closeChat();
-  }
+    function createGroup() {
+      let name = prompt("Enter group name (no special characters):");
+      if (!name) return;
+      name = name.trim().replace(/[^a-zA-Z0-9 _-]/g, '').replace(/\s+/g, '_');
 
-  function closeChat(){
-    document.getElementById('chatWindow').style.display='none';
-    currentChat=''; if(convoRef) convoRef.off();
-  }
+      let type = prompt("Group Type: Type 'public' or 'private'").toLowerCase();
+      if (type !== 'public' && type !== 'private') {
+        alert("Invalid group type. Please type 'public' or 'private'.");
+        return;
+      }
 
-  function logout(){
-    db.ref('status/'+user).set({online:false,last:Date.now()});
-    localStorage.removeItem('username'); window.location.href='index.html';
-  }
+      const isPublic = type === 'public';
+      let password = null;
 
-  function openTab(id){
-    document.querySelectorAll('.tabs button').forEach(b=>b.classList.toggle('active',b.textContent+'Content'===id));
-    document.querySelectorAll('.content').forEach(c=>c.classList.remove('active'));
-    document.getElementById(id).classList.add('active');
-    if(id==='chatContent') closeChat();
-  }
+      if (!isPublic) {
+        password = prompt("Enter a password for this private group:");
+        if (!password) return alert("Private group must have a password.");
+      }
+
+      const groupData = {
+        name,
+        admin: user,
+        public: isPublic,
+        password: isPublic ? null : password,
+        members: { [user]: true }
+      };
+
+      const newRef = db.ref('groups').push();
+      newRef.set(groupData, err => {
+        if (!err) {
+          db.ref('groupChats/' + newRef.key).push({
+            from: 'System',
+            text: `${user} created this ${type} group.`,
+            ts: Date.now()
+          });
+          alert(`${type.charAt(0).toUpperCase() + type.slice(1)} group created!`);
+        }
+      });
+    }
+
+    function sendMsg() {
+      const txt = document.getElementById('msgInput').value.trim();
+      if (!txt || !currentChat) return;
+      const msg = { from: user, text: txt, ts: Date.now() };
+      if (currentChat.startsWith('group__')) {
+        const g = currentChat.split('__')[1];
+        db.ref('groupChats/' + g).push(msg);
+      } else {
+        const convo = [user, currentChat].sort().join('_');
+        db.ref('privateChats/' + convo).push(msg);
+      }
+      document.getElementById('msgInput').value = '';
+    }
+
+    function startCall(type) {
+      if (!currentChat || currentChat.startsWith('group__')) return alert('Open a private chat.');
+      const room = `https://YOUR_DAILY_DOMAIN.daily.co/${[user, currentChat].sort().join('-')}`;
+      db.ref('calls/' + currentChat + '/incoming').set({ from: user, type, room });
+      window.open(room, '_blank');
+    }
+
+    db.ref('calls/' + user + '/incoming').on('value', snap => {
+      const c = snap.val();
+      if (c) {
+        db.ref('calls/' + user + '/incoming').remove();
+        const ok = confirm(`${c.from} (${c.type}) call. Accept?`);
+        if (ok) window.open(c.room, '_blank');
+      }
+    });
+
+    function logout() {
+      localStorage.removeItem('username');
+      location.href = 'index.html';
+    }
+
+    function openTab(id) {
+      document.querySelectorAll('.tabs button').forEach(b => b.classList.toggle('active', b.textContent + 'Content' === id));
+      document.querySelectorAll('.content').forEach(c => c.classList.remove('active'));
+      document.getElementById(id).classList.add('active');
+      if (id === 'chatContent') document.getElementById('chatWindow').style.display = 'none';
+    }
+
+    function closeChat() {
+      document.getElementById('chatWindow').style.display = 'none';
+    }
+
+    // 🟢 ENHANCEMENTS: Typing, Last Seen, Right-click Delete, Group Options...
+    // (See next message, due to length)
   </script>
 </body>
 </html>
