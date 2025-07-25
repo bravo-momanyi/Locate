@@ -131,31 +131,37 @@ header {
   z-index: 10;
 }
 
-/* Chat Title */
+.chatTitleWrapper {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
 #chatWith {
   font-weight: bold;
   text-align: center;
-  flex: 1;
   text-decoration: underline;
   cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
 }
 
-/* Back Button */
 #backBtn {
   display: none;
-  position: absolute;
-  left: 10px;
   background: white;
   color: #128C7E;
   border: none;
   padding: 5px 10px;
   border-radius: 5px;
   font-size: 14px;
-  z-index: 1000;
+  margin-right: 10px;
+  cursor: pointer;
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
 }
 
-/* Call Buttons */
 .callGroup {
   display: flex;
   gap: 5px;
@@ -287,14 +293,15 @@ header {
 
   <div id="chatWindow">
     <div id="chatHeader">
-      <button id="backBtn" onclick="closeChat()">⬅</button>
-      <div class="chatTitleWrapper">
-        <span id="chatWith" onclick="openChatOptions()">---</span>
-      </div>
-      <div class="callGroup">
-        <button class="voice" onclick="startCall('voice')">📞</button>
-        <button class="video" onclick="startCall('video')">🎥</button>
-      </div>
+  <button id="backBtn" onclick="closeChat()">⬅</button>
+  <div class="chatTitleWrapper">
+    <span id="chatWith" onclick="openChatOptions()">---</span>
+  </div>
+  <div class="callGroup">
+    <button class="voice" onclick="startCall('voice')">📞</button>
+    <button class="video" onclick="startCall('video')">🎥</button>
+  </div>
+    </div>
     </div>
 
     <div id="messages"></div>
