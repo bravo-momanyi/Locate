@@ -260,8 +260,22 @@ div.addEventListener('contextmenu', e => {
   if (choice === '1') div.remove();
   else if (choice === '2' && isMine && isRecent) {
     snap.ref.remove(); // remove from groupChats DB
+    if (m.deleted) {
+  div.className = 'msg';
+  div.style.fontStyle = 'italic';
+  div.textContent = "Message deleted";
+} else {
+  div.className = 'msg ' + (m.from === user ? 'you' : 'them');
+  div.textContent = m.from + ': ' + m.text;
+  div.setAttribute('oncontextmenu', `event.preventDefault(); confirmDeleteMessage('${snap.key}', ${JSON.stringify(m)})`);
+    }
   }
 });
+      div.oncontextmenu = function(e) {
+  e.preventDefault();
+  confirmDeleteMessage(snap.key, m);
+};
+      div.setAttribute('oncontextmenu', `event.preventDefault(); confirmDeleteMessage('${snap.key}', ${JSON.stringify(m)})`);
       document.getElementById('messages').appendChild(div);
       document.getElementById('messages').scrollTop = 1e9;
     });
@@ -295,11 +309,57 @@ div.addEventListener('contextmenu', e => {
   if (choice === '1') div.remove();
   else if (choice === '2' && isMine && isRecent) {
     snap.ref.remove(); // delete from Firebase for both
+    if (m.deleted) {
+  div.className = 'msg';
+  div.style.fontStyle = 'italic';
+  div.textContent = "Message deleted";
+} else {
+  div.className = 'msg ' + (m.from === user ? 'you' : 'them');
+  div.textContent = m.from + ': ' + m.text;
+  div.setAttribute('oncontextmenu', `event.preventDefault(); confirmDeleteMessage('${snap.key}', ${JSON.stringify(m)})`);
+    }
   }
 });
+      div.oncontextmenu = function(e) {
+  e.preventDefault();
+  confirmDeleteMessage(snap.key, m);
+};
+      div.setAttribute('oncontextmenu', `event.preventDefault(); confirmDeleteMessage('${snap.key}', ${JSON.stringify(m)})`);
       document.getElementById('messages').appendChild(div);
       document.getElementById('messages').scrollTop = 1e9;
     });
+  }
+  function confirmDeleteMessage(msgKey, msgObj) {
+  const now = Date.now();
+  const ageInMs = now - msgObj.ts;
+  const oneMinute = 60 * 1000;
+
+  const isPrivate = !currentChat.startsWith('group__');
+  const isSender = msgObj.from === user;
+
+  if (ageInMs > oneMinute) {
+    alert("Message is too old to delete.");
+    return;
+  }
+
+  if (!isSender && !isPrivate) {
+    alert("Only the sender can delete this group message.");
+    return;
+  }
+
+  const confirmed = confirm("Delete this message for everyone?");
+  if (!confirmed) return;
+
+  let ref;
+  if (isPrivate) {
+    const convo = [user, currentChat].sort().join('_');
+    ref = db.ref('privateChats/' + convo + '/' + msgKey);
+  } else {
+    const groupId = currentChat.split('__')[1];
+    ref = db.ref('groupChats/' + groupId + '/' + msgKey);
+  }
+
+  ref.set({ deleted: true, from: msgObj.from, ts: msgObj.ts });
   }
 
   function sendMsg() {
