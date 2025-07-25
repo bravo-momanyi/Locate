@@ -397,25 +397,33 @@
   });
 
   searchBox.addEventListener('input', refreshUserList);
-
   function refreshUserList() {
-    let html = `<h3 style="margin:10px 0 5px;">Users</h3>`;
-    Object.keys(allUsers).forEach(u => {
-      if (u !== user && u.toLowerCase().includes(searchBox.value.toLowerCase())) {
-        html += `<button onclick="openChat('${u}')">${u}</button>`;
-      }
-    });
+  const searchTerm = searchBox.value.trim().toLowerCase();
+  let html = `<h3 style="margin:10px 0 5px;">Users</h3>`;
 
-    html += `<h3 style="margin:15px 0 5px;">Groups</h3>`;
-    Object.entries(allGroups).forEach(([id, data]) => {
-      if (!data.name) return;
+  // Filter and display users
+  Object.keys(allUsers).forEach(u => {
+    if (u !== user && u.toLowerCase().includes(searchTerm)) {
+      html += `<button onclick="openChat('${u}')">${u}</button>`;
+    }
+  });
+
+  html += `<h3 style="margin:15px 0 5px;">Groups</h3>`;
+
+  // Filter and display groups
+  Object.entries(allGroups).forEach(([id, data]) => {
+    if (!data || typeof data.name !== 'string') return;
+
+    const groupName = data.name.trim().toLowerCase();
+    
+    if (groupName.includes(searchTerm)) {
       const label = data.public ? `# ${data.name}` : `🔒 ${data.name}`;
       html += `<button class="group" onclick="attemptJoinGroup('${id}', '${data.name}')">${label}</button>`;
-    });
+    }
+  });
 
-    userList.innerHTML = html;
+  userList.innerHTML = html;
   }
-
   function createGroup() {
     let name = prompt("Enter group name (no special characters):");
     if (!name) return;
