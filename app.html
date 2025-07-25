@@ -120,31 +120,28 @@
 
   /* Chat Header */
   #chatHeader {
-  display: none;
+  position: relative;
+  display: flex;
   align-items: center;
   justify-content: center;
   padding: 10px;
   background: #128C7E;
   color: white;
   font-size: 16px;
-  position: relative;
-  z-index: 10;
-  }
+}
 
-  /* Chat Title */
-  #chatWith {
+#chatWith {
   font-weight: bold;
   text-align: center;
-  flex: 0 0 auto;
   text-decoration: underline;
   cursor: pointer;
   position: absolute;
   left: 50%;
   transform: translateX(-50%);
+  white-space: nowrap;
 }
 
 #backBtn {
-  display: none;
   position: absolute;
   left: 10px;
   background: white;
@@ -153,8 +150,8 @@
   padding: 5px 10px;
   border-radius: 5px;
   font-size: 14px;
-  z-index: 1000;
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+  z-index: 2;
 }
 
 .callGroup {
@@ -162,6 +159,7 @@
   right: 10px;
   display: flex;
   gap: 5px;
+  z-index: 2;
 }
 
   .callGroup button {
