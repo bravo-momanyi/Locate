@@ -1,11 +1,10 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
+  <meta charset="UTF-8" />
   <title>Sign Up</title>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
   <style>
     body {
@@ -29,6 +28,7 @@
       background: green;
       color: white;
       border: none;
+      cursor: pointer;
     }
     .toggle {
       position: relative;
@@ -42,39 +42,49 @@
       cursor: pointer;
       user-select: none;
     }
-    .status {
-      font-size: 12px;
-      color: lightgray;
+    .msg {
+      font-size: 13px;
+      color: orange;
+      margin-top: -5px;
       margin-bottom: 5px;
+    }
+    .msg.error {
+      color: red;
+    }
+    .msg.success {
+      color: lightgreen;
     }
   </style>
 </head>
 <body>
 
   <h2>Create Account</h2>
-  <input id="username" type="text" placeholder="Username" /><br>
-  
+
+  <input id="username" type="text" placeholder="Username" />
+  <div id="usernameMsg" class="msg"></div>
+
   <div class="toggle">
     <input id="password" type="password" placeholder="Password" />
     <span onclick="toggleVisibility('password', this)">Show</span>
   </div>
+  <div id="passwordMsg" class="msg"></div>
 
   <div class="toggle">
     <input id="confirmPassword" type="password" placeholder="Confirm Password" />
     <span onclick="toggleVisibility('confirmPassword', this)">Show</span>
   </div>
+  <div id="confirmPasswordMsg" class="msg"></div>
 
-  <input id="mobile" type="text" placeholder="Mobile Number (e.g. +2547XXXXXXX)" /><br>
-  <input id="email" type="email" placeholder="Email Address" /><br>
+  <input id="mobile" type="text" placeholder="Mobile Number (+254...)" />
+  <div id="mobileMsg" class="msg"></div>
 
-  <button id="sendOtpBtn" onclick="sendVerificationCode()">Send Verification Code</button>
-  <input id="otp" type="text" placeholder="Enter Email OTP" /><br>
-  <div id="emailOtpStatus" class="status"></div>
+  <input id="email" type="email" placeholder="Email Address" />
+  <div id="emailMsg" class="msg"></div>
 
-  <div id="recaptcha-container" style="margin-top: 10px;"></div>
-  <button onclick="sendPhoneCode()">Send SMS Code</button>
-  <input id="phoneOtp" type="text" placeholder="Enter Phone OTP" />
-  <div id="phoneOtpStatus" class="status"></div>
+  <button id="sendEmailOtpBtn" onclick="sendEmailOtp()">Send Verification Code</button>
+
+  <input id="emailOtp" type="text" placeholder="Enter Email OTP" />
+  <div id="emailOtpMsg" class="msg"></div>
 
   <button onclick="createAccount()">Create Account</button><br><br>
   <a href="login.html" style="color: lightblue;">Already have an account? Login</a>
@@ -90,148 +100,110 @@
       appId: "1:250348367998:web:d734b2b4c735b5684ae82f"
     };
     firebase.initializeApp(firebaseConfig);
-    firebase.auth().useDeviceLanguage();
     const db = firebase.database();
-
     emailjs.init("NuLLYSNdHyhKlSFe0");
 
-    let generatedCode = "";
-    let codeExpiryTime = 0;
-    let otpTimer = null;
-
-    let phoneConfirmationResult = null;
-    window.recaptchaVerifier = new firebase.auth.RecaptchaVerifier('recaptcha-container', {
-      'size': 'normal',
-      'callback': () => console.log("reCAPTCHA solved"),
-      'expired-callback': () => console.warn("reCAPTCHA expired")
-    });
+    let emailOtp = "";
+    let emailOtpExpiry = null;
 
     function toggleVisibility(inputId, toggleEl) {
       const input = document.getElementById(inputId);
-      const isHidden = input.type === "password";
-      input.type = isHidden ? "text" : "password";
-      toggleEl.textContent = isHidden ? "Hide" : "Show";
+      input.type = input.type === "password" ? "text" : "password";
+      toggleEl.textContent = input.type === "password" ? "Show" : "Hide";
     }
 
-    function sendVerificationCode() {
+    function showMsg(id, text, type = '') {
+      const el = document.getElementById(id);
+      el.textContent = text;
+      el.className = "msg " + type;
+    }
+
+    function validateEmailFormat(email) {
+      const regex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      return regex.test(email);
+    }
+
+    document.getElementById("email").addEventListener("blur", checkEmailUniqueness);
+    document.getElementById("email").addEventListener("keyup", e => {
+      if (e.key === "Enter") checkEmailUniqueness();
+    });
+
+    function checkEmailUniqueness() {
       const email = document.getElementById("email").value.trim();
-      const btn = document.getElementById("sendOtpBtn");
-      if (!email) return alert("Please enter your email.");
+      if (!validateEmailFormat(email)) {
+        showMsg("emailMsg", "Wrong email format", "error");
+        return;
+      }
 
-      generatedCode = Math.floor(100000 + Math.random() * 900000).toString();
-      codeExpiryTime = Date.now() + 2 * 60 * 1000;
-
-      const expiryStr = new Date(codeExpiryTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-
-      const params = {
-        email: email,
-        passcode: generatedCode,
-        time: expiryStr
-      };
-
-      emailjs.send("service_p7hwdj9", "template_9ooaehi", params)
-        .then(() => {
-          alert("Verification code sent to email.");
-          startCountdown(120);
-        })
-        .catch(err => {
-          console.error("EmailJS error: ", err);
-          alert("Failed to send verification email.");
-        });
+      db.ref("users").orderByChild("email").equalTo(email).once("value", snap => {
+        if (snap.exists()) {
+          showMsg("emailMsg", "Email already signed up. Please login.", "error");
+        } else {
+          showMsg("emailMsg", "", "");
+        }
+      });
     }
 
-    function startCountdown(seconds) {
-      const btn = document.getElementById("sendOtpBtn");
-      let remaining = seconds;
+    function sendEmailOtp() {
+      const email = document.getElementById("email").value.trim();
+      if (!validateEmailFormat(email)) {
+        return showMsg("emailMsg", "Enter valid email before sending OTP", "error");
+      }
 
+      emailOtp = Math.floor(100000 + Math.random() * 900000).toString();
+      const now = new Date();
+      now.setMinutes(now.getMinutes() + 2);
+      emailOtpExpiry = now;
+
+      const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+      emailjs.send("service_p7hwdj9", "template_9ooaehi", {
+        email: email,
+        passcode: emailOtp,
+        time: timeStr
+      }).then(() => {
+        showMsg("emailOtpMsg", "OTP sent. Check your email.", "success");
+        startCountdown();
+      }).catch(err => {
+        console.error("EmailJS error", err);
+        showMsg("emailOtpMsg", "Failed to send OTP", "error");
+      });
+    }
+
+    function startCountdown() {
+      let timeLeft = 120;
+      const btn = document.getElementById("sendEmailOtpBtn");
       btn.disabled = true;
-      btn.textContent = `Resend OTP (${remaining}s)`;
 
-      otpTimer = setInterval(() => {
-        remaining--;
-        btn.textContent = `Resend OTP (${remaining}s)`;
-
-        if (remaining <= 0) {
-          clearInterval(otpTimer);
+      const interval = setInterval(() => {
+        timeLeft--;
+        btn.textContent = `Resend OTP (${timeLeft}s)`;
+        if (timeLeft <= 0) {
+          clearInterval(interval);
           btn.disabled = false;
-          btn.textContent = "Resend OTP";
+          btn.textContent = "Send Verification Code";
         }
       }, 1000);
     }
 
-    function verifyEmailOtp() {
-      const code = document.getElementById("otp").value.trim();
-      const status = document.getElementById("emailOtpStatus");
+    document.getElementById("emailOtp").addEventListener("blur", validateEmailOtp);
+    document.getElementById("emailOtp").addEventListener("keyup", e => {
+      if (e.key === "Enter") validateEmailOtp();
+    });
 
-      if (!code) {
-        status.textContent = "";
+    function validateEmailOtp() {
+      const otp = document.getElementById("emailOtp").value.trim();
+      if (!otp) {
+        showMsg("emailOtpMsg", "Enter OTP", "error");
         return;
       }
-
-      if (Date.now() > codeExpiryTime) {
-        status.textContent = "OTP expired";
-        status.style.color = "orange";
-      } else if (code === generatedCode) {
-        status.textContent = "Verified";
-        status.style.color = "lightgreen";
+      const now = new Date();
+      if (otp === emailOtp && now <= emailOtpExpiry) {
+        showMsg("emailOtpMsg", "Verified", "success");
       } else {
-        status.textContent = "Wrong OTP";
-        status.style.color = "red";
+        showMsg("emailOtpMsg", "Wrong or expired OTP", "error");
       }
     }
-
-    function sendPhoneCode() {
-      const phone = document.getElementById("mobile").value.trim();
-      if (!phone.startsWith("+") || phone.length < 10) {
-        return alert("Enter valid phone number (+254...)");
-      }
-
-      const verifier = window.recaptchaVerifier;
-      firebase.auth().signInWithPhoneNumber(phone, verifier)
-        .then(result => {
-          phoneConfirmationResult = result;
-          alert("SMS code sent. Enter code.");
-        })
-        .catch(err => {
-          console.warn("SMS not sent. Skipping:", err.message);
-        });
-    }
-
-    function verifyPhoneOtp() {
-      const code = document.getElementById("phoneOtp").value.trim();
-      const status = document.getElementById("phoneOtpStatus");
-
-      if (!code) {
-        status.textContent = "";
-        return;
-      }
-
-      if (!phoneConfirmationResult) {
-        status.textContent = "Send code first.";
-        status.style.color = "orange";
-        return;
-      }
-
-      phoneConfirmationResult.confirm(code)
-        .then(() => {
-          status.textContent = "Phone verified.";
-          status.style.color = "lightgreen";
-        })
-        .catch(() => {
-          status.textContent = "Wrong OTP";
-          status.style.color = "red";
-        });
-    }
-
-    document.getElementById("otp").addEventListener("blur", verifyEmailOtp);
-    document.getElementById("otp").addEventListener("keyup", e => {
-      if (e.key === "Enter") verifyEmailOtp();
-    });
-
-    document.getElementById("phoneOtp").addEventListener("blur", verifyPhoneOtp);
-    document.getElementById("phoneOtp").addEventListener("keyup", e => {
-      if (e.key === "Enter") verifyPhoneOtp();
-    });
 
     function createAccount() {
       const username = document.getElementById("username").value.trim();
@@ -239,35 +211,66 @@
       const confirmPassword = document.getElementById("confirmPassword").value;
       const mobile = document.getElementById("mobile").value.trim();
       const email = document.getElementById("email").value.trim();
-      const otp = document.getElementById("otp").value.trim();
+      const otp = document.getElementById("emailOtp").value.trim();
 
-      if (!username || !password || !confirmPassword || !mobile || !email || !otp)
-        return alert("Please fill all fields.");
+      let valid = true;
 
-      if (username.length < 4 || password.length < 4)
-        return alert("Username and password must be at least 4 characters.");
+      if (username.length < 4) {
+        showMsg("usernameMsg", "Username must be at least 4 characters", "error");
+        valid = false;
+      } else {
+        showMsg("usernameMsg", "");
+      }
 
-      if (password !== confirmPassword)
-        return alert("Passwords do not match.");
+      if (password.length < 4) {
+        showMsg("passwordMsg", "Password must be at least 4 characters", "error");
+        valid = false;
+      } else {
+        showMsg("passwordMsg", "");
+      }
 
-      if (otp !== generatedCode || Date.now() > codeExpiryTime)
-        return alert("Invalid or expired email OTP.");
+      if (confirmPassword !== password) {
+        showMsg("confirmPasswordMsg", "Passwords do not match", "error");
+        valid = false;
+      } else {
+        showMsg("confirmPasswordMsg", "");
+      }
 
-      db.ref("users/" + username).once("value", snap => {
+      if (!/^\+?\d{10,15}$/.test(mobile)) {
+        showMsg("mobileMsg", "Phone must be in international format e.g. +2547xxxx", "error");
+        valid = false;
+      } else {
+        showMsg("mobileMsg", "");
+      }
+
+      if (!validateEmailFormat(email)) {
+        showMsg("emailMsg", "Invalid email format", "error");
+        valid = false;
+      }
+
+      const now = new Date();
+      if (otp !== emailOtp || now > emailOtpExpiry) {
+        showMsg("emailOtpMsg", "Invalid or expired OTP", "error");
+        valid = false;
+      }
+
+      if (!valid) return;
+
+      db.ref("users").orderByChild("email").equalTo(email).once("value", snap => {
         if (snap.exists()) {
-          alert("Username already taken.");
-        } else {
-          db.ref("users/" + username).set({
-            password: password,
-            mobile: mobile,
-            email: email
-          }).then(() => {
-            alert("Account created!");
-            window.location.href = "index.html";
-          }).catch(() => {
-            alert("Error creating account.");
-          });
+          return showMsg("emailMsg", "Email already exists", "error");
         }
+
+        db.ref("users/" + username).set({
+          password,
+          email,
+          mobile
+        }).then(() => {
+          alert("Account created successfully!");
+          window.location.href = "index.html";
+        }).catch(() => {
+          alert("Error creating account.");
+        });
       });
     }
   </script>
