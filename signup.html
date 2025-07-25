@@ -165,7 +165,7 @@
         return;
       }
       // Check if already registered
-      db.ref("users").orderByChild("email").equalTo(email).once("value", snap => {
+      db.ref("users").orderByChild("email_lower").equalTo(email.toLowerCase()).once("value", snap => {
         if (snap.exists()) {
           msg.textContent = "Email already registered. Please login.";
           msg.className = "error";
@@ -259,7 +259,7 @@
       if (otp !== generatedCode || Date.now() > otpExpiry)
         return alert("OTP is invalid or expired.");
 
-      db.ref("users").orderByChild("email").equalTo(email).once("value", snap => {
+      db.ref("users").orderByChild("email_lower").equalTo(email.toLowerCase()).once("value", snap => {
         if (snap.exists()) {
           alert("This email is already used.");
         } else {
@@ -267,6 +267,7 @@
             password: password,
             mobile: phone,
             email: email
+            email_lower: email.toLowerCase()
           }).then(() => {
             alert("Account created!");
             window.location.href = "index.html";
