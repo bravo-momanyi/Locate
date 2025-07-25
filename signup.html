@@ -5,7 +5,7 @@
   <title>Sign Up</title>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
   <style>
     body {
       font-family: Arial, sans-serif;
@@ -46,11 +46,10 @@
 <body>
 
   <h2>Create Account</h2>
-
-  <input id="username" type="text" placeholder="Username (min 4 characters)" /><br>
-
+  <input id="username" type="text" placeholder="Username" /><br>
+  
   <div class="toggle">
-    <input id="password" type="password" placeholder="Password (min 4 characters)" />
+    <input id="password" type="password" placeholder="Password" />
     <span onclick="toggleVisibility('password', this)">Show</span>
   </div>
 
@@ -59,15 +58,13 @@
     <span onclick="toggleVisibility('confirmPassword', this)">Show</span>
   </div>
 
-  <input id="phone" type="tel" placeholder="Mobile Number" /><br>
+  <input id="mobile" type="text" placeholder="Mobile Number" /><br>
   <input id="email" type="email" placeholder="Email Address" /><br>
 
-  <div style="display:none;" id="verifySection">
-    <input id="codeInput" type="text" placeholder="Enter verification code" />
-    <button onclick="verifyCode()">Verify Code</button>
-  </div>
+  <button onclick="sendVerificationCode()">Send Verification Code</button>
+  <input id="otp" type="text" placeholder="Enter Verification Code" /><br>
 
-  <button onclick="sendVerificationCode()">Send Verification Code</button><br><br>
+  <button onclick="createAccount()">Create Account</button><br><br>
   <a href="login.html" style="color: lightblue;">Already have an account? Login</a>
 
   <script>
@@ -83,10 +80,9 @@
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
 
-    // Initialize EmailJS
-    window.onload = function () {
-      emailjs.init('NuLLYSNdHyhKlSFe0');
-    };
+    emailjs.init("NuLLYSNdHyhKlSFe0");
+
+    let generatedCode = "";
 
     function toggleVisibility(inputId, toggleEl) {
       const input = document.getElementById(inputId);
@@ -95,75 +91,69 @@
       toggleEl.textContent = isHidden ? "Hide" : "Show";
     }
 
-    let generatedCode = "";
-
     function sendVerificationCode() {
       const email = document.getElementById("email").value.trim();
-      const username = document.getElementById("username").value.trim();
-      const password = document.getElementById("password").value;
-      const confirmPassword = document.getElementById("confirmPassword").value;
-      const phone = document.getElementById("phone").value.trim();
+      if (!email) return alert("Please enter your email.");
 
-      if (!username || !password || !confirmPassword || !phone || !email) {
-        return alert("Please fill all fields.");
-      }
+      generatedCode = Math.floor(100000 + Math.random() * 900000).toString();
 
-      if (username.length < 4 || password.length < 4) {
-        return alert("Username and password must be at least 4 characters.");
-      }
-
-      if (password !== confirmPassword) {
-        return alert("Passwords do not match.");
-      }
-
-      generatedCode = Math.floor(100000 + Math.random() * 900000).toString(); // 6-digit code
+      const now = new Date();
+      now.setMinutes(now.getMinutes() + 15);
+      const timeString = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
       const templateParams = {
-        to_email: email,
-        to_name: username,
-        verification_code: generatedCode
+        email: email,
+        passcode: generatedCode,
+        time: timeString
       };
 
-      emailjs.send('service_p7hwdj9', 'template_9ooaehi', templateParams)
+      emailjs.send("service_p7hwdj9", "template_9ooaehi", templateParams)
         .then(() => {
           alert("Verification code sent to your email.");
-          document.getElementById("verifySection").style.display = "block";
         })
         .catch((error) => {
-          console.error("EmailJS error:", error);
+          console.error("EmailJS error: ", error);
           alert("Failed to send verification email.");
         });
     }
 
-    function verifyCode() {
-      const inputCode = document.getElementById("codeInput").value.trim();
+    function createAccount() {
       const username = document.getElementById("username").value.trim();
       const password = document.getElementById("password").value;
-      const phone = document.getElementById("phone").value.trim();
+      const confirmPassword = document.getElementById("confirmPassword").value;
+      const mobile = document.getElementById("mobile").value.trim();
       const email = document.getElementById("email").value.trim();
+      const otp = document.getElementById("otp").value.trim();
 
-      if (inputCode !== generatedCode) {
-        return alert("Incorrect verification code.");
-      }
+      if (!username || !password || !confirmPassword || !mobile || !email || !otp)
+        return alert("Please fill all fields.");
+
+      if (username.length < 4 || password.length < 4)
+        return alert("Username and password must be at least 4 characters long.");
+
+      if (password !== confirmPassword)
+        return alert("Passwords do not match.");
+
+      if (otp !== generatedCode)
+        return alert("Invalid verification code.");
 
       db.ref("users/" + username).once("value", snap => {
         if (snap.exists()) {
           alert("Username already taken.");
         } else {
           db.ref("users/" + username).set({
-            password,
-            email,
-            phone
+            password: password,
+            mobile: mobile,
+            email: email
           }).then(() => {
-            alert("Account created successfully!");
+            alert("Account created!");
             window.location.href = "index.html";
           }).catch(() => {
-            alert("Error saving account to database.");
+            alert("Error creating account.");
           });
         }
       });
     }
   </script>
-
 </body>
 </html>
