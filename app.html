@@ -374,8 +374,7 @@
 
   const user = sessionStorage.getItem('username');
   document.getElementById('currentUser').textContent = user;
-  db.ref('users/' + user).set(true);
-
+  db.ref('users/' + user).update({ online: true });
   // Map setup
   const map = L.map('map').setView([1.29, 36.82], 12);
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
