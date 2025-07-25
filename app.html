@@ -389,10 +389,20 @@ function openGroup(groupId, displayName) {
   }
 
   function openTab(id) {
-    document.querySelectorAll('.tabs button').forEach(b => b.classList.toggle('active', b.textContent + 'Content' === id));
-    document.querySelectorAll('.content').forEach(c => c.classList.remove('active'));
-    document.getElementById(id).classList.add('active');
-    if (id === 'chatContent') document.getElementById('chatWindow').style.display = 'none';
+  // Highlight the correct tab button
+  document.querySelectorAll('.tabs button').forEach(b => {
+    const targetId = b.textContent.trim().toLowerCase() + 'Content';
+    b.classList.toggle('active', targetId === id);
+  });
+
+  // Show only the selected content section
+  document.querySelectorAll('.content').forEach(c => c.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+
+  // Hide chat window when switching to Chats tab
+  if (id === 'chatContent') {
+    document.getElementById('chatWindow').style.display = 'none';
+  }
   }
   function openChatOptions() {
   if (!currentChat) return;
