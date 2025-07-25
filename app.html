@@ -729,6 +729,313 @@ function startCall(type) {
     };
 
     peer.createOffer().then(offer => {
+<script>
+const config = {
+  apiKey: "AIzaSyBfkUJS81minjxj0DFz4pzNnGzCtb5ZJss",
+  authDomain: "locater-42fb4.firebaseapp.com",
+  databaseURL: "https://locater-42fb4-default-rtdb.firebaseio.com",
+  projectId: "locater-42fb4",
+  storageBucket: "locater-42fb4.appspot.com",
+  messagingSenderId: "250348367998",
+  appId: "1:250348367998:web:d734b2b4c735b5684ae82f"
+};
+
+firebase.initializeApp(config);
+const db = firebase.database();
+const user = localStorage.getItem('username') || prompt('Enter username');
+localStorage.setItem('username', user);
+document.getElementById('currentUser').textContent = user;
+db.ref('users/' + user).set(true);
+
+const map = L.map('map').setView([1.29, 36.82], 12);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+const markers = {};
+
+setInterval(() => {
+  navigator.geolocation.getCurrentPosition(pos => {
+    db.ref('locations/' + user).set({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+  });
+}, 5000);
+
+db.ref('locations').on('value', snap => {
+  const locs = snap.val() || {};
+  for (const [u, loc] of Object.entries(locs)) {
+    if (markers[u]) markers[u].setLatLng([loc.lat, loc.lng]);
+    else markers[u] = L.marker([loc.lat, loc.lng]).addTo(map).bindPopup(u);
+  }
+});
+
+const userList = document.getElementById('users');
+const searchBox = document.getElementById('searchBox');
+let allUsers = {}, allGroups = {}, currentChat = '', convoRef = null;
+
+db.ref('users').on('value', snap => {
+  allUsers = snap.val() || {};
+  refreshUserList();
+});
+
+db.ref('groups').on('value', snap => {
+  allGroups = snap.val() || {};
+  refreshUserList();
+});
+
+searchBox.addEventListener('input', refreshUserList);
+
+function refreshUserList() {
+  let html = `<h3 style="margin:10px 0 5px;">Users</h3>`;
+  Object.keys(allUsers).forEach(u => {
+    if (u !== user && u.toLowerCase().includes(searchBox.value.toLowerCase())) {
+      html += `<button onclick="openChat('${u}')">${u}</button>`;
+    }
+  });
+
+  html += `<h3 style="margin:15px 0 5px;">Groups</h3>`;
+  Object.entries(allGroups).forEach(([id, data]) => {
+    if (!data.name) return;
+    const label = data.public ? `# ${data.name}` : `🔒 ${data.name}`;
+    html += `<button class="group" onclick="attemptJoinGroup('${id}', '${data.name}')">${label}</button>`;
+  });
+
+  userList.innerHTML = html;
+}
+
+function createGroup() {
+  let name = prompt("Enter group name (no special characters):");
+  if (!name) return;
+  name = name.trim().replace(/[^a-zA-Z0-9 -]/g, '').replace(/\s+/g, '');
+
+  let type = prompt("Group Type: Type 'public' or 'private'").toLowerCase();
+  if (type !== 'public' && type !== 'private') return alert("Invalid group type.");
+  const isPublic = type === 'public';
+  let password = null;
+
+  if (!isPublic) {
+    password = prompt("Enter password:");
+    if (!password) return alert("Private group must have a password.");
+  }
+
+  const groupData = {
+    name,
+    admin: user,
+    public: isPublic,
+    password: isPublic ? null : password,
+    members: { [user]: true }
+  };
+
+  const newRef = db.ref('groups').push();
+  newRef.set(groupData, err => {
+    if (!err) {
+      db.ref('groupChats/' + newRef.key).push({
+        from: 'System',
+        text: `${user} created this ${type} group.`,
+        ts: Date.now()
+      });
+      alert(`${type.charAt(0).toUpperCase() + type.slice(1)} group created!`);
+    }
+  });
+}
+
+function attemptJoinGroup(groupId, groupName) {
+  db.ref('groups/' + groupId).once('value').then(snap => {
+    const group = snap.val();
+    if (!group) return;
+
+    if (group.members && group.members[user]) {
+      openGroup(groupId, groupName);
+    } else if (!group.public) {
+      const pwd = prompt("Private group. Enter password:");
+      if (pwd === group.password) {
+        const join = confirm("Correct password. Join group?");
+        if (join) {
+          db.ref('groups/' + groupId + '/members/' + user).set(true);
+          openGroup(groupId, groupName);
+        }
+      } else {
+        alert("Wrong password.");
+      }
+    } else {
+      const join = confirm("Join this public group?");
+      if (join) {
+        db.ref('groups/' + groupId + '/members/' + user).set(true);
+        openGroup(groupId, groupName);
+      }
+    }
+  });
+}
+
+function openChat(other) {
+  currentChat = other;
+  document.getElementById('chatWith').innerHTML = `<span onclick="openChatOptions()" style="cursor:pointer; text-decoration:underline;">${other}</span>`;
+  document.getElementById('chatWindow').style.display = 'flex';
+  document.getElementById('chatHeader').style.display = 'flex';
+  document.getElementById('messages').innerHTML = '';
+  if (convoRef) convoRef.off();
+  const convo = [user, other].sort().join('_');
+  convoRef = db.ref('privateChats/' + convo);
+
+  convoRef.on('child_added', snap => renderMessage(snap.key, snap.val()));
+  convoRef.on('child_changed', snap => updateMessage(snap.key, snap.val()));
+}
+
+function openGroup(groupId, displayName) {
+  currentChat = 'group__' + groupId;
+  document.getElementById('chatWith').innerHTML = `<span onclick="openChatOptions()" style="cursor:pointer; text-decoration:underline;">#${displayName}</span>`;
+  document.getElementById('chatWindow').style.display = 'flex';
+  document.getElementById('chatHeader').style.display = 'flex';
+  document.getElementById('messages').innerHTML = '';
+  if (window.innerWidth <= 600) document.getElementById('backBtn').style.display = 'inline-block';
+  if (convoRef) convoRef.off();
+  convoRef = db.ref('groupChats/' + groupId);
+
+  convoRef.on('child_added', snap => renderMessage(snap.key, snap.val()));
+  convoRef.on('child_changed', snap => updateMessage(snap.key, snap.val()));
+}
+
+function renderMessage(key, m) {
+  const div = document.createElement('div');
+  div.setAttribute('data-key', key);
+  if (m.deleted) {
+    div.className = 'msg';
+    div.style.fontStyle = 'italic';
+    div.textContent = "Message deleted";
+  } else {
+    div.className = 'msg ' + (m.from === user ? 'you' : 'them');
+    div.textContent = m.from === user && !currentChat.startsWith('group__') ? m.text : m.from + ": " + m.text;
+    div.oncontextmenu = function (e) {
+      e.preventDefault();
+      confirmDeleteMessage(key, m);
+    };
+  }
+  document.getElementById('messages').appendChild(div);
+  document.getElementById('messages').scrollTop = 1e9;
+}
+
+function updateMessage(key, m) {
+  const msgElement = document.querySelector(`[data-key="${key}"]`);
+  if (!msgElement) return;
+  if (m.deleted) {
+    msgElement.className = 'msg';
+    msgElement.style.fontStyle = 'italic';
+    msgElement.textContent = "Message deleted";
+  }
+}
+
+function sendMsg() {
+  const txt = document.getElementById('msgInput').value.trim();
+  if (!txt || !currentChat) return;
+  const msg = { from: user, text: txt, ts: Date.now() };
+  if (currentChat.startsWith('group__')) {
+    const g = currentChat.split('__')[1];
+    db.ref('groupChats/' + g).push(msg);
+  } else {
+    const convo = [user, currentChat].sort().join('_');
+    db.ref('privateChats/' + convo).push(msg);
+  }
+  document.getElementById('msgInput').value = '';
+}
+
+function closeChat() {
+  document.getElementById('chatWindow').style.display = 'none';
+  document.getElementById('chatHeader').style.display = 'none';
+  document.getElementById('backBtn').style.display = 'none';
+}
+
+function logout() {
+  localStorage.removeItem('username');
+  location.href = 'index.html';
+}
+
+function openTab(id) {
+  document.querySelectorAll('.tabs button').forEach(b => {
+    const targetId = b.textContent.trim().toLowerCase() + 'Content';
+    b.classList.toggle('active', targetId === id);
+  });
+  document.querySelectorAll('.content').forEach(c => c.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  if (id === 'chatContent') {
+    document.getElementById('chatWindow').style.display = 'none';
+  }
+}
+
+function confirmDeleteMessage(msgKey, msgObj) {
+  const now = Date.now();
+  const age = now - msgObj.ts;
+  const isPrivate = !currentChat.startsWith('group__');
+  const isSender = msgObj.from === user;
+
+  if (age > 60000 && isSender) {
+    if (confirm("Delete for you only?")) event.target.remove();
+    return;
+  }
+
+  const choice = prompt("Delete this message:\n1. For Me" + (isSender ? "\n2. For Everyone" : ""));
+  if (choice === '1') event.target.remove();
+  else if (choice === '2' && isSender && age <= 60000) {
+    const ref = isPrivate
+      ? db.ref('privateChats/' + [user, currentChat].sort().join('_') + '/' + msgKey)
+      : db.ref('groupChats/' + currentChat.split('__')[1] + '/' + msgKey);
+    ref.set({ deleted: true, from: msgObj.from, ts: msgObj.ts });
+  }
+}
+
+function openChatOptions() {
+  if (!currentChat) return;
+  const isGroup = currentChat.startsWith('group__');
+  const name = document.getElementById('chatWith').textContent;
+  let option = prompt(isGroup
+    ? `Group: ${name}\n1. View Members\n2. Leave Group\n3. Delete Chat`
+    : `User: ${name}\n1. Block User\n2. Delete Chat`);
+  if (!option) return;
+
+  const groupId = currentChat.split('__')[1];
+  if (!isGroup) {
+    if (option === '1') alert(`${name} blocked locally.`);
+    else if (option === '2') {
+      db.ref('privateChats/' + [user, currentChat].sort().join('_')).remove();
+      closeChat();
+    }
+  } else {
+    if (option === '1') {
+      db.ref('groups/' + groupId + '/members').once('value').then(snap => {
+        alert("Members:\n" + Object.keys(snap.val() || {}).join(', '));
+      });
+    } else if (option === '2') {
+      db.ref('groups/' + groupId + '/members/' + user).remove();
+      closeChat();
+    } else if (option === '3') {
+      closeChat();
+    }
+  }
+}
+
+let localStream, peer, remoteStreamRef;
+const callUI = document.getElementById('callModal');
+const localVideo = document.getElementById('localVideo');
+const remoteVideo = document.getElementById('remoteVideo');
+
+function startCall(type) {
+  if (!currentChat || currentChat.startsWith('group__')) return alert('Only private chats supported.');
+  navigator.mediaDevices.getUserMedia({ video: type === 'video', audio: true }).then(stream => {
+    localStream = stream;
+    localVideo.srcObject = stream;
+    peer = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
+    localStream.getTracks().forEach(track => peer.addTrack(track, localStream));
+
+    peer.ontrack = e => {
+      if (!remoteStreamRef) {
+        remoteStreamRef = new MediaStream();
+        remoteVideo.srcObject = remoteStreamRef;
+      }
+      remoteStreamRef.addTrack(e.track);
+    };
+
+    peer.onicecandidate = e => {
+      if (e.candidate) {
+        db.ref(`calls/${currentChat}/ice`).push({ from: user, candidate: e.candidate });
+      }
+    };
+
+    peer.createOffer().then(offer => {
       peer.setLocalDescription(offer);
       db.ref(`calls/${currentChat}/signal`).set({
         from: user,
@@ -756,7 +1063,7 @@ function endCall() {
   localVideo.srcObject = null;
 }
 
-// Incoming call listener
+// Handle incoming call
 db.ref(`calls/${user}/signal`).on('value', snap => {
   const data = snap.val();
   if (!data || data.from === user) return;
@@ -764,10 +1071,7 @@ db.ref(`calls/${user}/signal`).on('value', snap => {
   const accept = confirm(`${data.from} is calling (${data.type}) — Accept?`);
   if (!accept) return;
 
-  navigator.mediaDevices.getUserMedia({ 
-    video: data.type === 'video', 
-    audio: true 
-  }).then(stream => {
+  navigator.mediaDevices.getUserMedia({ video: data.type === 'video', audio: true }).then(stream => {
     localStream = stream;
     localVideo.srcObject = stream;
 
@@ -788,33 +1092,30 @@ db.ref(`calls/${user}/signal`).on('value', snap => {
       }
     };
 
-    const offerDesc = new RTCSessionDescription(JSON.parse(data.offer));
-    peer.setRemoteDescription(offerDesc).then(() => {
-      peer.createAnswer().then(answer => {
-        peer.setLocalDescription(answer);
-        db.ref(`calls/${data.from}/signal/answer`).set(JSON.stringify(answer));
-      });
+    const offer = JSON.parse(data.offer);
+    peer.setRemoteDescription(new RTCSessionDescription(offer)).then(() => {
+      return peer.createAnswer();
+    }).then(answer => {
+      peer.setLocalDescription(answer);
+      db.ref(`calls/${data.from}/signal/answer`).set(JSON.stringify(answer));
     });
 
     showCallUI();
   });
 });
 
-// Listen for answer
-db.ref(`calls/${user}/signal/answer`).on('value', snap => {
-  const answer = snap.val();
-  if (answer && peer && !peer.remoteDescription) {
-    peer.setRemoteDescription(new RTCSessionDescription(JSON.parse(answer)));
+db.ref(`calls/${user}/ice`).on('child_added', snap => {
+  const ice = snap.val();
+  if (ice.from !== user && peer) {
+    peer.addIceCandidate(new RTCIceCandidate(ice.candidate));
   }
 });
 
-// ICE candidate exchange
-db.ref(`calls/${user}/ice`).on('child_added', snap => {
-  const cand = snap.val();
-  if (cand && peer) {
-    peer.addIceCandidate(new RTCIceCandidate(cand.candidate));
+db.ref(`calls/${currentChat}/signal/answer`).on('value', snap => {
+  const answer = snap.val();
+  if (answer && peer) {
+    peer.setRemoteDescription(new RTCSessionDescription(JSON.parse(answer)));
   }
 });
-  </script>
-</body>
+</script>
 </html>
