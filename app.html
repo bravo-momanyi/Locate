@@ -240,8 +240,6 @@
 <script>
 function openGroup(groupId, displayName) {
   currentChat = 'group__' + groupId;
-function openGroup(groupId, displayName) {
-  currentChat = 'group__' + groupId;
   document.getElementById('chatWith').innerHTML = `<span onclick="openChatOptions()" style="cursor:pointer; text-decoration:underline;">#${displayName}</span>`;
   document.getElementById('chatWindow').style.display = 'flex';
   document.getElementById('messages').innerHTML = '';
