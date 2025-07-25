@@ -1,8 +1,8 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Find Account</title>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
@@ -12,81 +12,121 @@
       font-family: Arial, sans-serif;
       background: #111;
       color: white;
+      margin: 0;
+      padding: 30px 15px;
       display: flex;
       flex-direction: column;
       align-items: center;
-      padding: 30px 15px;
-      margin: 0;
       min-height: 100vh;
     }
+
+    h2 {
+      text-align: center;
+    }
+
     input, button {
       padding: 14px;
       margin: 8px 0;
       width: 100%;
       max-width: 400px;
       font-size: 16px;
+      box-sizing: border-box;
     }
+
     button {
       background: teal;
       color: white;
       border: none;
       cursor: pointer;
     }
-    h2 {
-      margin-bottom: 15px;
-    }
+
     .result-box {
       background: #222;
-      padding: 15px;
+      padding: 20px;
       border-radius: 6px;
       width: 100%;
       max-width: 400px;
-      margin-top: 10px;
+      margin-top: 15px;
     }
+
+    .toggle {
+      position: relative;
+    }
+
+    .toggle span {
+      position: absolute;
+      right: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 13px;
+      color: lightblue;
+      cursor: pointer;
+      user-select: none;
+    }
+
     small {
       font-size: 13px;
       color: orange;
+      display: block;
     }
+
     small.valid {
       color: lightgreen;
     }
+
     small.error {
       color: red;
     }
+
     a {
       color: lightblue;
-      margin-top: 15px;
-      font-size: 15px;
-      display: block;
+      font-size: 14px;
       text-align: center;
+      margin-top: 20px;
+    }
+
+    .hidden {
+      display: none;
     }
   </style>
 </head>
 <body>
 
-  <h2>Find Your Account</h2>
-  <input id="searchInput" type="text" placeholder="Enter Username, Email or Phone" />
-  <button onclick="findAccount()">Search</button>
+  <div id="searchSection">
+    <h2>Find Your Account</h2>
+    <input id="searchInput" type="text" placeholder="Enter Username, Email or Phone" />
+    <button onclick="findAccount()">Search</button>
+    <button onclick="cancelReset()" style="background:red;">Cancel</button>
+  </div>
 
-  <div id="result" class="result-box" style="display: none;">
+  <div id="result" class="result-box hidden">
     <p><strong>Username:</strong> <span id="resUsername"></span></p>
     <p><strong>Email:</strong> <span id="resEmail"></span></p>
     <p><strong>Phone:</strong> <span id="resPhone"></span></p>
     <button id="resetBtn" onclick="sendResetCode()">Get Reset Code</button>
-    <button onclick="cancelReset()" style="background:red;">Cancel</button>
   </div>
 
-  <div id="resetSection" class="result-box" style="display: none;">
+  <div id="resetSection" class="result-box hidden">
+    <h2>Reset Password</h2>
+
     <input id="resetCode" type="text" placeholder="Enter Reset Code" onblur="validateResetCode()" onkeypress="if(event.key==='Enter') validateResetCode()">
     <small id="resetCodeMsg"></small>
 
-    <input id="newPassword" type="password" placeholder="New Password" oninput="checkNewPassword()">
+    <div class="toggle">
+      <input id="newPassword" type="password" placeholder="New Password" oninput="checkNewPassword()">
+      <span onclick="toggleVisibility('newPassword', this)">Show</span>
+    </div>
     <small id="newPasswordMsg"></small>
 
-    <input id="confirmNewPassword" type="password" placeholder="Confirm New Password" oninput="checkConfirmNewPassword()">
+    <div class="toggle">
+      <input id="confirmNewPassword" type="password" placeholder="Confirm New Password" oninput="checkConfirmNewPassword()">
+      <span onclick="toggleVisibility('confirmNewPassword', this)">Show</span>
+    </div>
     <small id="confirmNewPasswordMsg"></small>
 
     <button onclick="updatePassword()">Update Password</button>
+    <button id="resendBtn" onclick="sendResetCode()">Resend Reset Code</button>
+    <button onclick="cancelReset()" style="background:red;">Cancel</button>
   </div>
 
   <a href="mailto:stvbravo18794@gmail.com">Having trouble? Contact Me</a>
@@ -109,6 +149,12 @@
     let sentResetCode = "";
     let codeExpiry = 0;
     let countdownInterval = null;
+
+    function toggleVisibility(inputId, toggleEl) {
+      const input = document.getElementById(inputId);
+      input.type = input.type === "password" ? "text" : "password";
+      toggleEl.textContent = input.type === "text" ? "Hide" : "Show";
+    }
 
     function maskString(str, visible = 2) {
       if (!str || str.length <= visible * 2) return str;
@@ -138,15 +184,13 @@
             document.getElementById("resUsername").textContent = username;
             document.getElementById("resEmail").textContent = maskString(email, 3);
             document.getElementById("resPhone").textContent = maskString(phone, 4);
-            document.getElementById("result").style.display = "block";
-            document.getElementById("resetSection").style.display = "none";
-            document.getElementById("resetBtn").textContent = "Get Reset Code";
+            document.getElementById("result").classList.remove("hidden");
             found = true;
           }
         });
 
         if (!found) {
-          document.getElementById("result").style.display = "none";
+          document.getElementById("result").classList.add("hidden");
           alert("Account not found.");
         }
       });
@@ -167,7 +211,9 @@
       emailjs.send("service_p7hwdj9", "template_9ooaehi", params)
         .then(() => {
           alert("Reset code sent to email.");
-          document.getElementById("resetSection").style.display = "block";
+          document.getElementById("searchSection").classList.add("hidden");
+          document.getElementById("result").classList.add("hidden");
+          document.getElementById("resetSection").classList.remove("hidden");
           startCountdown();
         })
         .catch((err) => {
@@ -177,7 +223,7 @@
     }
 
     function startCountdown() {
-      const btn = document.getElementById("resetBtn");
+      const btn = document.getElementById("resendBtn");
       let remaining = 120;
       btn.disabled = true;
 
@@ -232,21 +278,20 @@
       const newPwd = document.getElementById("newPassword").value;
       const confirmPwd = document.getElementById("confirmNewPassword").value;
 
-      if (code !== sentResetCode || Date.now() > codeExpiry) {
+      if (code !== sentResetCode || Date.now() > codeExpiry)
         return alert("Invalid or expired reset code.");
-      }
-      if (newPwd.length < 4 || newPwd !== confirmPwd) {
-        return alert("Check your password inputs.");
-      }
 
-      db.ref("users/" + foundUser.username).update({
-        password: newPwd
-      }).then(() => {
-        alert("Password updated successfully.");
-        window.location.href = "index.html";
-      }).catch(() => {
-        alert("Failed to update password.");
-      });
+      if (newPwd.length < 4 || newPwd !== confirmPwd)
+        return alert("Check your password inputs.");
+
+      db.ref("users/" + foundUser.username).update({ password: newPwd })
+        .then(() => {
+          alert("Password updated successfully.");
+          window.location.href = "login.html";
+        })
+        .catch(() => {
+          alert("Failed to update password.");
+        });
     }
 
     function cancelReset() {
