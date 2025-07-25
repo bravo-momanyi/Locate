@@ -305,6 +305,12 @@ header {
     </div>
   </div>
 </div>
+<!-- CALL MODAL -->
+<div id="callModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:#000c; z-index:9999; align-items:center; justify-content:center; flex-direction:column;">
+  <video id="remoteVideo" autoplay playsinline style="width:90%; max-width:500px; background:black;"></video>
+  <video id="localVideo" muted autoplay playsinline style="position:absolute; bottom:20px; right:20px; width:100px; border:2px solid white; border-radius:10px;"></video>
+  <button onclick="endCall()" style="margin-top:20px; padding:10px 20px; background:red; color:white; border:none; border-radius:5px;">End Call</button>
+</div>
 <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
@@ -579,24 +585,7 @@ function updateMessage(key, m) {
     document.getElementById('msgInput').value = '';
   }
 
-  function startCall(type) {
-    if (!currentChat || currentChat.startsWith('group__')) {
-      return alert('Open a private chat.');
-    }
-    const room = `https://YOUR_DAILY_DOMAIN.daily.co/${[user, currentChat].sort().join('-')}`;
-    db.ref('calls/' + currentChat + '/incoming').set({ from: user, type, room });
-    window.open(room, '_blank');
-  }
-
-  db.ref('calls/' + user + '/incoming').on('value', snap => {
-    const c = snap.val();
-    if (c) {
-      db.ref('calls/' + user + '/incoming').remove();
-      const ok = confirm(`${c.from} (${c.type}) call. Accept?`);
-      if (ok) window.open(c.room, '_blank');
-    }
-  });
-
+  
   function closeChat() {
     document.getElementById('chatWindow').style.display = 'none';
     document.getElementById('chatHeader').style.display = 'none';
@@ -674,5 +663,128 @@ function updateMessage(key, m) {
   }
   }
 </script>
+  <script>
+let localStream, peer, remoteStreamRef;
+const callUI = document.getElementById('callModal');
+const localVideo = document.getElementById('localVideo');
+const remoteVideo = document.getElementById('remoteVideo');
+
+function startCall(type) {
+  if (!currentChat || currentChat.startsWith('group__')) {
+    return alert('Only private chats supported.');
+  }
+
+  navigator.mediaDevices.getUserMedia({ 
+    video: type === 'video', 
+    audio: true 
+  }).then(stream => {
+    localStream = stream;
+    localVideo.srcObject = stream;
+
+    peer = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
+    localStream.getTracks().forEach(track => peer.addTrack(track, localStream));
+
+    peer.ontrack = e => {
+      if (!remoteStreamRef) {
+        remoteStreamRef = new MediaStream();
+        remoteVideo.srcObject = remoteStreamRef;
+      }
+      remoteStreamRef.addTrack(e.track);
+    };
+
+    peer.onicecandidate = e => {
+      if (e.candidate) {
+        db.ref(`calls/${currentChat}/ice`).push({ from: user, candidate: e.candidate });
+      }
+    };
+
+    peer.createOffer().then(offer => {
+      peer.setLocalDescription(offer);
+      db.ref(`calls/${currentChat}/signal`).set({
+        from: user,
+        to: currentChat,
+        type,
+        offer: JSON.stringify(offer)
+      });
+    });
+
+    showCallUI();
+  });
+}
+
+function showCallUI() {
+  callUI.style.display = 'flex';
+}
+
+function endCall() {
+  if (peer) peer.close();
+  if (localStream) localStream.getTracks().forEach(t => t.stop());
+  callUI.style.display = 'none';
+  db.ref(`calls/${user}/signal`).remove();
+  db.ref(`calls/${user}/ice`).remove();
+  remoteVideo.srcObject = null;
+  localVideo.srcObject = null;
+}
+
+// Incoming call listener
+db.ref(`calls/${user}/signal`).on('value', snap => {
+  const data = snap.val();
+  if (!data || data.from === user) return;
+
+  const accept = confirm(`${data.from} is calling (${data.type}) — Accept?`);
+  if (!accept) return;
+
+  navigator.mediaDevices.getUserMedia({ 
+    video: data.type === 'video', 
+    audio: true 
+  }).then(stream => {
+    localStream = stream;
+    localVideo.srcObject = stream;
+
+    peer = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
+    localStream.getTracks().forEach(track => peer.addTrack(track, localStream));
+
+    peer.ontrack = e => {
+      if (!remoteStreamRef) {
+        remoteStreamRef = new MediaStream();
+        remoteVideo.srcObject = remoteStreamRef;
+      }
+      remoteStreamRef.addTrack(e.track);
+    };
+
+    peer.onicecandidate = e => {
+      if (e.candidate) {
+        db.ref(`calls/${data.from}/ice`).push({ from: user, candidate: e.candidate });
+      }
+    };
+
+    const offerDesc = new RTCSessionDescription(JSON.parse(data.offer));
+    peer.setRemoteDescription(offerDesc).then(() => {
+      peer.createAnswer().then(answer => {
+        peer.setLocalDescription(answer);
+        db.ref(`calls/${data.from}/signal/answer`).set(JSON.stringify(answer));
+      });
+    });
+
+    showCallUI();
+  });
+});
+
+// Listen for answer
+db.ref(`calls/${user}/signal/answer`).on('value', snap => {
+  const answer = snap.val();
+  if (answer && peer && !peer.remoteDescription) {
+    peer.setRemoteDescription(new RTCSessionDescription(JSON.parse(answer)));
+  }
+});
+
+// ICE candidate exchange
+db.ref(`calls/${user}/ice`).on('child_added', snap => {
+  const cand = snap.val();
+  if (cand && peer) {
+    peer.addIceCandidate(new RTCIceCandidate(cand.candidate));
+  }
+});
+  </script>
 </body>
 </html>
