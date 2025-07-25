@@ -5,11 +5,7 @@
   <title>Sign Up</title>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
-  <script type="module">
-    import emailjs from 'https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js';
-    window.emailjs = emailjs;
-    emailjs.init('NuLLYSNdHyhKlSFe0');
-  </script>
+  <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
   <style>
     body {
       font-family: Arial, sans-serif;
@@ -50,12 +46,11 @@
 <body>
 
   <h2>Create Account</h2>
-  <input id="username" type="text" placeholder="Username" /><br>
-  <input id="email" type="email" placeholder="Email" /><br>
-  <input id="phone" type="text" placeholder="Phone Number" /><br>
+
+  <input id="username" type="text" placeholder="Username (min 4 characters)" /><br>
 
   <div class="toggle">
-    <input id="password" type="password" placeholder="Password" />
+    <input id="password" type="password" placeholder="Password (min 4 characters)" />
     <span onclick="toggleVisibility('password', this)">Show</span>
   </div>
 
@@ -64,10 +59,15 @@
     <span onclick="toggleVisibility('confirmPassword', this)">Show</span>
   </div>
 
-  <input id="codeInput" type="text" placeholder="Enter Verification Code" style="display:none;" /><br>
-  <button onclick="sendVerificationCode()" id="verifyBtn">Send Verification Code</button>
-  <button onclick="createAccount()" id="signupBtn" style="display:none;">Create Account</button><br><br>
+  <input id="phone" type="tel" placeholder="Mobile Number" /><br>
+  <input id="email" type="email" placeholder="Email Address" /><br>
 
+  <div style="display:none;" id="verifySection">
+    <input id="codeInput" type="text" placeholder="Enter verification code" />
+    <button onclick="verifyCode()">Verify Code</button>
+  </div>
+
+  <button onclick="sendVerificationCode()">Send Verification Code</button><br><br>
   <a href="login.html" style="color: lightblue;">Already have an account? Login</a>
 
   <script>
@@ -83,7 +83,10 @@
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
 
-    let generatedCode = "";
+    // Initialize EmailJS
+    window.onload = function () {
+      emailjs.init('NuLLYSNdHyhKlSFe0');
+    };
 
     function toggleVisibility(inputId, toggleEl) {
       const input = document.getElementById(inputId);
@@ -92,51 +95,55 @@
       toggleEl.textContent = isHidden ? "Hide" : "Show";
     }
 
+    let generatedCode = "";
+
     function sendVerificationCode() {
       const email = document.getElementById("email").value.trim();
-
-      if (!email.includes("@") || !email.includes(".")) {
-        return alert("Enter a valid email address.");
-      }
-
-      generatedCode = Math.floor(1000 + Math.random() * 9000).toString();
-
-      emailjs.send("service_p7hwdj9", "template_9ooaehi", {
-        to_email: email,
-        code: generatedCode
-      }).then(() => {
-        alert("Verification code sent to your email.");
-        document.getElementById("codeInput").style.display = "inline";
-        document.getElementById("signupBtn").style.display = "inline";
-        document.getElementById("verifyBtn").disabled = true;
-      }).catch(err => {
-        console.error("EmailJS Error:", err);
-        alert("Failed to send verification code. Check your EmailJS setup.");
-      });
-    }
-
-    function createAccount() {
       const username = document.getElementById("username").value.trim();
-      const email = document.getElementById("email").value.trim();
-      const phone = document.getElementById("phone").value.trim();
       const password = document.getElementById("password").value;
       const confirmPassword = document.getElementById("confirmPassword").value;
-      const code = document.getElementById("codeInput").value.trim();
+      const phone = document.getElementById("phone").value.trim();
 
-      if (username.length < 4 || password.length < 4) {
-        return alert("Username and password must be at least 4 characters long.");
+      if (!username || !password || !confirmPassword || !phone || !email) {
+        return alert("Please fill all fields.");
       }
 
-      if (!email || !phone || !password || !confirmPassword || !code) {
-        return alert("Please fill in all fields.");
+      if (username.length < 4 || password.length < 4) {
+        return alert("Username and password must be at least 4 characters.");
       }
 
       if (password !== confirmPassword) {
         return alert("Passwords do not match.");
       }
 
-      if (code !== generatedCode) {
-        return alert("Invalid verification code.");
+      generatedCode = Math.floor(100000 + Math.random() * 900000).toString(); // 6-digit code
+
+      const templateParams = {
+        to_email: email,
+        to_name: username,
+        verification_code: generatedCode
+      };
+
+      emailjs.send('service_p7hwdj9', 'template_9ooaehi', templateParams)
+        .then(() => {
+          alert("Verification code sent to your email.");
+          document.getElementById("verifySection").style.display = "block";
+        })
+        .catch((error) => {
+          console.error("EmailJS error:", error);
+          alert("Failed to send verification email.");
+        });
+    }
+
+    function verifyCode() {
+      const inputCode = document.getElementById("codeInput").value.trim();
+      const username = document.getElementById("username").value.trim();
+      const password = document.getElementById("password").value;
+      const phone = document.getElementById("phone").value.trim();
+      const email = document.getElementById("email").value.trim();
+
+      if (inputCode !== generatedCode) {
+        return alert("Incorrect verification code.");
       }
 
       db.ref("users/" + username).once("value", snap => {
@@ -151,11 +158,12 @@
             alert("Account created successfully!");
             window.location.href = "index.html";
           }).catch(() => {
-            alert("Error creating account.");
+            alert("Error saving account to database.");
           });
         }
       });
     }
   </script>
+
 </body>
 </html>
