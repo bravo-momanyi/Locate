@@ -1033,14 +1033,24 @@ const localVideo = document.getElementById('localVideo');
 const remoteVideo = document.getElementById('remoteVideo');
 
 function startCall(type) {
-  if (!currentChat || currentChat.startsWith('group__')) return alert('Only private chats supported.');
-  navigator.mediaDevices.getUserMedia({ video: type === 'video', audio: true }).then(stream => {
+  if (!currentChat || currentChat.startsWith('group__')) {
+    return alert('Only private one-to-one calls are supported.');
+  }
+
+  navigator.mediaDevices.getUserMedia({ 
+    video: type === 'video', 
+    audio: true 
+  }).then(stream => {
     localStream = stream;
     localVideo.srcObject = stream;
-    peer = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
-    localStream.getTracks().forEach(track => peer.addTrack(track, localStream));
 
-    peer.ontrack = e => {
+    peer = new RTCPeerConnection({ 
+      iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] 
+    });
+
+    stream.getTracks().forEach(track => peer.addTrack(track, stream));
+
+    peer.ontrack = (e) => {
       if (!remoteStreamRef) {
         remoteStreamRef = new MediaStream();
         remoteVideo.srcObject = remoteStreamRef;
@@ -1048,7 +1058,7 @@ function startCall(type) {
       remoteStreamRef.addTrack(e.track);
     };
 
-    peer.onicecandidate = e => {
+    peer.onicecandidate = (e) => {
       if (e.candidate) {
         db.ref(`calls/${currentChat}/ice`).push({ from: user, candidate: e.candidate });
       }
@@ -1062,9 +1072,8 @@ function startCall(type) {
         type,
         offer: JSON.stringify(offer)
       });
+      showCallUI();
     });
-
-    showCallUI();
   });
 }
 
@@ -1074,30 +1083,36 @@ function showCallUI() {
 
 function endCall() {
   if (peer) peer.close();
-  if (localStream) localStream.getTracks().forEach(t => t.stop());
+  if (localStream) localStream.getTracks().forEach(track => track.stop());
   callUI.style.display = 'none';
-  db.ref(`calls/${user}/signal`).remove();
-  db.ref(`calls/${user}/ice`).remove();
   remoteVideo.srcObject = null;
   localVideo.srcObject = null;
+  db.ref(`calls/${user}/signal`).remove();
+  db.ref(`calls/${user}/ice`).remove();
 }
 
-// Handle incoming call
+// Receiver handles incoming call
 db.ref(`calls/${user}/signal`).on('value', snap => {
   const data = snap.val();
   if (!data || data.from === user) return;
 
-  const accept = confirm(`${data.from} is calling (${data.type}) — Accept?`);
+  const accept = confirm(`${data.from} is calling (${data.type})\nDo you want to accept?`);
   if (!accept) return;
 
-  navigator.mediaDevices.getUserMedia({ video: data.type === 'video', audio: true }).then(stream => {
+  navigator.mediaDevices.getUserMedia({ 
+    video: data.type === 'video', 
+    audio: true 
+  }).then(stream => {
     localStream = stream;
     localVideo.srcObject = stream;
 
-    peer = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
-    localStream.getTracks().forEach(track => peer.addTrack(track, localStream));
+    peer = new RTCPeerConnection({ 
+      iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] 
+    });
 
-    peer.ontrack = e => {
+    stream.getTracks().forEach(track => peer.addTrack(track, stream));
+
+    peer.ontrack = (e) => {
       if (!remoteStreamRef) {
         remoteStreamRef = new MediaStream();
         remoteVideo.srcObject = remoteStreamRef;
@@ -1105,7 +1120,7 @@ db.ref(`calls/${user}/signal`).on('value', snap => {
       remoteStreamRef.addTrack(e.track);
     };
 
-    peer.onicecandidate = e => {
+    peer.onicecandidate = (e) => {
       if (e.candidate) {
         db.ref(`calls/${data.from}/ice`).push({ from: user, candidate: e.candidate });
       }
@@ -1117,12 +1132,12 @@ db.ref(`calls/${user}/signal`).on('value', snap => {
     }).then(answer => {
       peer.setLocalDescription(answer);
       db.ref(`calls/${data.from}/signal/answer`).set(JSON.stringify(answer));
+      showCallUI();
     });
-
-    showCallUI();
   });
 });
 
+// Receiver gets ICE candidates from caller
 db.ref(`calls/${user}/ice`).on('child_added', snap => {
   const ice = snap.val();
   if (ice.from !== user && peer) {
@@ -1130,6 +1145,7 @@ db.ref(`calls/${user}/ice`).on('child_added', snap => {
   }
 });
 
+// Caller receives answer
 db.ref(`calls/${currentChat}/signal/answer`).on('value', snap => {
   const answer = snap.val();
   if (answer && peer) {
