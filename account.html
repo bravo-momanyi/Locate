@@ -72,7 +72,8 @@
     <p><strong>Username:</strong> <span id="resUsername"></span></p>
     <p><strong>Email:</strong> <span id="resEmail"></span></p>
     <p><strong>Phone:</strong> <span id="resPhone"></span></p>
-    <button onclick="sendResetCode()">Get Password Reset Code</button>
+    <button id="resetBtn" onclick="sendResetCode()">Get Reset Code</button>
+    <button onclick="cancelReset()" style="background:red;">Cancel</button>
   </div>
 
   <div id="resetSection" class="result-box" style="display: none;">
@@ -107,6 +108,7 @@
     let foundUser = null;
     let sentResetCode = "";
     let codeExpiry = 0;
+    let countdownInterval = null;
 
     function maskString(str, visible = 2) {
       if (!str || str.length <= visible * 2) return str;
@@ -138,6 +140,7 @@
             document.getElementById("resPhone").textContent = maskString(phone, 4);
             document.getElementById("result").style.display = "block";
             document.getElementById("resetSection").style.display = "none";
+            document.getElementById("resetBtn").textContent = "Get Reset Code";
             found = true;
           }
         });
@@ -150,28 +153,44 @@
     }
 
     function sendResetCode() {
-      if (!foundUser || !foundUser.email) {
-        return alert("No email found for this account.");
-      }
+      if (!foundUser || !foundUser.email) return alert("No email found for this account.");
 
       sentResetCode = Math.floor(100000 + Math.random() * 900000).toString();
       codeExpiry = Date.now() + 2 * 60 * 1000;
 
-      const templateParams = {
+      const params = {
         email: foundUser.email,
         passcode: sentResetCode,
         time: new Date(codeExpiry).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
       };
 
-      emailjs.send("service_p7hwdj9", "template_9ooaehi", templateParams)
+      emailjs.send("service_p7hwdj9", "template_9ooaehi", params)
         .then(() => {
           alert("Reset code sent to email.");
           document.getElementById("resetSection").style.display = "block";
+          startCountdown();
         })
         .catch((err) => {
           console.error(err);
           alert("Failed to send code.");
         });
+    }
+
+    function startCountdown() {
+      const btn = document.getElementById("resetBtn");
+      let remaining = 120;
+      btn.disabled = true;
+
+      clearInterval(countdownInterval);
+      countdownInterval = setInterval(() => {
+        remaining--;
+        btn.textContent = `Resend Reset Code (${remaining}s)`;
+        if (remaining <= 0) {
+          clearInterval(countdownInterval);
+          btn.disabled = false;
+          btn.textContent = "Resend Reset Code";
+        }
+      }, 1000);
     }
 
     function validateResetCode() {
@@ -196,26 +215,16 @@
     function checkNewPassword() {
       const pwd = document.getElementById("newPassword").value;
       const msg = document.getElementById("newPasswordMsg");
-      if (pwd.length < 4) {
-        msg.textContent = "Password must be at least 4 characters.";
-        msg.className = "error";
-      } else {
-        msg.textContent = "Password is valid.";
-        msg.className = "valid";
-      }
+      msg.textContent = pwd.length < 4 ? "Password must be at least 4 characters." : "Password is valid.";
+      msg.className = pwd.length < 4 ? "error" : "valid";
     }
 
     function checkConfirmNewPassword() {
       const pwd = document.getElementById("newPassword").value;
       const confirm = document.getElementById("confirmNewPassword").value;
       const msg = document.getElementById("confirmNewPasswordMsg");
-      if (pwd !== confirm) {
-        msg.textContent = "Passwords do not match.";
-        msg.className = "error";
-      } else {
-        msg.textContent = "Passwords match.";
-        msg.className = "valid";
-      }
+      msg.textContent = pwd !== confirm ? "Passwords do not match." : "Passwords match.";
+      msg.className = pwd !== confirm ? "error" : "valid";
     }
 
     function updatePassword() {
@@ -238,6 +247,10 @@
       }).catch(() => {
         alert("Failed to update password.");
       });
+    }
+
+    function cancelReset() {
+      window.location.href = "index.html";
     }
   </script>
 </body>
