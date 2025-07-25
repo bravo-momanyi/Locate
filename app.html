@@ -372,8 +372,7 @@
   firebase.initializeApp(config);
   const db = firebase.database();
 
-  const user = localStorage.getItem('username') || prompt('Enter username');
-  localStorage.setItem('username', user);
+  const user = sessionStorage.getItem('username');
   document.getElementById('currentUser').textContent = user;
   db.ref('users/' + user).set(true);
 
