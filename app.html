@@ -1026,15 +1026,15 @@ function openChatOptions() {
     }
   }
 }
-
+<script>
 let localStream, peer, remoteStreamRef;
 const callUI = document.getElementById('callModal');
 const localVideo = document.getElementById('localVideo');
 const remoteVideo = document.getElementById('remoteVideo');
 
-function startCall(type) {
+window.startCall = function(type) {
   if (!currentChat || currentChat.startsWith('group__')) {
-    return alert('Only private one-to-one calls are supported.');
+    return alert('Only private chats are supported for calling.');
   }
 
   navigator.mediaDevices.getUserMedia({ 
@@ -1050,7 +1050,7 @@ function startCall(type) {
 
     stream.getTracks().forEach(track => peer.addTrack(track, stream));
 
-    peer.ontrack = (e) => {
+    peer.ontrack = e => {
       if (!remoteStreamRef) {
         remoteStreamRef = new MediaStream();
         remoteVideo.srcObject = remoteStreamRef;
@@ -1058,7 +1058,7 @@ function startCall(type) {
       remoteStreamRef.addTrack(e.track);
     };
 
-    peer.onicecandidate = (e) => {
+    peer.onicecandidate = e => {
       if (e.candidate) {
         db.ref(`calls/${currentChat}/ice`).push({ from: user, candidate: e.candidate });
       }
@@ -1074,8 +1074,10 @@ function startCall(type) {
       });
       showCallUI();
     });
+  }).catch(err => {
+    alert('Call failed: ' + err.message);
   });
-}
+};
 
 function showCallUI() {
   callUI.style.display = 'flex';
@@ -1083,20 +1085,20 @@ function showCallUI() {
 
 function endCall() {
   if (peer) peer.close();
-  if (localStream) localStream.getTracks().forEach(track => track.stop());
+  if (localStream) localStream.getTracks().forEach(t => t.stop());
   callUI.style.display = 'none';
-  remoteVideo.srcObject = null;
-  localVideo.srcObject = null;
   db.ref(`calls/${user}/signal`).remove();
   db.ref(`calls/${user}/ice`).remove();
+  remoteVideo.srcObject = null;
+  localVideo.srcObject = null;
 }
 
-// Receiver handles incoming call
+// Incoming call listener
 db.ref(`calls/${user}/signal`).on('value', snap => {
   const data = snap.val();
   if (!data || data.from === user) return;
 
-  const accept = confirm(`${data.from} is calling (${data.type})\nDo you want to accept?`);
+  const accept = confirm(`${data.from} is calling (${data.type}). Accept?`);
   if (!accept) return;
 
   navigator.mediaDevices.getUserMedia({ 
@@ -1112,7 +1114,7 @@ db.ref(`calls/${user}/signal`).on('value', snap => {
 
     stream.getTracks().forEach(track => peer.addTrack(track, stream));
 
-    peer.ontrack = (e) => {
+    peer.ontrack = e => {
       if (!remoteStreamRef) {
         remoteStreamRef = new MediaStream();
         remoteVideo.srcObject = remoteStreamRef;
@@ -1120,7 +1122,7 @@ db.ref(`calls/${user}/signal`).on('value', snap => {
       remoteStreamRef.addTrack(e.track);
     };
 
-    peer.onicecandidate = (e) => {
+    peer.onicecandidate = e => {
       if (e.candidate) {
         db.ref(`calls/${data.from}/ice`).push({ from: user, candidate: e.candidate });
       }
@@ -1134,10 +1136,11 @@ db.ref(`calls/${user}/signal`).on('value', snap => {
       db.ref(`calls/${data.from}/signal/answer`).set(JSON.stringify(answer));
       showCallUI();
     });
+  }).catch(err => {
+    alert('Could not accept call: ' + err.message);
   });
 });
 
-// Receiver gets ICE candidates from caller
 db.ref(`calls/${user}/ice`).on('child_added', snap => {
   const ice = snap.val();
   if (ice.from !== user && peer) {
@@ -1145,12 +1148,12 @@ db.ref(`calls/${user}/ice`).on('child_added', snap => {
   }
 });
 
-// Caller receives answer
-db.ref(`calls/${currentChat}/signal/answer`).on('value', snap => {
+db.ref(`calls/${user}/signal/answer`).on('value', snap => {
   const answer = snap.val();
   if (answer && peer) {
     peer.setRemoteDescription(new RTCSessionDescription(JSON.parse(answer)));
   }
 });
+</script>
 </script>
 </html>
