@@ -233,101 +233,60 @@
   }
 </script>
 <script>
-  function openGroup(groupId, displayName) {
-    currentChat = 'group__' + groupId;
-    document.getElementById('chatWith').textContent = '#' + displayName;
-    document.getElementById('chatWindow').style.display = 'flex';
-    document.getElementById('messages').innerHTML = '';
-    if (convoRef) convoRef.off();
-    convoRef = db.ref('groupChats/' + groupId);
-    convoRef.on('child_added', snap => {
-      const m = snap.val();
-      const div = document.createElement('div');
+function openGroup(groupId, displayName) {
+  currentChat = 'group__' + groupId;
+  document.getElementById('chatWith').innerHTML = `<span onclick="openChatOptions()" style="cursor:pointer; text-decoration:underline;">#${displayName}</span>`;
+  document.getElementById('chatWindow').style.display = 'flex';
+  document.getElementById('messages').innerHTML = '';
+
+  if (convoRef) convoRef.off();
+  convoRef = db.ref('groupChats/' + groupId);
+
+  convoRef.on('child_added', snap => {
+    const m = snap.val();
+    const div = document.createElement('div');
+
+    if (m.deleted) {
+      div.className = 'msg';
+      div.style.fontStyle = 'italic';
+      div.textContent = "Message deleted";
+    } else {
       div.className = 'msg ' + (m.from === user ? 'you' : 'them');
       div.textContent = m.from + ': ' + m.text;
-
-div.addEventListener('contextmenu', e => {
-  e.preventDefault();
-  const isMine = m.from === user;
-  const ageInMs = Date.now() - m.ts;
-  const isRecent = ageInMs < 60000;
-
-  let options = 'Delete this message:\n1. For Me';
-  if (isMine && isRecent) options += '\n2. For Everyone';
-
-  const choice = prompt(options);
-
-  if (choice === '1') div.remove();
-  else if (choice === '2' && isMine && isRecent) {
-    snap.ref.remove(); // remove from groupChats DB
-    if (m.deleted) {
-  div.className = 'msg';
-  div.style.fontStyle = 'italic';
-  div.textContent = "Message deleted";
-} else {
-  div.className = 'msg ' + (m.from === user ? 'you' : 'them');
-  div.textContent = m.from + ': ' + m.text;
-  div.setAttribute('oncontextmenu', `event.preventDefault(); confirmDeleteMessage('${snap.key}', ${JSON.stringify(m)})`);
-    }
-  }
-});
-      div.oncontextmenu = function(e) {
-  e.preventDefault();
-  confirmDeleteMessage(snap.key, m);
-};
       div.setAttribute('oncontextmenu', `event.preventDefault(); confirmDeleteMessage('${snap.key}', ${JSON.stringify(m)})`);
-      document.getElementById('messages').appendChild(div);
-      document.getElementById('messages').scrollTop = 1e9;
-    });
-  }
+    }
 
+    document.getElementById('messages').appendChild(div);
+    document.getElementById('messages').scrollTop = 1e9;
+  });
+}
   function openChat(other) {
-    currentChat = other;
-    document.getElementById('chatWith').textContent = other;
-    document.getElementById('chatWindow').style.display = 'flex';
-    document.getElementById('messages').innerHTML = '';
-    if (convoRef) convoRef.off();
-    const convo = [user, other].sort().join('_');
-    convoRef = db.ref('privateChats/' + convo);
-    convoRef.on('child_added', snap => {
-      const m = snap.val();
-      const div = document.createElement('div');
+  currentChat = other;
+  document.getElementById('chatWith').innerHTML = `<span onclick="openChatOptions()" style="cursor:pointer; text-decoration:underline;">${other}</span>`;
+  document.getElementById('chatWindow').style.display = 'flex';
+  document.getElementById('messages').innerHTML = '';
+
+  if (convoRef) convoRef.off();
+  const convo = [user, other].sort().join('_');
+  convoRef = db.ref('privateChats/' + convo);
+
+  convoRef.on('child_added', snap => {
+    const m = snap.val();
+    const div = document.createElement('div');
+
+    if (m.deleted) {
+      div.className = 'msg';
+      div.style.fontStyle = 'italic';
+      div.textContent = "Message deleted";
+    } else {
       div.className = 'msg ' + (m.from === user ? 'you' : 'them');
       div.textContent = m.text;
-
-div.addEventListener('contextmenu', e => {
-  e.preventDefault();
-  const isMine = m.from === user;
-  const ageInMs = Date.now() - m.ts;
-  const isRecent = ageInMs < 60000;
-
-  let options = 'Delete this message:\n1. For Me';
-  if (isMine && isRecent) options += '\n2. For Everyone';
-
-  const choice = prompt(options);
-
-  if (choice === '1') div.remove();
-  else if (choice === '2' && isMine && isRecent) {
-    snap.ref.remove(); // delete from Firebase for both
-    if (m.deleted) {
-  div.className = 'msg';
-  div.style.fontStyle = 'italic';
-  div.textContent = "Message deleted";
-} else {
-  div.className = 'msg ' + (m.from === user ? 'you' : 'them');
-  div.textContent = m.from + ': ' + m.text;
-  div.setAttribute('oncontextmenu', `event.preventDefault(); confirmDeleteMessage('${snap.key}', ${JSON.stringify(m)})`);
-    }
-  }
-});
-      div.oncontextmenu = function(e) {
-  e.preventDefault();
-  confirmDeleteMessage(snap.key, m);
-};
       div.setAttribute('oncontextmenu', `event.preventDefault(); confirmDeleteMessage('${snap.key}', ${JSON.stringify(m)})`);
-      document.getElementById('messages').appendChild(div);
-      document.getElementById('messages').scrollTop = 1e9;
-    });
+    }
+
+    document.getElementById('messages').appendChild(div);
+    document.getElementById('messages').scrollTop = 1e9;
+  });
   }
   function confirmDeleteMessage(msgKey, msgObj) {
   const now = Date.now();
