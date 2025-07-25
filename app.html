@@ -241,7 +241,7 @@ header {
 }
 
 /* Mobile Responsive */
-@media (max-width: 600px) {
+    @media (max-width: 600px) {
   #userList {
     width: 100%;
   }
@@ -259,13 +259,13 @@ header {
   }
 
   #chatHeader {
-    display: none;
+    display: flex !important;
   }
 
   #backBtn {
-    display: inline-block;
+    display: inline-block !important;
   }
-}
+    }
   </style>
 </head>
 <body>
@@ -290,9 +290,8 @@ header {
     <button onclick="createGroup()">Create Group</button>
     <div id="users"></div>
   </div>
-
-  <div id="chatWindow">
-    <div id="chatHeader">
+  <div id="chatWindow" style="display: none;">
+  <div id="chatHeader" style="display: none;">
   <button id="backBtn" onclick="closeChat()">⬅</button>
   <div class="chatTitleWrapper">
     <span id="chatWith" onclick="openChatOptions()">---</span>
@@ -466,7 +465,8 @@ function openChat(other) {
   currentChat = other;
   document.getElementById('chatWith').innerHTML = `<span onclick="openChatOptions()" style="cursor:pointer; text-decoration:underline;">${other}</span>`;
   document.getElementById('chatWindow').style.display = 'flex';
-  document.getElementById('chatHeader').style.display = 'flex';
+document.getElementById('chatHeader').style.display = window.innerWidth <= 600 ? 'flex' : 'flex';
+document.getElementById('backBtn').style.display = window.innerWidth <= 600 ? 'inline-block' : 'none';
   document.getElementById('messages').innerHTML = '';
 
   if (convoRef) convoRef.off();
@@ -485,7 +485,8 @@ function openChat(other) {
   currentChat = 'group__' + groupId;
   document.getElementById('chatWith').innerHTML = `<span onclick="openChatOptions()" style="cursor:pointer; text-decoration:underline;">#${displayName}</span>`;
   document.getElementById('chatWindow').style.display = 'flex';
-  document.getElementById('chatHeader').style.display = 'flex';
+document.getElementById('chatHeader').style.display = window.innerWidth <= 600 ? 'flex' : 'flex';
+document.getElementById('backBtn').style.display = window.innerWidth <= 600 ? 'inline-block' : 'none';
   document.getElementById('messages').innerHTML = '';
     if (window.innerWidth <= 600) {
     document.getElementById('backBtn').style.display = 'inline-block';
