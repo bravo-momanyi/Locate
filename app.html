@@ -133,9 +133,7 @@
     searchBox.addEventListener('input', refreshUserList);
 
     function refreshUserList() {
-      let html = '';
-
-      html += `<h3 style="margin:10px 0 5px;">Users</h3>`;
+      let html = `<h3 style="margin:10px 0 5px;">Users</h3>`;
       Object.keys(allUsers).forEach(u => {
         if (u !== user && u.toLowerCase().includes(searchBox.value.toLowerCase())) {
           html += `<button onclick="openChat('${u}')">${u}</button>`;
@@ -143,12 +141,10 @@
       });
 
       html += `<h3 style="margin:15px 0 5px;">Groups</h3>`;
-      Object.entries(allGroups).forEach(([groupId, data]) => {
+      Object.entries(allGroups).forEach(([id, data]) => {
         if (!data.name) return;
-        if (data.name.toLowerCase().includes(searchBox.value.toLowerCase())) {
-          const label = data.public ? `# ${data.name}` : `🔒 ${data.name}`;
-          html += `<button class="group" onclick="openGroup('${groupId}', '${data.name}')">${label}</button>`;
-        }
+        const label = data.public ? `# ${data.name}` : `🔒 ${data.name}`;
+        html += `<button class="group" onclick="attemptJoinGroup('${id}', '${data.name}')">${label}</button>`;
       });
 
       userList.innerHTML = html;
@@ -174,7 +170,7 @@
       }
 
       const groupData = {
-        name: name,
+        name,
         admin: user,
         public: isPublic,
         password: isPublic ? null : password,
@@ -194,21 +190,31 @@
       });
     }
 
-    function openChat(other) {
-      currentChat = other;
-      document.getElementById('chatWith').textContent = other;
-      document.getElementById('chatWindow').style.display = 'flex';
-      document.getElementById('messages').innerHTML = '';
-      if (convoRef) convoRef.off();
-      const convo = [user, other].sort().join('_');
-      convoRef = db.ref('privateChats/' + convo);
-      convoRef.on('child_added', snap => {
-        const m = snap.val();
-        const div = document.createElement('div');
-        div.className = 'msg ' + (m.from === user ? 'you' : 'them');
-        div.textContent = m.text;
-        document.getElementById('messages').appendChild(div);
-        document.getElementById('messages').scrollTop = 1e9;
+    function attemptJoinGroup(groupId, groupName) {
+      db.ref('groups/' + groupId).once('value').then(snap => {
+        const group = snap.val();
+        if (!group) return;
+
+        if (group.members && group.members[user]) {
+          openGroup(groupId, groupName);
+        } else if (!group.public) {
+          const pwd = prompt("This is a private group. Enter password:");
+          if (pwd === group.password) {
+            const confirmJoin = confirm("Correct password. Do you want to join this group?");
+            if (confirmJoin) {
+              db.ref('groups/' + groupId + '/members/' + user).set(true);
+              openGroup(groupId, groupName);
+            }
+          } else {
+            alert("Wrong password.");
+          }
+        } else {
+          const confirmJoin = confirm("Do you want to join this public group?");
+          if (confirmJoin) {
+            db.ref('groups/' + groupId + '/members/' + user).set(true);
+            openGroup(groupId, groupName);
+          }
+        }
       });
     }
 
@@ -227,15 +233,23 @@
         document.getElementById('messages').appendChild(div);
         document.getElementById('messages').scrollTop = 1e9;
       });
+    }
 
-      db.ref('groups/' + groupId).once('value').then(snap => {
-        const data = snap.val();
-        if (!data.public && data.password) {
-          const passDiv = document.createElement('div');
-          passDiv.textContent = `🔒 Group Password: ${data.password}`;
-          passDiv.style = "padding: 5px 10px; background: #ffe0b2; color: #bf360c; font-weight: bold; border-radius: 5px; margin: 5px;";
-          document.getElementById('messages').prepend(passDiv);
-        }
+    function openChat(other) {
+      currentChat = other;
+      document.getElementById('chatWith').textContent = other;
+      document.getElementById('chatWindow').style.display = 'flex';
+      document.getElementById('messages').innerHTML = '';
+      if (convoRef) convoRef.off();
+      const convo = [user, other].sort().join('_');
+      convoRef = db.ref('privateChats/' + convo);
+      convoRef.on('child_added', snap => {
+        const m = snap.val();
+        const div = document.createElement('div');
+        div.className = 'msg ' + (m.from === user ? 'you' : 'them');
+        div.textContent = m.text;
+        document.getElementById('messages').appendChild(div);
+        document.getElementById('messages').scrollTop = 1e9;
       });
     }
 
