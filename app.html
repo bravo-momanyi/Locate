@@ -339,6 +339,11 @@
         border-radius: 5px;
       ">End Call</button>
   </div>
+  <div id="callModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:#000; z-index:9999; flex-direction:column; align-items:center; justify-content:center;">
+  <video id="remoteVideo" autoplay playsinline style="width:100%; max-height:70%;"></video>
+  <video id="localVideo" muted autoplay playsinline style="width:30%; position:absolute; bottom:80px; right:20px; border:2px solid #fff;"></video>
+  <button onclick="endCall()" style="margin-top:20px; background:red; color:#fff; padding:10px 20px;">End Call</button>
+  </div>
 </body>
 </html>
 <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
@@ -1032,9 +1037,9 @@ const callUI = document.getElementById('callModal');
 const localVideo = document.getElementById('localVideo');
 const remoteVideo = document.getElementById('remoteVideo');
 
-window.startCall = function(type) {
+function startCall(type) {
   if (!currentChat || currentChat.startsWith('group__')) {
-    return alert('Only private chats are supported for calling.');
+    return alert('Only private chats supported.');
   }
 
   navigator.mediaDevices.getUserMedia({ 
@@ -1044,8 +1049,8 @@ window.startCall = function(type) {
     localStream = stream;
     localVideo.srcObject = stream;
 
-    peer = new RTCPeerConnection({ 
-      iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] 
+    peer = new RTCPeerConnection({
+      iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
     });
 
     stream.getTracks().forEach(track => peer.addTrack(track, stream));
@@ -1072,28 +1077,27 @@ window.startCall = function(type) {
         type,
         offer: JSON.stringify(offer)
       });
-      showCallUI();
     });
-  }).catch(err => {
-    alert('Call failed: ' + err.message);
-  });
-};
 
-function showCallUI() {
-  callUI.style.display = 'flex';
+    callUI.style.display = 'flex';
+  });
 }
 
 function endCall() {
   if (peer) peer.close();
   if (localStream) localStream.getTracks().forEach(t => t.stop());
-  callUI.style.display = 'none';
-  db.ref(`calls/${user}/signal`).remove();
-  db.ref(`calls/${user}/ice`).remove();
-  remoteVideo.srcObject = null;
+
   localVideo.srcObject = null;
+  remoteVideo.srcObject = null;
+  callUI.style.display = 'none';
+
+  if (currentChat) {
+    db.ref(`calls/${currentChat}/signal`).remove();
+    db.ref(`calls/${currentChat}/ice`).remove();
+  }
 }
 
-// Incoming call listener
+// Handle incoming call offer
 db.ref(`calls/${user}/signal`).on('value', snap => {
   const data = snap.val();
   if (!data || data.from === user) return;
@@ -1101,15 +1105,15 @@ db.ref(`calls/${user}/signal`).on('value', snap => {
   const accept = confirm(`${data.from} is calling (${data.type}). Accept?`);
   if (!accept) return;
 
-  navigator.mediaDevices.getUserMedia({ 
-    video: data.type === 'video', 
-    audio: true 
+  navigator.mediaDevices.getUserMedia({
+    video: data.type === 'video',
+    audio: true
   }).then(stream => {
     localStream = stream;
     localVideo.srcObject = stream;
 
-    peer = new RTCPeerConnection({ 
-      iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] 
+    peer = new RTCPeerConnection({
+      iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
     });
 
     stream.getTracks().forEach(track => peer.addTrack(track, stream));
@@ -1134,26 +1138,26 @@ db.ref(`calls/${user}/signal`).on('value', snap => {
     }).then(answer => {
       peer.setLocalDescription(answer);
       db.ref(`calls/${data.from}/signal/answer`).set(JSON.stringify(answer));
-      showCallUI();
     });
-  }).catch(err => {
-    alert('Could not accept call: ' + err.message);
+
+    callUI.style.display = 'flex';
   });
 });
 
+// Handle ICE candidates
 db.ref(`calls/${user}/ice`).on('child_added', snap => {
   const ice = snap.val();
-  if (ice.from !== user && peer) {
+  if (ice && peer && ice.from !== user) {
     peer.addIceCandidate(new RTCIceCandidate(ice.candidate));
   }
 });
 
-db.ref(`calls/${user}/signal/answer`).on('value', snap => {
-  const answer = snap.val();
-  if (answer && peer) {
-    peer.setRemoteDescription(new RTCSessionDescription(JSON.parse(answer)));
+// Handle answer
+db.ref(`calls/${currentChat}/signal/answer`).on('value', snap => {
+  const ans = snap.val();
+  if (ans && peer) {
+    peer.setRemoteDescription(new RTCSessionDescription(JSON.parse(ans)));
   }
 });
-</script>
 </script>
 </html>
