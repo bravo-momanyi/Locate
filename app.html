@@ -6,304 +6,297 @@
   <title>Bravo Chat & Map</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
   <style>
-    /* General */
-body, html {
-  margin: 0;
-  padding: 0;
-  height: 100%;
-  font-family: Arial, sans-serif;
-  background: #fff;
-  overflow: hidden;
-}
+    html, body {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      font-family: Arial, sans-serif;
+      background: #fff;
+      overflow: hidden;
+    }
 
-/* Header */
-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  background: #075E54;
-  color: white;
-  padding: 10px;
-  font-size: 16px;
-}
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: #075E54;
+      color: white;
+      padding: 10px;
+      font-size: 16px;
+    }
 
-/* Tabs */
-.tabs {
-  display: flex;
-  background: #128C7E;
-}
+    .tabs {
+      display: flex;
+      background: #128C7E;
+    }
 
-.tabs button {
-  flex: 1;
-  padding: 12px;
-  border: none;
-  background: #128C7E;
-  color: white;
-  cursor: pointer;
-  font-size: 15px;
-}
+    .tabs button {
+      flex: 1;
+      padding: 12px;
+      border: none;
+      background: #128C7E;
+      color: white;
+      cursor: pointer;
+      font-size: 15px;
+    }
 
-.tabs button.active {
-  background: #25D366;
-  font-weight: bold;
-}
+    .tabs button.active {
+      background: #25D366;
+      font-weight: bold;
+    }
 
-/* Content Areas */
-.content {
-  display: none;
-  height: calc(100% - 92px);
-  overflow: hidden;
-}
+    .content {
+      display: none;
+      height: calc(100% - 92px);
+      overflow: hidden;
+    }
 
-.content.active {
-  display: flex;
-}
+    .content.active {
+      display: flex;
+    }
 
-#mapContent {
-  position: relative;
-}
+    #map {
+      width: 100%;
+      height: 100%;
+    }
 
-#map {
-  width: 100%;
-  height: 100%;
-}
+    #chatContent {
+      display: flex;
+      width: 100%;
+      height: 100%;
+    }
 
-/* Chat Layout */
-#chatContent {
-  display: flex;
-  width: 100%;
-}
+    #userList {
+      width: 30%;
+      border-right: 1px solid #ddd;
+      overflow-y: auto;
+      padding: 10px;
+      box-sizing: border-box;
+      background: #fafafa;
+    }
 
-/* User List */
-#userList {
-  width: 30%;
-  border-right: 1px solid #ddd;
-  overflow-y: auto;
-  padding: 10px;
-  box-sizing: border-box;
-  background: #fafafa;
-}
+    #userList input,
+    #userList button {
+      width: 100%;
+      margin-bottom: 5px;
+      padding: 8px;
+      border: none;
+      border-radius: 4px;
+      box-sizing: border-box;
+    }
 
-#userList input,
-#userList button {
-  width: 100%;
-  margin-bottom: 5px;
-  padding: 8px;
-  border: none;
-  border-radius: 4px;
-  box-sizing: border-box;
-}
+    #userList input {
+      border: 1px solid #ccc;
+    }
 
-#userList input {
-  border: 1px solid #ccc;
-}
+    #userList button {
+      background: #f1f1f1;
+      cursor: pointer;
+    }
 
-#userList button {
-  background: #f1f1f1;
-  cursor: pointer;
-}
+    #userList button.group {
+      background: #e1f5fe;
+      font-weight: bold;
+    }
 
-#userList button.group {
-  background: #e1f5fe;
-  font-weight: bold;
-}
+    #chatWindow {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      background: white;
+      height: 100%;
+    }
 
-/* Chat Window */
-#chatWindow {
-  flex: 1;
-  display: none;
-  flex-direction: column;
-  position: relative;
-  background: white;
-  height: 100%;
-}
+    #chatHeader {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px;
+      background: #128C7E;
+      color: white;
+      font-size: 16px;
+      position: relative;
+      z-index: 10;
+    }
 
-/* Chat Header */
-#chatHeader {
-  display: none;
-  align-items: center;
-  justify-content: space-between;
-  padding: 10px;
-  background: #128C7E;
-  color: white;
-  font-size: 16px;
-  position: relative;
-  z-index: 10;
-}
+    .chatTitleWrapper {
+      flex: 1;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
 
-.chatTitleWrapper {
-  flex: 1;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-}
+    #chatWith {
+      font-weight: bold;
+      text-align: center;
+      text-decoration: underline;
+      cursor: pointer;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 100%;
+    }
 
-#chatWith {
-  font-weight: bold;
-  text-align: center;
-  text-decoration: underline;
-  cursor: pointer;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 100%;
-}
+    #backBtn {
+      background: white;
+      color: #128C7E;
+      border: none;
+      padding: 5px 10px;
+      border-radius: 5px;
+      font-size: 14px;
+      margin-right: 10px;
+      cursor: pointer;
+      box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+      display: none;
+    }
 
-#backBtn {
-  display: none;
-  background: white;
-  color: #128C7E;
-  border: none;
-  padding: 5px 10px;
-  border-radius: 5px;
-  font-size: 14px;
-  margin-right: 10px;
-  cursor: pointer;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
-}
+    .callGroup {
+      display: flex;
+      gap: 5px;
+    }
 
-.callGroup {
-  display: flex;
-  gap: 5px;
-}
+    .callGroup button {
+      padding: 6px 10px;
+      border: none;
+      border-radius: 5px;
+      color: white;
+      font-size: 14px;
+      cursor: pointer;
+    }
 
-.callGroup button {
-  padding: 6px 10px;
-  border: none;
-  border-radius: 5px;
-  color: white;
-  font-size: 14px;
-  cursor: pointer;
-}
+    .callGroup .voice {
+      background: #075E54;
+    }
 
-.callGroup .voice {
-  background: #075E54;
-}
+    .callGroup .video {
+      background: #128C7E;
+    }
 
-.callGroup .video {
-  background: #128C7E;
-}
+    #messages {
+      flex: 1;
+      padding: 10px;
+      overflow-y: auto;
+      background: #e5ddd5;
+      display: flex;
+      flex-direction: column;
+    }
 
-/* Messages Area */
-#messages {
-  flex: 1;
-  padding: 10px;
-  overflow-y: auto;
-  background: #e5ddd5;
-  display: flex;
-  flex-direction: column;
-}
+    .msg {
+      padding: 8px;
+      margin: 5px;
+      border-radius: 7px;
+      max-width: 70%;
+      word-wrap: break-word;
+    }
 
-/* Individual Message */
-.msg {
-  padding: 8px;
-  margin: 5px;
-  border-radius: 7px;
-  max-width: 70%;
-  word-wrap: break-word;
-}
+    .you {
+      background: #dcf8c6;
+      align-self: flex-end;
+    }
 
-.you {
-  background: #dcf8c6;
-  align-self: flex-end;
-}
+    .them {
+      background: white;
+      align-self: flex-start;
+    }
 
-.them {
-  background: white;
-  align-self: flex-start;
-}
+    #sendBar {
+      display: flex;
+      padding: 10px;
+      border-top: 1px solid #ccc;
+      background: #fff;
+    }
 
-/* Send Bar */
-#sendBar {
-  display: flex;
-  padding: 10px;
-  border-top: 1px solid #ccc;
-  background: #fff;
-}
+    #sendBar input {
+      flex: 1;
+      padding: 8px;
+      border-radius: 20px;
+      border: 1px solid #ccc;
+      font-size: 14px;
+    }
 
-#sendBar input {
-  flex: 1;
-  padding: 8px;
-  border-radius: 20px;
-  border: 1px solid #ccc;
-  font-size: 14px;
-}
+    #sendBar button {
+      padding: 8px 12px;
+      background: #25D366;
+      border: none;
+      color: white;
+      margin-left: 5px;
+      border-radius: 20px;
+      font-size: 14px;
+      cursor: pointer;
+    }
 
-#sendBar button {
-  padding: 8px 12px;
-  background: #25D366;
-  border: none;
-  color: white;
-  margin-left: 5px;
-  border-radius: 20px;
-  font-size: 14px;
-  cursor: pointer;
-}
-
-/* Mobile Responsive */
     @media (max-width: 600px) {
-  #userList {
-    width: 100%;
-  }
+      #userList {
+        width: 100%;
+      }
 
-  #chatWindow {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    display: none;
-    flex-direction: column;
-    background: white;
-    z-index: 100;
-  }
+      #chatWindow {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        z-index: 100;
+      }
 
-  #chatHeader {
-    display: flex !important;
-  }
+      #chatHeader {
+        display: flex;
+      }
 
-  #backBtn {
-    display: inline-block !important;
-  }
+      #backBtn {
+        display: inline-block;
+      }
     }
   </style>
 </head>
 <body>
 
-<header>
-  <div id="currentUser"></div>
-  <button onclick="logout()">Logout</button>
-</header>
+  <header>
+    <div>Bravo Chat</div>
+  </header>
 
-<div class="tabs">
-  <button class="active" onclick="openTab('mapContent')">Map</button>
-  <button onclick="openTab('chatContent')">Chats</button>
-</div>
+  <div class="tabs">
+    <button class="active">Chat</button>
+    <button>Map</button>
+  </div>
 
-<div id="mapContent" class="content active">
-  <div id="map"></div>
-</div>
+  <div id="chatContent" class="content active">
+    <div id="userList">
+      <!-- Users -->
+      <input type="text" placeholder="Search" />
+      <button class="group">Group Chat</button>
+    </div>
 
-<div id="chatContent" class="content">
-  <div id="userList"> ... </div>
+    <div id="chatWindow">
+      <div id="chatHeader">
+        <button id="backBtn">Back</button>
+        <div class="chatTitleWrapper">
+          <span id="chatWith">Chatting with Bravo</span>
+        </div>
+        <div class="callGroup">
+          <button class="voice">📞</button>
+          <button class="video">🎥</button>
+        </div>
+      </div>
 
-  <div id="chatWindow" style="display: none;">
-    <div id="chatHeader" style="display: none;"> ... </div>
+      <div id="messages">
+        <div class="msg you">Hello Bravo!</div>
+        <div class="msg them">Hey there!</div>
+      </div>
 
-    <div id="messages"></div>
-
-    <div id="sendBar">
-      <input id="msgInput" placeholder="Type message..." oninput="notifyTyping()" />
-      <button onclick="sendMsg()">Send</button>
+      <div id="sendBar">
+        <input type="text" placeholder="Type a message" />
+        <button>Send</button>
+      </div>
     </div>
   </div>
-</div>
-<!-- CALL MODAL -->
-<div id="callModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:#000c; z-index:9999; align-items:center; justify-content:center; flex-direction:column;">
-  <video id="remoteVideo" autoplay playsinline style="width:90%; max-width:500px; background:black;"></video>
-  <video id="localVideo" muted autoplay playsinline style="position:absolute; bottom:20px; right:20px; width:100px; border:2px solid white; border-radius:10px;"></video>
-  <button onclick="endCall()" style="margin-top:20px; padding:10px 20px; background:red; color:white; border:none; border-radius:5px;">End Call</button>
-</div>
+
+  <div id="mapContent" class="content">
+    <div id="map">Map Here</div>
+  </div>
+
+</body>
+  </html>
 <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
