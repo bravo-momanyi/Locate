@@ -1,7 +1,8 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" /><meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Bravo Chat & Map</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
   <style>
@@ -21,6 +22,7 @@
     #userList button.group { background:#e1f5fe; font-weight:bold; }
     #chatWindow { flex:1; display:none; flex-direction:column; position:relative; }
     #chatHeader { padding:10px; background:#128C7E; color:white; display:flex; align-items:center; justify-content:space-between;}
+    #chatWith { cursor: pointer; text-decoration: underline; }
     #messages { flex:1; padding:10px; overflow-y:auto; background:#e5ddd5;}
     .msg { padding:8px; margin:5px; border-radius:7px; max-width:70%; }
     .you { background:#dcf8c6; align-self:flex-end; }
@@ -43,201 +45,265 @@
   </style>
 </head>
 <body>
-  <header>
-    <div id="currentUser"></div>
-    <button onclick="logout()">Logout</button>
-  </header>
+<header>
+  <div id="currentUser"></div>
+  <button onclick="logout()">Logout</button>
+</header>
 
-  <div class="tabs">
-    <button class="active" onclick="openTab('mapContent')">Map</button>
-    <button onclick="openTab('chatContent')">Chats</button>
+<div class="tabs">
+  <button class="active" onclick="openTab('mapContent')">Map</button>
+  <button onclick="openTab('chatContent')">Chats</button>
+</div>
+
+<div id="mapContent" class="content active"><div id="map"></div></div>
+<div id="chatContent" class="content">
+  <div id="userList">
+    <input id="searchBox" placeholder="Search users/groups..." />
+    <button onclick="createGroup()">Create Group</button>
+    <div id="users"></div>
   </div>
-
-  <div id="mapContent" class="content active"><div id="map"></div></div>
-
-  <div id="chatContent" class="content">
-    <div id="userList">
-      <input id="searchBox" placeholder="Search users/groups..." />
-      <button onclick="createGroup()">Create Group</button>
-      <div id="users"></div>
-    </div>
-    <div id="chatWindow">
-      <button id="backBtn" onclick="closeChat()">Back</button>
-      <div id="chatHeader">
-        <span id="chatWith">---</span>
-        <div class="callGroup">
-          <button class="voice" onclick="startCall('voice')">Voice</button>
-          <button class="video" onclick="startCall('video')">Video</button>
-        </div>
-      </div>
-      <div id="messages"></div>
-      <div id="sendBar">
-        <input id="msgInput" placeholder="Type message..."/>
-        <button onclick="sendMsg()">Send</button>
+  <div id="chatWindow">
+    <button id="backBtn" onclick="closeChat()">Back</button>
+    <div id="chatHeader">
+      <span id="chatWith" onclick="handleChatHeaderClick()">---</span>
+      <div class="callGroup">
+        <button class="voice" onclick="startCall('voice')">Voice</button>
+        <button class="video" onclick="startCall('video')">Video</button>
       </div>
     </div>
+    <div id="messages"></div>
+    <div id="sendBar">
+      <input id="msgInput" placeholder="Type message..." oninput="notifyTyping()" />
+      <button onclick="sendMsg()">Send</button>
+    </div>
   </div>
+</div>
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
+<script>
+  const config = {
+    apiKey: "AIzaSyBfkUJS81minjxj0DFz4pzNnGzCtb5ZJss",
+    authDomain: "locater-42fb4.firebaseapp.com",
+    databaseURL: "https://locater-42fb4-default-rtdb.firebaseio.com",
+    projectId: "locater-42fb4",
+    storageBucket: "locater-42fb4.appspot.com",
+    messagingSenderId: "250348367998",
+    appId: "1:250348367998:web:d734b2b4c735b5684ae82f"
+  };
+  firebase.initializeApp(config);
+  const db = firebase.database();
 
-  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
-  <script>
-    const config = {
-      apiKey: "AIzaSyBfkUJS81minjxj0DFz4pzNnGzCtb5ZJss",
-      authDomain: "locater-42fb4.firebaseapp.com",
-      databaseURL: "https://locater-42fb4-default-rtdb.firebaseio.com",
-      projectId: "locater-42fb4",
-      storageBucket: "locater-42fb4.appspot.com",
-      messagingSenderId: "250348367998",
-      appId: "1:250348367998:web:d734b2b4c735b5684ae82f"
+  const user = localStorage.getItem('username') || prompt('Enter username');
+  localStorage.setItem('username', user);
+  document.getElementById('currentUser').textContent = user;
+  db.ref('users/' + user).set(true);
+
+  // Map setup
+  const map = L.map('map').setView([1.29, 36.82], 12);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+  const markers = {};
+
+  setInterval(() => {
+    navigator.geolocation.getCurrentPosition(pos => {
+      db.ref('locations/' + user).set({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+    });
+  }, 5000);
+
+  db.ref('locations').on('value', snap => {
+    const locs = snap.val() || {};
+    for (const [u, loc] of Object.entries(locs)) {
+      if (markers[u]) markers[u].setLatLng([loc.lat, loc.lng]);
+      else markers[u] = L.marker([loc.lat, loc.lng]).addTo(map).bindPopup(u);
+    }
+  });
+
+  // Chat system
+  const userList = document.getElementById('users');
+  const searchBox = document.getElementById('searchBox');
+  let allUsers = {}, allGroups = {}, currentChat = '', convoRef = null;
+
+  db.ref('users').on('value', snap => {
+    allUsers = snap.val() || {};
+    refreshUserList();
+  });
+
+  db.ref('groups').on('value', snap => {
+    allGroups = snap.val() || {};
+    refreshUserList();
+  });
+
+  searchBox.addEventListener('input', refreshUserList);
+
+  function refreshUserList() {
+    let html = `<h3 style="margin:10px 0 5px;">Users</h3>`;
+    Object.keys(allUsers).forEach(u => {
+      if (u !== user && u.toLowerCase().includes(searchBox.value.toLowerCase())) {
+        html += `<button onclick="openChat('${u}')">${u}</button>`;
+      }
+    });
+
+    html += `<h3 style="margin:15px 0 5px;">Groups</h3>`;
+    Object.entries(allGroups).forEach(([id, data]) => {
+      if (!data.name) return;
+      const label = data.public ? `# ${data.name}` : `🔒 ${data.name}`;
+      html += `<button class="group" onclick="attemptJoinGroup('${id}', '${data.name}')">${label}</button>`;
+    });
+
+    userList.innerHTML = html;
+  }
+
+  function createGroup() {
+    let name = prompt("Enter group name (no special characters):");
+    if (!name) return;
+    name = name.trim().replace(/[^a-zA-Z0-9 _-]/g, '').replace(/\s+/g, '_');
+
+    let type = prompt("Group Type: Type 'public' or 'private'").toLowerCase();
+    if (type !== 'public' && type !== 'private') {
+      alert("Invalid group type. Please type 'public' or 'private'.");
+      return;
+    }
+
+    const isPublic = type === 'public';
+    let password = null;
+
+    if (!isPublic) {
+      password = prompt("Enter a password for this private group:");
+      if (!password) return alert("Private group must have a password.");
+    }
+
+    const groupData = {
+      name,
+      admin: user,
+      public: isPublic,
+      password: isPublic ? null : password,
+      members: { [user]: true }
     };
-    firebase.initializeApp(config);
-    const db = firebase.database();
 
-    const user = localStorage.getItem('username') || prompt('Enter username');
-    localStorage.setItem('username', user);
-    document.getElementById('currentUser').textContent = user;
-    db.ref('users/' + user).set(true);
-
-    const map = L.map('map').setView([1.29, 36.82], 12);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
-    const markers = {};
-    setInterval(() => {
-      navigator.geolocation.getCurrentPosition(pos => {
-        db.ref('locations/' + user).set({ lat: pos.coords.latitude, lng: pos.coords.longitude });
-      });
-    }, 5000);
-
-    db.ref('locations').on('value', snap => {
-      const locs = snap.val() || {};
-      for (const [u, loc] of Object.entries(locs)) {
-        if (markers[u]) markers[u].setLatLng([loc.lat, loc.lng]);
-        else markers[u] = L.marker([loc.lat, loc.lng]).addTo(map).bindPopup(u);
+    const newRef = db.ref('groups').push();
+    newRef.set(groupData, err => {
+      if (!err) {
+        db.ref('groupChats/' + newRef.key).push({
+          from: 'System',
+          text: `${user} created this ${type} group.`,
+          ts: Date.now()
+        });
+        alert(`${type.charAt(0).toUpperCase() + type.slice(1)} group created!`);
       }
     });
+  }
 
-    const userList = document.getElementById('users');
-    const searchBox = document.getElementById('searchBox');
-    let allUsers = {}, allGroups = {}, currentChat = '', convoRef = null;
+  function attemptJoinGroup(groupId, groupName) {
+    db.ref('groups/' + groupId).once('value').then(snap => {
+      const group = snap.val();
+      if (!group) return;
 
-    db.ref('users').on('value', snap => {
-      allUsers = snap.val() || {};
-      refreshUserList();
-    });
-
-    db.ref('groups').on('value', snap => {
-      allGroups = snap.val() || {};
-      refreshUserList();
-    });
-
-    searchBox.addEventListener('input', refreshUserList);
-
-    function refreshUserList() {
-      let html = `<h3 style="margin:10px 0 5px;">Users</h3>`;
-      Object.keys(allUsers).forEach(u => {
-        if (u !== user && u.toLowerCase().includes(searchBox.value.toLowerCase())) {
-          html += `<button onclick="openChat('${u}')">${u}</button>`;
+      if (group.members && group.members[user]) {
+        openGroup(groupId, groupName);
+      } else if (!group.public) {
+        const pwd = prompt("This is a private group. Enter password:");
+        if (pwd === group.password) {
+          const confirmJoin = confirm("Correct password. Do you want to join this group?");
+          if (confirmJoin) {
+            db.ref('groups/' + groupId + '/members/' + user).set(true);
+            openGroup(groupId, groupName);
+          }
+        } else {
+          alert("Wrong password.");
         }
-      });
-
-      html += `<h3 style="margin:15px 0 5px;">Groups</h3>`;
-      Object.entries(allGroups).forEach(([id, data]) => {
-        if (!data.name) return;
-        const label = data.public ? `# ${data.name}` : `🔒 ${data.name}`;
-        html += `<button class="group" onclick="attemptJoinGroup('${id}', '${data.name}')">${label}</button>`;
-      });
-
-      userList.innerHTML = html;
-    }
-
-    function createGroup() {
-      let name = prompt("Enter group name (no special characters):");
-      if (!name) return;
-      name = name.trim().replace(/[^a-zA-Z0-9 _-]/g, '').replace(/\s+/g, '_');
-
-      let type = prompt("Group Type: Type 'public' or 'private'").toLowerCase();
-      if (type !== 'public' && type !== 'private') {
-        alert("Invalid group type. Please type 'public' or 'private'.");
-        return;
-      }
-
-      const isPublic = type === 'public';
-      let password = null;
-
-      if (!isPublic) {
-        password = prompt("Enter a password for this private group:");
-        if (!password) return alert("Private group must have a password.");
-      }
-
-      const groupData = {
-        name,
-        admin: user,
-        public: isPublic,
-        password: isPublic ? null : password,
-        members: { [user]: true }
-      };
-
-      const newRef = db.ref('groups').push();
-      newRef.set(groupData, err => {
-        if (!err) {
-          db.ref('groupChats/' + newRef.key).push({
-            from: 'System',
-            text: `${user} created this ${type} group.`,
-            ts: Date.now()
-          });
-          alert(`${type.charAt(0).toUpperCase() + type.slice(1)} group created!`);
-        }
-      });
-    }
-
-    function sendMsg() {
-      const txt = document.getElementById('msgInput').value.trim();
-      if (!txt || !currentChat) return;
-      const msg = { from: user, text: txt, ts: Date.now() };
-      if (currentChat.startsWith('group__')) {
-        const g = currentChat.split('__')[1];
-        db.ref('groupChats/' + g).push(msg);
       } else {
-        const convo = [user, currentChat].sort().join('_');
-        db.ref('privateChats/' + convo).push(msg);
-      }
-      document.getElementById('msgInput').value = '';
-    }
-
-    function startCall(type) {
-      if (!currentChat || currentChat.startsWith('group__')) return alert('Open a private chat.');
-      const room = `https://YOUR_DAILY_DOMAIN.daily.co/${[user, currentChat].sort().join('-')}`;
-      db.ref('calls/' + currentChat + '/incoming').set({ from: user, type, room });
-      window.open(room, '_blank');
-    }
-
-    db.ref('calls/' + user + '/incoming').on('value', snap => {
-      const c = snap.val();
-      if (c) {
-        db.ref('calls/' + user + '/incoming').remove();
-        const ok = confirm(`${c.from} (${c.type}) call. Accept?`);
-        if (ok) window.open(c.room, '_blank');
+        const confirmJoin = confirm("Do you want to join this public group?");
+        if (confirmJoin) {
+          db.ref('groups/' + groupId + '/members/' + user).set(true);
+          openGroup(groupId, groupName);
+        }
       }
     });
+  }
+</script>
+<script>
+  function openGroup(groupId, displayName) {
+    currentChat = 'group__' + groupId;
+    document.getElementById('chatWith').textContent = '#' + displayName;
+    document.getElementById('chatWindow').style.display = 'flex';
+    document.getElementById('messages').innerHTML = '';
+    if (convoRef) convoRef.off();
+    convoRef = db.ref('groupChats/' + groupId);
+    convoRef.on('child_added', snap => {
+      const m = snap.val();
+      const div = document.createElement('div');
+      div.className = 'msg ' + (m.from === user ? 'you' : 'them');
+      div.textContent = m.from + ': ' + m.text;
+      document.getElementById('messages').appendChild(div);
+      document.getElementById('messages').scrollTop = 1e9;
+    });
+  }
 
-    function logout() {
-      localStorage.removeItem('username');
-      location.href = 'index.html';
+  function openChat(other) {
+    currentChat = other;
+    document.getElementById('chatWith').textContent = other;
+    document.getElementById('chatWindow').style.display = 'flex';
+    document.getElementById('messages').innerHTML = '';
+    if (convoRef) convoRef.off();
+    const convo = [user, other].sort().join('_');
+    convoRef = db.ref('privateChats/' + convo);
+    convoRef.on('child_added', snap => {
+      const m = snap.val();
+      const div = document.createElement('div');
+      div.className = 'msg ' + (m.from === user ? 'you' : 'them');
+      div.textContent = m.text;
+      document.getElementById('messages').appendChild(div);
+      document.getElementById('messages').scrollTop = 1e9;
+    });
+  }
+
+  function sendMsg() {
+    const txt = document.getElementById('msgInput').value.trim();
+    if (!txt || !currentChat) return;
+    const msg = { from: user, text: txt, ts: Date.now() };
+    if (currentChat.startsWith('group__')) {
+      const g = currentChat.split('__')[1];
+      db.ref('groupChats/' + g).push(msg);
+    } else {
+      const convo = [user, currentChat].sort().join('_');
+      db.ref('privateChats/' + convo).push(msg);
     }
+    document.getElementById('msgInput').value = '';
+  }
 
-    function openTab(id) {
-      document.querySelectorAll('.tabs button').forEach(b => b.classList.toggle('active', b.textContent + 'Content' === id));
-      document.querySelectorAll('.content').forEach(c => c.classList.remove('active'));
-      document.getElementById(id).classList.add('active');
-      if (id === 'chatContent') document.getElementById('chatWindow').style.display = 'none';
+  function startCall(type) {
+    if (!currentChat || currentChat.startsWith('group__')) {
+      return alert('Open a private chat.');
     }
+    const room = `https://YOUR_DAILY_DOMAIN.daily.co/${[user, currentChat].sort().join('-')}`;
+    db.ref('calls/' + currentChat + '/incoming').set({ from: user, type, room });
+    window.open(room, '_blank');
+  }
 
-    function closeChat() {
-      document.getElementById('chatWindow').style.display = 'none';
+  db.ref('calls/' + user + '/incoming').on('value', snap => {
+    const c = snap.val();
+    if (c) {
+      db.ref('calls/' + user + '/incoming').remove();
+      const ok = confirm(`${c.from} (${c.type}) call. Accept?`);
+      if (ok) window.open(c.room, '_blank');
     }
+  });
 
-    // 🟢 ENHANCEMENTS: Typing, Last Seen, Right-click Delete, Group Options...
-    // (See next message, due to length)
-  </script>
+  function closeChat() {
+    document.getElementById('chatWindow').style.display = 'none';
+  }
+
+  function logout() {
+    localStorage.removeItem('username');
+    location.href = 'index.html';
+  }
+
+  function openTab(id) {
+    document.querySelectorAll('.tabs button').forEach(b => b.classList.toggle('active', b.textContent + 'Content' === id));
+    document.querySelectorAll('.content').forEach(c => c.classList.remove('active'));
+    document.getElementById(id).classList.add('active');
+    if (id === 'chatContent') document.getElementById('chatWindow').style.display = 'none';
+  }
+</script>
 </body>
 </html>
