@@ -3,8 +3,17 @@
 <head>
   <meta charset="UTF-8">
   <title>Sign Up</title>
+
+  <!-- Firebase -->
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
+
+  <!-- EmailJS -->
+  <script src="https://cdn.emailjs.com/dist/email.min.js"></script>
+  <script>
+    emailjs.init("NuLLYSNdHyhKISFe0"); // Your public key
+  </script>
+
   <style>
     body {
       font-family: Arial, sans-serif;
@@ -45,8 +54,9 @@
 <body>
 
   <h2>Create Account</h2>
+
   <input id="username" type="text" placeholder="Username" /><br>
-  
+
   <div class="toggle">
     <input id="password" type="password" placeholder="Password" />
     <span onclick="toggleVisibility('password', this)">Show</span>
@@ -57,7 +67,13 @@
     <span onclick="toggleVisibility('confirmPassword', this)">Show</span>
   </div>
 
-  <button onclick="createAccount()">Create Account</button><br><br>
+  <input id="mobile" type="text" placeholder="Mobile Number" /><br>
+  <input id="email" type="email" placeholder="Email Address" /><br>
+  <input id="codeInput" type="text" placeholder="Verification Code" style="display:none;" /><br>
+
+  <button onclick="sendVerification()">Send Verification Code</button>
+  <button id="signupBtn" onclick="createAccount()" style="display:none;">Create Account</button><br><br>
+
   <a href="login.html" style="color: lightblue;">Already have an account? Login</a>
 
   <script>
@@ -73,6 +89,8 @@
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
 
+    let generatedCode = null;
+
     function toggleVisibility(inputId, toggleEl) {
       const input = document.getElementById(inputId);
       const isHidden = input.type === "password";
@@ -80,20 +98,65 @@
       toggleEl.textContent = isHidden ? "Hide" : "Show";
     }
 
+    function sendVerification() {
+      const username = document.getElementById("username").value.trim();
+      const password = document.getElementById("password").value;
+      const email = document.getElementById("email").value.trim();
+      const mobile = document.getElementById("mobile").value.trim();
+
+      if (username.length < 4 || password.length < 4) {
+        return alert("Username and password must be at least 4 characters.");
+      }
+      if (!email.includes("@") || !email.includes(".")) {
+        return alert("Please enter a valid email.");
+      }
+      if (!mobile.match(/^\d{7,15}$/)) {
+        return alert("Enter a valid mobile number.");
+      }
+
+      generatedCode = Math.floor(100000 + Math.random() * 900000);
+
+      emailjs.send("service_p7hwdj9", "template_9ooaehi", {
+        to_email: email,
+        code: generatedCode
+      }).then(() => {
+        alert("Verification code sent to your email!");
+        document.getElementById("codeInput").style.display = "inline";
+        document.getElementById("signupBtn").style.display = "inline";
+      }).catch(error => {
+        console.error(error);
+        alert("Failed to send verification email.");
+      });
+    }
+
     function createAccount() {
       const username = document.getElementById("username").value.trim();
       const password = document.getElementById("password").value;
       const confirmPassword = document.getElementById("confirmPassword").value;
+      const email = document.getElementById("email").value.trim();
+      const mobile = document.getElementById("mobile").value.trim();
+      const codeInput = document.getElementById("codeInput").value.trim();
 
-      if (!username || !password) return alert("Please fill all fields.");
-      if (password !== confirmPassword) return alert("Passwords do not match.");
+      if (!username || !password || !email || !mobile || !codeInput) {
+        return alert("Please fill all fields.");
+      }
+      if (password !== confirmPassword) {
+        return alert("Passwords do not match.");
+      }
+      if (codeInput != generatedCode) {
+        return alert("Incorrect verification code.");
+      }
 
       db.ref("users/" + username).once("value", snap => {
         if (snap.exists()) {
           alert("Username already taken.");
         } else {
-          db.ref("users/" + username).set({ password }).then(() => {
-            alert("Account created!");
+          db.ref("users/" + username).set({
+            password,
+            email,
+            mobile
+          }).then(() => {
+            alert("Account created successfully!");
             window.location.href = "index.html";
           }).catch(() => {
             alert("Error creating account.");
