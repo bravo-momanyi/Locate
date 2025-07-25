@@ -88,12 +88,9 @@
           const data = snap.val();
           if (data.password === password) {
             alert("Login successful!");
-           const username = document.getElementById('usernameInput').value.trim();
-            if (username) {
-              sessionStorage.setItem('loggedIn', 'yes');
-              sessionStorage.setItem('username', username);
-              window.location.href = 'app.html';
-            }
+            sessionStorage.setItem('loggedIn', 'yes');
+            sessionStorage.setItem('username', username);
+            window.location.href = 'app.html';
           } else {
             alert("Wrong password.");
           }
