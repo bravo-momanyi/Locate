@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
+  <meta charset="UTF-8">
   <title>Sign Up</title>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
@@ -40,12 +40,12 @@
       font-size: 12px;
       color: lightblue;
       cursor: pointer;
+      user-select: none;
     }
-    small {
-      color: lightblue;
+    .status {
       font-size: 12px;
-      margin-top: -5px;
-      margin-bottom: 8px;
+      color: lightgray;
+      margin-bottom: 5px;
     }
   </style>
 </head>
@@ -53,7 +53,7 @@
 
   <h2>Create Account</h2>
   <input id="username" type="text" placeholder="Username" /><br>
-
+  
   <div class="toggle">
     <input id="password" type="password" placeholder="Password" />
     <span onclick="toggleVisibility('password', this)">Show</span>
@@ -64,20 +64,17 @@
     <span onclick="toggleVisibility('confirmPassword', this)">Show</span>
   </div>
 
-  <input id="mobile" type="text" placeholder="Mobile Number" /><br>
+  <input id="mobile" type="text" placeholder="Mobile Number (e.g. +2547XXXXXXX)" /><br>
   <input id="email" type="email" placeholder="Email Address" /><br>
 
-  <button onclick="sendEmailCode()">Send Email Code</button>
-  <input id="emailOtp" type="text" placeholder="Enter Email OTP"
-         onkeydown="verifyEmailCodeOnEnter(event)"
-         onblur="verifyEmailCode()" />
-  <small id="emailOtpStatus">Enter OTP</small>
+  <button id="sendOtpBtn" onclick="sendVerificationCode()">Send Verification Code</button>
+  <input id="otp" type="text" placeholder="Enter Email OTP" /><br>
+  <div id="emailOtpStatus" class="status"></div>
 
+  <div id="recaptcha-container" style="margin-top: 10px;"></div>
   <button onclick="sendPhoneCode()">Send SMS Code</button>
-  <input id="phoneOtp" type="text" placeholder="Enter Phone OTP"
-         onkeydown="verifyPhoneCodeOnEnter(event)"
-         onblur="verifyPhoneCode()" />
-  <small id="phoneOtpStatus">Enter OTP</small>
+  <input id="phoneOtp" type="text" placeholder="Enter Phone OTP" />
+  <div id="phoneOtpStatus" class="status"></div>
 
   <button onclick="createAccount()">Create Account</button><br><br>
   <a href="login.html" style="color: lightblue;">Already have an account? Login</a>
@@ -93,123 +90,183 @@
       appId: "1:250348367998:web:d734b2b4c735b5684ae82f"
     };
     firebase.initializeApp(firebaseConfig);
+    firebase.auth().useDeviceLanguage();
     const db = firebase.database();
-    const auth = firebase.auth();
 
     emailjs.init("NuLLYSNdHyhKlSFe0");
 
-    let generatedEmailCode = "";
-    let phoneVerificationId = null;
+    let generatedCode = "";
+    let codeExpiryTime = 0;
+    let otpTimer = null;
 
-    function toggleVisibility(id, toggle) {
-      const input = document.getElementById(id);
-      input.type = input.type === 'password' ? 'text' : 'password';
-      toggle.textContent = input.type === 'password' ? 'Show' : 'Hide';
+    let phoneConfirmationResult = null;
+    window.recaptchaVerifier = new firebase.auth.RecaptchaVerifier('recaptcha-container', {
+      'size': 'normal',
+      'callback': () => console.log("reCAPTCHA solved"),
+      'expired-callback': () => console.warn("reCAPTCHA expired")
+    });
+
+    function toggleVisibility(inputId, toggleEl) {
+      const input = document.getElementById(inputId);
+      const isHidden = input.type === "password";
+      input.type = isHidden ? "text" : "password";
+      toggleEl.textContent = isHidden ? "Hide" : "Show";
     }
 
-    function sendEmailCode() {
+    function sendVerificationCode() {
       const email = document.getElementById("email").value.trim();
-      if (!email) return alert("Enter email first.");
+      const btn = document.getElementById("sendOtpBtn");
+      if (!email) return alert("Please enter your email.");
 
-      generatedEmailCode = Math.floor(100000 + Math.random() * 900000).toString();
+      generatedCode = Math.floor(100000 + Math.random() * 900000).toString();
+      codeExpiryTime = Date.now() + 2 * 60 * 1000;
 
-      const now = new Date();
-      now.setMinutes(now.getMinutes() + 15);
-      const time = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      const expiryStr = new Date(codeExpiryTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
       const params = {
-        email,
-        passcode: generatedEmailCode,
-        time
+        email: email,
+        passcode: generatedCode,
+        time: expiryStr
       };
 
       emailjs.send("service_p7hwdj9", "template_9ooaehi", params)
-        .then(() => alert("Email OTP sent."))
+        .then(() => {
+          alert("Verification code sent to email.");
+          startCountdown(120);
+        })
         .catch(err => {
-          console.error("EmailJS error:", err);
-          alert("Failed to send email OTP.");
+          console.error("EmailJS error: ", err);
+          alert("Failed to send verification email.");
         });
     }
 
-    function verifyEmailCode() {
-      const otp = document.getElementById("emailOtp").value.trim();
-      const status = document.getElementById("emailOtpStatus");
-      if (!otp) return status.textContent = "Enter OTP";
-      status.textContent = (otp === generatedEmailCode) ? "Verified" : "Wrong OTP";
+    function startCountdown(seconds) {
+      const btn = document.getElementById("sendOtpBtn");
+      let remaining = seconds;
+
+      btn.disabled = true;
+      btn.textContent = `Resend OTP (${remaining}s)`;
+
+      otpTimer = setInterval(() => {
+        remaining--;
+        btn.textContent = `Resend OTP (${remaining}s)`;
+
+        if (remaining <= 0) {
+          clearInterval(otpTimer);
+          btn.disabled = false;
+          btn.textContent = "Resend OTP";
+        }
+      }, 1000);
     }
 
-    function verifyEmailCodeOnEnter(e) {
-      if (e.key === "Enter") verifyEmailCode();
+    function verifyEmailOtp() {
+      const code = document.getElementById("otp").value.trim();
+      const status = document.getElementById("emailOtpStatus");
+
+      if (!code) {
+        status.textContent = "";
+        return;
+      }
+
+      if (Date.now() > codeExpiryTime) {
+        status.textContent = "OTP expired";
+        status.style.color = "orange";
+      } else if (code === generatedCode) {
+        status.textContent = "Verified";
+        status.style.color = "lightgreen";
+      } else {
+        status.textContent = "Wrong OTP";
+        status.style.color = "red";
+      }
     }
 
     function sendPhoneCode() {
       const phone = document.getElementById("mobile").value.trim();
-      if (!phone) return alert("Enter mobile number first.");
+      if (!phone.startsWith("+") || phone.length < 10) {
+        return alert("Enter valid phone number (+254...)");
+      }
 
-      const recaptcha = new firebase.auth.RecaptchaVerifier('sendPhoneCode', {
-        size: 'invisible'
-      });
-
-      auth.signInWithPhoneNumber("+254" + phone.replace(/^0/, ""), recaptcha)
+      const verifier = window.recaptchaVerifier;
+      firebase.auth().signInWithPhoneNumber(phone, verifier)
         .then(result => {
-          phoneVerificationId = result.verificationId;
-          alert("SMS OTP sent.");
+          phoneConfirmationResult = result;
+          alert("SMS code sent. Enter code.");
         })
-        .catch(error => {
-          console.warn("SMS OTP failed:", error.message);
-          phoneVerificationId = null;
+        .catch(err => {
+          console.warn("SMS not sent. Skipping:", err.message);
         });
     }
 
-    function verifyPhoneCode() {
+    function verifyPhoneOtp() {
       const code = document.getElementById("phoneOtp").value.trim();
       const status = document.getElementById("phoneOtpStatus");
-      if (!code) return status.textContent = "Enter OTP";
-      if (!phoneVerificationId) {
-        status.textContent = "Skipped";
+
+      if (!code) {
+        status.textContent = "";
         return;
       }
 
-      const credential = firebase.auth.PhoneAuthProvider.credential(phoneVerificationId, code);
-      auth.signInWithCredential(credential)
-        .then(() => status.textContent = "Verified")
-        .catch(() => status.textContent = "Wrong OTP");
+      if (!phoneConfirmationResult) {
+        status.textContent = "Send code first.";
+        status.style.color = "orange";
+        return;
+      }
+
+      phoneConfirmationResult.confirm(code)
+        .then(() => {
+          status.textContent = "Phone verified.";
+          status.style.color = "lightgreen";
+        })
+        .catch(() => {
+          status.textContent = "Wrong OTP";
+          status.style.color = "red";
+        });
     }
 
-    function verifyPhoneCodeOnEnter(e) {
-      if (e.key === "Enter") verifyPhoneCode();
-    }
+    document.getElementById("otp").addEventListener("blur", verifyEmailOtp);
+    document.getElementById("otp").addEventListener("keyup", e => {
+      if (e.key === "Enter") verifyEmailOtp();
+    });
+
+    document.getElementById("phoneOtp").addEventListener("blur", verifyPhoneOtp);
+    document.getElementById("phoneOtp").addEventListener("keyup", e => {
+      if (e.key === "Enter") verifyPhoneOtp();
+    });
 
     function createAccount() {
       const username = document.getElementById("username").value.trim();
       const password = document.getElementById("password").value;
-      const confirm = document.getElementById("confirmPassword").value;
+      const confirmPassword = document.getElementById("confirmPassword").value;
       const mobile = document.getElementById("mobile").value.trim();
       const email = document.getElementById("email").value.trim();
-      const emailOtp = document.getElementById("emailOtp").value.trim();
+      const otp = document.getElementById("otp").value.trim();
 
-      if (!username || !password || !confirm || !mobile || !email || !emailOtp)
-        return alert("Fill all fields.");
+      if (!username || !password || !confirmPassword || !mobile || !email || !otp)
+        return alert("Please fill all fields.");
 
       if (username.length < 4 || password.length < 4)
-        return alert("Username & password must be ≥4 characters.");
+        return alert("Username and password must be at least 4 characters.");
 
-      if (password !== confirm)
-        return alert("Passwords don’t match.");
+      if (password !== confirmPassword)
+        return alert("Passwords do not match.");
 
-      if (emailOtp !== generatedEmailCode)
-        return alert("Wrong email OTP.");
+      if (otp !== generatedCode || Date.now() > codeExpiryTime)
+        return alert("Invalid or expired email OTP.");
 
       db.ref("users/" + username).once("value", snap => {
         if (snap.exists()) {
-          alert("Username taken.");
+          alert("Username already taken.");
         } else {
           db.ref("users/" + username).set({
-            password, email, mobile
+            password: password,
+            mobile: mobile,
+            email: email
           }).then(() => {
-            alert("Account created.");
+            alert("Account created!");
             window.location.href = "index.html";
-          }).catch(() => alert("Error creating account."));
+          }).catch(() => {
+            alert("Error creating account.");
+          });
         }
       });
     }
