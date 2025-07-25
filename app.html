@@ -1,18 +1,19 @@
 <!DOCTYPE html>
-<script>
-  // If not logged in via index.html, force logout
-  if (sessionStorage.getItem('loggedIn') !== 'yes' || !sessionStorage.getItem('username')) {
-    location.href = 'index.html';
-  }
 
-  // Assign the logged in user
-  const user = sessionStorage.getItem('username');
-</script>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Bravo Chat & Map</title>
+  <script>
+    // Force logout if not logged in via session
+    if (sessionStorage.getItem('loggedIn') !== 'yes' || !sessionStorage.getItem('username')) {
+      location.href = 'index.html';
+    }
+
+    // Declare globally for use in entire page
+    window.user = sessionStorage.getItem('username');
+  </script>
   <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
  <style>  
   /* General */  
@@ -1172,19 +1173,17 @@ db.ref(`calls/${currentChat}/signal/answer`).on('value', snap => {
 });
 </script>
 <script>
+  // Always force logout on page reload, tab close, back/forward nav, or exit
   window.addEventListener('beforeunload', function () {
-  localStorage.removeItem('username');
-});
-
-window.addEventListener('unload', function () {
-  localStorage.removeItem('username');
-});
-</script>
-<script>
-  // Clear login session on reload or exit
-  window.addEventListener('beforeunload', function () {
+    // Clear both storage types
     sessionStorage.removeItem('loggedIn');
     sessionStorage.removeItem('username');
+    localStorage.removeItem('username');
   });
+
+  // Prevent accessing app.html directly without login
+  if (sessionStorage.getItem('loggedIn') !== 'yes' || !sessionStorage.getItem('username')) {
+    window.location.href = 'index.html'; // redirect to login
+  }
 </script>
 </html>
