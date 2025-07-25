@@ -5,7 +5,8 @@
   <title>Sign Up</title>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/emailjs-com@2.6.4/dist/email.min.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
   <style>
     body {
       font-family: Arial, sans-serif;
@@ -39,16 +40,20 @@
       font-size: 12px;
       color: lightblue;
       cursor: pointer;
-      user-select: none;
+    }
+    small {
+      color: lightblue;
+      font-size: 12px;
+      margin-top: -5px;
+      margin-bottom: 8px;
     }
   </style>
 </head>
 <body>
 
   <h2>Create Account</h2>
-
   <input id="username" type="text" placeholder="Username" /><br>
-  
+
   <div class="toggle">
     <input id="password" type="password" placeholder="Password" />
     <span onclick="toggleVisibility('password', this)">Show</span>
@@ -59,11 +64,21 @@
     <span onclick="toggleVisibility('confirmPassword', this)">Show</span>
   </div>
 
-  <input id="email" type="email" placeholder="Email" /><br>
-  <input id="mobile" type="text" placeholder="Phone number (optional)" /><br>
-  <input id="emailOtp" type="text" placeholder="Enter OTP" /><br>
+  <input id="mobile" type="text" placeholder="Mobile Number" /><br>
+  <input id="email" type="email" placeholder="Email Address" /><br>
 
-  <button onclick="sendVerificationCode()">Send OTP</button>
+  <button onclick="sendEmailCode()">Send Email Code</button>
+  <input id="emailOtp" type="text" placeholder="Enter Email OTP"
+         onkeydown="verifyEmailCodeOnEnter(event)"
+         onblur="verifyEmailCode()" />
+  <small id="emailOtpStatus">Enter OTP</small>
+
+  <button onclick="sendPhoneCode()">Send SMS Code</button>
+  <input id="phoneOtp" type="text" placeholder="Enter Phone OTP"
+         onkeydown="verifyPhoneCodeOnEnter(event)"
+         onblur="verifyPhoneCode()" />
+  <small id="phoneOtpStatus">Enter OTP</small>
+
   <button onclick="createAccount()">Create Account</button><br><br>
   <a href="login.html" style="color: lightblue;">Already have an account? Login</a>
 
@@ -79,80 +94,124 @@
     };
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
-    emailjs.init("NuLLYSNdHyhKlSFe0"); // Your public key
+    const auth = firebase.auth();
 
-    let generatedOtp = "";
+    emailjs.init("NuLLYSNdHyhKlSFe0");
 
-    function toggleVisibility(id, el) {
+    let generatedEmailCode = "";
+    let phoneVerificationId = null;
+
+    function toggleVisibility(id, toggle) {
       const input = document.getElementById(id);
-      input.type = input.type === "password" ? "text" : "password";
-      el.textContent = input.type === "password" ? "Show" : "Hide";
+      input.type = input.type === 'password' ? 'text' : 'password';
+      toggle.textContent = input.type === 'password' ? 'Show' : 'Hide';
     }
 
-    function sendVerificationCode() {
+    function sendEmailCode() {
       const email = document.getElementById("email").value.trim();
-      if (!email) return alert("Please enter a valid email.");
-      generatedOtp = Math.floor(100000 + Math.random() * 900000).toString();
-      const time = new Date(Date.now() + 15 * 60000).toLocaleTimeString();
+      if (!email) return alert("Enter email first.");
 
-      const templateParams = {
+      generatedEmailCode = Math.floor(100000 + Math.random() * 900000).toString();
+
+      const now = new Date();
+      now.setMinutes(now.getMinutes() + 15);
+      const time = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+      const params = {
         email,
-        passcode: generatedOtp,
+        passcode: generatedEmailCode,
         time
       };
 
-      emailjs.send("service_p7hwdj9", "template_9ooaehi", templateParams)
-        .then(() => alert("OTP sent to your email."))
-        .catch(error => {
-          console.error("EmailJS error:", error);
-          alert("Failed to send verification email. Please try again.");
+      emailjs.send("service_p7hwdj9", "template_9ooaehi", params)
+        .then(() => alert("Email OTP sent."))
+        .catch(err => {
+          console.error("EmailJS error:", err);
+          alert("Failed to send email OTP.");
         });
+    }
+
+    function verifyEmailCode() {
+      const otp = document.getElementById("emailOtp").value.trim();
+      const status = document.getElementById("emailOtpStatus");
+      if (!otp) return status.textContent = "Enter OTP";
+      status.textContent = (otp === generatedEmailCode) ? "Verified" : "Wrong OTP";
+    }
+
+    function verifyEmailCodeOnEnter(e) {
+      if (e.key === "Enter") verifyEmailCode();
+    }
+
+    function sendPhoneCode() {
+      const phone = document.getElementById("mobile").value.trim();
+      if (!phone) return alert("Enter mobile number first.");
+
+      const recaptcha = new firebase.auth.RecaptchaVerifier('sendPhoneCode', {
+        size: 'invisible'
+      });
+
+      auth.signInWithPhoneNumber("+254" + phone.replace(/^0/, ""), recaptcha)
+        .then(result => {
+          phoneVerificationId = result.verificationId;
+          alert("SMS OTP sent.");
+        })
+        .catch(error => {
+          console.warn("SMS OTP failed:", error.message);
+          phoneVerificationId = null;
+        });
+    }
+
+    function verifyPhoneCode() {
+      const code = document.getElementById("phoneOtp").value.trim();
+      const status = document.getElementById("phoneOtpStatus");
+      if (!code) return status.textContent = "Enter OTP";
+      if (!phoneVerificationId) {
+        status.textContent = "Skipped";
+        return;
+      }
+
+      const credential = firebase.auth.PhoneAuthProvider.credential(phoneVerificationId, code);
+      auth.signInWithCredential(credential)
+        .then(() => status.textContent = "Verified")
+        .catch(() => status.textContent = "Wrong OTP");
+    }
+
+    function verifyPhoneCodeOnEnter(e) {
+      if (e.key === "Enter") verifyPhoneCode();
     }
 
     function createAccount() {
       const username = document.getElementById("username").value.trim();
       const password = document.getElementById("password").value;
-      const confirmPassword = document.getElementById("confirmPassword").value;
-      const email = document.getElementById("email").value.trim();
+      const confirm = document.getElementById("confirmPassword").value;
       const mobile = document.getElementById("mobile").value.trim();
-      const enteredOtp = document.getElementById("emailOtp").value.trim();
+      const email = document.getElementById("email").value.trim();
+      const emailOtp = document.getElementById("emailOtp").value.trim();
 
-      if (!username || !password || !confirmPassword || !email || !enteredOtp)
-        return alert("Please fill all required fields.");
+      if (!username || !password || !confirm || !mobile || !email || !emailOtp)
+        return alert("Fill all fields.");
 
       if (username.length < 4 || password.length < 4)
-        return alert("Username and password must be at least 4 characters.");
+        return alert("Username & password must be ≥4 characters.");
 
-      if (password !== confirmPassword)
-        return alert("Passwords do not match.");
+      if (password !== confirm)
+        return alert("Passwords don’t match.");
 
-      if (enteredOtp !== generatedOtp)
-        return alert("Invalid OTP. Please verify your email again.");
+      if (emailOtp !== generatedEmailCode)
+        return alert("Wrong email OTP.");
 
       db.ref("users/" + username).once("value", snap => {
         if (snap.exists()) {
-          alert("Username already taken.");
+          alert("Username taken.");
         } else {
-          db.ref("users/" + username).set({ password, email, mobile })
-            .then(() => {
-              alert("Account created successfully!");
-              window.location.href = "index.html";
-            })
-            .catch(() => {
-              alert("Error creating account.");
-            });
+          db.ref("users/" + username).set({
+            password, email, mobile
+          }).then(() => {
+            alert("Account created.");
+            window.location.href = "index.html";
+          }).catch(() => alert("Error creating account."));
         }
       });
-
-      // Optional: try to verify phone silently
-      if (mobile) {
-        try {
-          // Your Firebase phone auth code (optional if available)
-          console.log("Mobile verification attempted, but skipped due to daily limits.");
-        } catch (e) {
-          console.warn("Phone verification skipped:", e);
-        }
-      }
     }
   </script>
 </body>
