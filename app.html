@@ -2,480 +2,120 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Bravo Chat & Map</title>
-
-  <!-- Leaflet CSS -->
-  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
-
-  <!-- EmailJS -->
-  <script src="https://cdn.jsdelivr.net/npm/emailjs-com@3/dist/email.min.js"></script>
-  <script>
-    (function () {
-      emailjs.init("service_wn3z8ej");
-    })();
-  </script>
-
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Bravo Connect Dashboard</title>
   <style>
-    /* General */
-    body, html {
+    body {
       margin: 0;
       padding: 0;
-      height: 100%;
-      font-family: Arial, sans-serif;
-      background: #fff;
-      overflow: hidden;
-    }
-
-    /* Header */
-    header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      background: #075E54;
+      font-family: 'Segoe UI', sans-serif;
+      background: linear-gradient(to right, #004d40, #00695c);
       color: white;
-      padding: 10px;
-      font-size: 16px;
+      height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
     }
 
-    #currentUser {
-      cursor: pointer;
+    .welcome-box {
+      background: rgba(255, 255, 255, 0.1);
+      padding: 30px;
+      border-radius: 12px;
+      text-align: center;
+      max-width: 500px;
+      width: 90%;
+      box-shadow: 0 0 15px rgba(0, 0, 0, 0.2);
+      animation: fadeIn 1s ease-in-out;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    h1 {
+      font-size: 30px;
+      margin-bottom: 10px;
+    }
+
+    p {
+      font-size: 16px;
+      margin-bottom: 20px;
+    }
+
+    .user {
       font-weight: bold;
+      color: #a7ffeb;
+    }
+
+    .btn-group {
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
+      margin-top: 20px;
+    }
+
+    .btn {
+      padding: 14px;
+      background: #26a69a;
+      border: none;
+      color: white;
+      font-size: 16px;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background 0.3s ease;
+      text-decoration: none;
+    }
+
+    .btn:hover {
+      background: #00bfa5;
+    }
+
+    #logout {
+      margin-top: 25px;
+      font-size: 14px;
+      color: #ffab91;
+      background: none;
+      border: none;
+      cursor: pointer;
       text-decoration: underline;
     }
 
-    /* Tabs */
-    .tabs {
-      display: flex;
-      background: #128C7E;
+    @media (max-width: 500px) {
+      h1 { font-size: 24px; }
+      .btn { font-size: 15px; }
     }
-
-    .tabs button {
-      flex: 1;
-      padding: 12px;
-      border: none;
-      background: #128C7E;
-      color: white;
-      cursor: pointer;
-      font-size: 15px;
-    }
-
-    .tabs button.active {
-      background: #25D366;
-      font-weight: bold;
-    }
-
-    .content {
-      display: none;
-      height: calc(100% - 92px);
-      overflow: hidden;
-    }
-
-    .content.active {
-      display: flex;
-    }
-
-    #mapContent {
-      position: relative;
-    }
-
-    #map {
-      width: 100%;
-      height: 100%;
-    }
-    </style>
+  </style>
 </head>
 <body>
-  <!-- HEADER -->
-  <header>
-    <div id="currentUser" onclick="openProfileTab()">---</div>
-    <button onclick="logout()">Logout</button>
-  </header>
-
-  <!-- TAB BUTTONS -->
-  <div class="tabs">
-    <button class="active" onclick="openTab('mapContent')">Map</button>
-    <button onclick="openTab('chatContent')">Chats</button>
-    <button onclick="openTab('profileContent')">Profile</button>
-  </div>
-
-  <!-- MAP TAB -->
-  <div id="mapContent" class="content active">
-    <div id="map"></div>
-  </div>
-
-  <!-- CHAT TAB -->
-  <div id="chatContent" class="content">
-    <div id="userList">
-      <input id="searchBox" placeholder="Search users/groups..." />
-      <button onclick="createGroup()">Create Group</button>
-      <div id="users"></div>
+  <div class="welcome-box">
+    <h1>Welcome to Bravo Connect</h1>
+    <p>Hello, <span class="user" id="usernameDisplay">...</span> 👋</p>
+    <p>What would you like to do today?</p>
+    
+    <div class="btn-group">
+      <a class="btn" href="map.html">📍 Live Map</a>
+      <a class="btn" href="chat.html">💬 Chat & Call</a>
+      <a class="btn" href="profile.html">👤 My Profile</a>
     </div>
-    <div id="chatWindow">
-      <div id="chatHeader">
-        <button id="backBtn" onclick="closeChat()">⬅</button>
-        <span id="chatWith" onclick="openChatOptions()">---</span>
-        <div class="callGroup">
-          <button class="voice" onclick="startCall('voice')">📞</button>
-          <button class="video" onclick="startCall('video')">🎥</button>
-        </div>
-      </div>
 
-      <div id="messages"></div>
-
-      <div id="sendBar">
-        <input id="msgInput" placeholder="Type message..." oninput="notifyTyping()" />
-        <button onclick="sendMsg()">Send</button>
-      </div>
-    </div>
+    <button id="logout">Logout</button>
   </div>
 
-  <!-- PROFILE TAB -->
-  <div id="profileContent" class="content" style="flex-direction: column; align-items: center; justify-content: center; padding: 20px;">
-    <h2>Profile Settings</h2>
-    <div style="max-width:400px; width:100%;">
-      <h4>Change Username</h4>
-      <input type="password" id="changeUsername_password" placeholder="Enter Current Password" />
-      <input type="text" id="newUsername" placeholder="New Username" />
-      <button onclick="changeUsername()">Update Username</button>
-
-      <h4>Change Password (using old)</h4>
-      <input type="password" id="oldPass" placeholder="Current Password" />
-      <input type="password" id="newPass" placeholder="New Password" />
-      <button onclick="changePassword()">Update Password</button>
-
-      <h4>Reset Password / Username via Email Code</h4>
-      <input type="email" id="resetEmail" placeholder="Enter your Email" />
-      <button onclick="sendResetCode()">Send Reset Code</button>
-
-      <div id="otpSection" style="display:none;">
-        <input id="enteredCode" placeholder="Enter OTP Code" />
-        <input id="otpNewValue" placeholder="New Password or Username" />
-        <button onclick="verifyResetCode()">Confirm</button>
-        <p id="otpCountdown" style="color:red;"></p>
-      </div>
-    </div>
-  </div>
-
-  <!-- CALL MODAL -->
-  <div id="callModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:#000c; z-index:9999; flex-direction:column; align-items:center; justify-content:center;">
-    <video id="remoteVideo" autoplay playsinline style="width:90%; max-width:500px; background:black;"></video>
-    <video id="localVideo" muted autoplay playsinline style="position: absolute; bottom: 20px; right: 20px; width: 100px; border: 2px solid white; border-radius: 10px;"></video>
-    <button onclick="endCall()" style="margin-top: 20px; padding: 10px 20px; background: red; color: white; border: none; border-radius: 5px;">End Call</button>
-  </div>
-  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script><script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script><script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script><script src="https://cdn.jsdelivr.net/npm/emailjs-com@2/dist/email.min.js"></script><script>
-  // Firebase & EmailJS Setup
-  const config = {
-    apiKey: "AIzaSyBfkUJS81minjxj0DFz4pzNnGzCtb5ZJss",
-    authDomain: "locater-42fb4.firebaseapp.com",
-    databaseURL: "https://locater-42fb4-default-rtdb.firebaseio.com",
-    projectId: "locater-42fb4",
-    storageBucket: "locater-42fb4.appspot.com",
-    messagingSenderId: "250348367998",
-    appId: "1:250348367998:web:d734b2b4c735b5684ae82f"
-  };
-  firebase.initializeApp(config);
-  const db = firebase.database();
-  emailjs.init("user_XXXXX"); // Replace with your EmailJS user ID
-
-  const user = sessionStorage.getItem('username');
-  if (!user) location.href = 'index.html';
-  document.getElementById('currentUser').textContent = user;
-  db.ref('users/' + user).update({ online: true });
-
-  // Tabs
-  function openTab(id) {
-    document.querySelectorAll('.tabs button').forEach(b => {
-      const target = b.textContent.toLowerCase() + 'Content';
-      b.classList.toggle('active', target === id);
-    });
-    document.querySelectorAll('.content').forEach(c => c.classList.remove('active'));
-    document.getElementById(id).classList.add('active');
-  }
-  function openProfileTab() {
-    openTab('profileContent');
-  }
-
-  // Logout
-  function logout() {
-    sessionStorage.clear();
-    location.href = 'index.html';
-  }
-
-  // Map
-  const map = L.map('map').setView([1.29, 36.82], 12);
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
-  const markers = {};
-
-  setInterval(() => {
-    navigator.geolocation.getCurrentPosition(pos => {
-      db.ref('locations/' + user).set({ lat: pos.coords.latitude, lng: pos.coords.longitude });
-    });
-  }, 5000);
-
-  db.ref('locations').on('value', snap => {
-    const locs = snap.val() || {};
-    for (const [u, loc] of Object.entries(locs)) {
-      if (markers[u]) markers[u].setLatLng([loc.lat, loc.lng]);
-      else markers[u] = L.marker([loc.lat, loc.lng]).addTo(map).bindPopup(u);
+  <script>
+    // Session check
+    if (sessionStorage.getItem('loggedIn') !== 'yes' || !sessionStorage.getItem('username')) {
+      window.location.href = 'index.html';
     }
-  });
 
-  // You’ll receive chat, group, and call script in Part 4
+    const username = sessionStorage.getItem('username');
+    document.getElementById('usernameDisplay').textContent = username;
+
+    document.getElementById('logout').addEventListener('click', () => {
+      sessionStorage.clear();
+      location.href = 'index.html';
+    });
   </script>
-  <script src="https://cdn.emailjs.com/dist/email.min.js"></script>
-<script>
-emailjs.init("your_user_id"); // Replace with your EmailJS user ID
-
-let localStream, peer, remoteStreamRef;
-const callUI = document.getElementById('callModal');
-const localVideo = document.getElementById('localVideo');
-const remoteVideo = document.getElementById('remoteVideo');
-
-// ========== CHAT =============
-function sendMsg() {
-  const txt = document.getElementById('msgInput').value.trim();
-  if (!txt || !currentChat) return;
-  const msg = { from: user, text: txt, ts: Date.now() };
-  if (currentChat.startsWith('group__')) {
-    const g = currentChat.split('__')[1];
-    db.ref('groupChats/' + g).push(msg);
-  } else {
-    const convo = [user, currentChat].sort().join('_');
-    db.ref('privateChats/' + convo).push(msg);
-  }
-  document.getElementById('msgInput').value = '';
-}
-
-function renderMessage(key, m) {
-  const div = document.createElement('div');
-  div.setAttribute('data-key', key);
-
-  if (m.deleted) {
-    div.className = 'msg';
-    div.style.fontStyle = 'italic';
-    div.textContent = "Message deleted";
-  } else {
-    div.className = 'msg ' + (m.from === user ? 'you' : 'them');
-    div.textContent = m.from === user && !currentChat.startsWith('group__') ? m.text : m.from + ": " + m.text;
-    div.oncontextmenu = function (e) {
-      e.preventDefault();
-      confirmDeleteMessage(key, m);
-    };
-  }
-
-  document.getElementById('messages').appendChild(div);
-  document.getElementById('messages').scrollTop = 1e9;
-}
-
-function updateMessage(key, m) {
-  const msgElement = document.querySelector(`[data-key="${key}"]`);
-  if (!msgElement) return;
-
-  if (m.deleted) {
-    msgElement.className = 'msg';
-    msgElement.style.fontStyle = 'italic';
-    msgElement.textContent = "Message deleted";
-  }
-}
-
-// ========== VIDEO/VOICE CALL ============
-function startCall(type) {
-  if (!currentChat || currentChat.startsWith('group__')) {
-    return alert('Only private chats supported.');
-  }
-
-  navigator.mediaDevices.getUserMedia({
-    video: type === 'video',
-    audio: true
-  }).then(stream => {
-    localStream = stream;
-    localVideo.srcObject = stream;
-
-    peer = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
-    stream.getTracks().forEach(track => peer.addTrack(track, stream));
-
-    peer.ontrack = e => {
-      if (!remoteStreamRef) {
-        remoteStreamRef = new MediaStream();
-        remoteVideo.srcObject = remoteStreamRef;
-      }
-      remoteStreamRef.addTrack(e.track);
-    };
-
-    peer.onicecandidate = e => {
-      if (e.candidate) {
-        db.ref(`calls/${currentChat}/ice`).push({ from: user, candidate: e.candidate });
-      }
-    };
-
-    peer.createOffer().then(offer => {
-      peer.setLocalDescription(offer);
-      db.ref(`calls/${currentChat}/signal/offer`).set(JSON.stringify(offer));
-    });
-
-    callUI.style.display = 'flex';
-  });
-}
-
-function endCall() {
-  if (peer) peer.close();
-  callUI.style.display = 'none';
-  localVideo.srcObject = null;
-  remoteVideo.srcObject = null;
-}
-
-// Handle incoming ICE
-db.ref(`calls/${user}/ice`).on('child_added', snap => {
-  const ice = snap.val();
-  if (ice && peer && ice.from !== user) {
-    peer.addIceCandidate(new RTCIceCandidate(ice.candidate));
-  }
-});
-
-// Handle incoming offer
-db.ref(`calls/${user}/signal/offer`).on('value', snap => {
-  const data = snap.val();
-  if (!data) return;
-
-  navigator.mediaDevices.getUserMedia({
-    video: true,
-    audio: true
-  }).then(stream => {
-    localStream = stream;
-    localVideo.srcObject = stream;
-
-    peer = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
-    stream.getTracks().forEach(track => peer.addTrack(track, stream));
-
-    peer.ontrack = e => {
-      if (!remoteStreamRef) {
-        remoteStreamRef = new MediaStream();
-        remoteVideo.srcObject = remoteStreamRef;
-      }
-      remoteStreamRef.addTrack(e.track);
-    };
-
-    peer.onicecandidate = e => {
-      if (e.candidate) {
-        db.ref(`calls/${currentChat}/ice`).push({ from: user, candidate: e.candidate });
-      }
-    };
-
-    const offer = JSON.parse(data);
-    peer.setRemoteDescription(new RTCSessionDescription(offer)).then(() => {
-      return peer.createAnswer();
-    }).then(answer => {
-      peer.setLocalDescription(answer);
-      db.ref(`calls/${user}/signal/answer`).set(JSON.stringify(answer));
-    });
-
-    callUI.style.display = 'flex';
-  });
-});
-
-// ========== PROFILE TAB ===========
-function showProfile() {
-  const content = `
-    <h3>Your Profile</h3>
-    <p><b>Username:</b> ${user}</p>
-    <button onclick="showChangeUsername()">Change Username</button>
-    <button onclick="showChangePassword()">Change Password</button>
-    <hr />
-    <p>Forgot something?</p>
-    <button onclick="requestResetCode()">Reset via Email</button>
-    <div id="resetCodeTimer" style="color:red;margin-top:10px;"></div>
-  `;
-  document.getElementById('messages').innerHTML = content;
-  document.getElementById('chatWindow').style.display = 'flex';
-}
-
-function showChangeUsername() {
-  const newName = prompt("Enter new username:");
-  const pwd = prompt("Enter your current password:");
-
-  if (!newName || !pwd) return;
-  db.ref('users/' + user).once('value').then(snap => {
-    const data = snap.val();
-    if (data.password !== pwd) return alert("Wrong password.");
-
-    db.ref('users/' + newName).set({ ...data, username: newName });
-    db.ref('users/' + user).remove();
-    sessionStorage.setItem('username', newName);
-    location.reload();
-  });
-}
-
-function showChangePassword() {
-  const oldPwd = prompt("Enter current password:");
-  const newPwd = prompt("Enter new password:");
-
-  if (!oldPwd || !newPwd) return;
-  db.ref('users/' + user).once('value').then(snap => {
-    const data = snap.val();
-    if (data.password !== oldPwd) return alert("Wrong password.");
-    db.ref('users/' + user + '/password').set(newPwd);
-    alert("Password updated.");
-  });
-}
-
-// OTP RESET
-let resetCode = '', resetTimer = null, timeLeft = 120;
-
-function requestResetCode() {
-  db.ref('users/' + user).once('value').then(snap => {
-    const email = snap.val().email;
-    if (!email) return alert("No email found.");
-
-    resetCode = Math.floor(100000 + Math.random() * 900000).toString();
-    emailjs.send("service_xxx", "template_xxx", {
-      to_email: email,
-      code: resetCode,
-      username: user
-    }).then(() => {
-      alert("Code sent to your email. Expires in 2 minutes.");
-      startResetTimer();
-      promptResetForm();
-    });
-  });
-}
-
-function startResetTimer() {
-  clearInterval(resetTimer);
-  timeLeft = 120;
-  resetTimer = setInterval(() => {
-    timeLeft--;
-    document.getElementById("resetCodeTimer").textContent = `Code expires in ${timeLeft}s`;
-    if (timeLeft <= 0) {
-      clearInterval(resetTimer);
-      resetCode = '';
-      document.getElementById("resetCodeTimer").textContent = "Code expired. Request again.";
-    }
-  }, 1000);
-}
-
-function promptResetForm() {
-  const code = prompt("Enter the code sent to your email:");
-  if (code !== resetCode) return alert("Invalid or expired code.");
-
-  const opt = prompt("Type 'username' to reset username or 'password' to reset password");
-  if (!opt) return;
-
-  if (opt === 'username') {
-    const newName = prompt("Enter new username:");
-    db.ref('users/' + user).once('value').then(snap => {
-      const data = snap.val();
-      db.ref('users/' + newName).set({ ...data, username: newName });
-      db.ref('users/' + user).remove();
-      sessionStorage.setItem('username', newName);
-      location.reload();
-    });
-  } else if (opt === 'password') {
-    const newPass = prompt("Enter new password:");
-    db.ref('users/' + user + '/password').set(newPass);
-    alert("Password changed.");
-  }
-}
-      </script>
-
-    /* Chat and user list layout styles follow in Part 2 */
+</body>
+</html>
