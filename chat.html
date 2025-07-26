@@ -902,6 +902,10 @@ function startCall(type) {
     .catch(err => {
       alert("Could not access mic/camera: " + err.message);
     });
+  // Show ongoing call controls
+document.getElementById("incomingControls").style.display = "none";
+document.getElementById("ongoingControls").style.display = "flex";
+document.getElementById("callOverlay").style.display = "flex";
   // Setup your signaling or Firebase logic here
   callTimeout = setTimeout(() => {
     if (isCaller) {
