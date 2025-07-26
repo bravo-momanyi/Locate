@@ -364,12 +364,15 @@ function refreshList() {
 function openChat(toUser) {
   currentChat = toUser;
   document.getElementById("chatWith").textContent = toUser;
-  document.getElementById("chatWith").onclick = (e) => {
+  const chatTitle = document.getElementById("chatWith");
+chatTitle.onclick = (e) => {
+  e.stopPropagation(); // Prevent auto-close
   const menu = document.getElementById("chatTitleMenu");
   menu.style.left = e.pageX + "px";
   menu.style.top = e.pageY + "px";
   menu.style.display = "block";
 };
+
 document.addEventListener("click", () => {
   document.getElementById("chatTitleMenu").style.display = "none";
 });
@@ -416,12 +419,15 @@ function attemptJoinGroup(id, name) {
 function openGroup(id, name) {
   currentChat = "group_" + id;
   document.getElementById("chatWith").textContent = name;
-  document.getElementById("chatWith").onclick = (e) => {
+  const chatTitle = document.getElementById("chatWith");
+chatTitle.onclick = (e) => {
+  e.stopPropagation(); // Prevent auto-close
   const menu = document.getElementById("chatTitleMenu");
   menu.style.left = e.pageX + "px";
   menu.style.top = e.pageY + "px";
   menu.style.display = "block";
 };
+
 document.addEventListener("click", () => {
   document.getElementById("chatTitleMenu").style.display = "none";
 });
@@ -478,16 +484,7 @@ function renderMessage(id, msg, isGroup = false, groupId = "") {
     e.preventDefault();
     showMsgOptions(id, msg, isGroup, groupId, div, e.pageX, e.pageY);
   });
-function updateMessageUI(id, msg, isGroup = false, groupId = "") {
-  const existing = [...messagesDiv.children].find(div => div.dataset.id === id);
-  if (!existing) return; // Not visible currently
 
-  // Remove old one
-  existing.remove();
-
-  // Re-render the updated one
-  renderMessage(id, msg, isGroup, groupId);
-}
 
   // Swipe to reply
   ////////////////////////////
@@ -638,6 +635,16 @@ function showMsgOptions(id, msg, isGroup, groupId, div, x = 100, y = 100) {
   }
 
   document.addEventListener("click", closeMenu, { once: true });
+}
+function updateMessageUI(id, msg, isGroup = false, groupId = "") {
+  const existing = [...messagesDiv.children].find(div => div.dataset.id === id);
+  if (!existing) return; // Not visible currently
+
+  // Remove old one
+  existing.remove();
+
+  // Re-render the updated one
+  renderMessage(id, msg, isGroup, groupId);
 }
   /////////////////////////////
 // UNREAD COUNTER & NOTIFS //
