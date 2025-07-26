@@ -905,7 +905,9 @@ function startCall(type) {
   // Show ongoing call controls
 document.getElementById("incomingControls").style.display = "none";
 document.getElementById("ongoingControls").style.display = "flex";
-document.getElementById("callOverlay").style.display = "flex";
+const overlay = document.getElementById("callOverlay");
+overlay.style.display = "flex";
+overlay.classList.add("show");
   // Setup your signaling or Firebase logic here
   callTimeout = setTimeout(() => {
     if (isCaller) {
@@ -969,21 +971,20 @@ let activeCallRef = null;
 let localStream = null;
 
 function endCall(force = false) {
-  clearTimeout(callTimeout);
-  document.getElementById("callOverlay").classList.remove("show");
-
-  setTimeout(() => {
-    document.getElementById("callOverlay").style.display = "none";
-    activeCallRef?.remove();
+  if (activeCallRef) {
+    activeCallRef.remove();
     activeCallRef = null;
+  }
 
-    if (localStream) {
-      localStream.getTracks().forEach(t => t.stop());
-      localStream = null;
-    }
+  if (localStream) {
+    localStream.getTracks().forEach(track => track.stop());
+    localStream = null;
+  }
 
-    document.getElementById("localVideo").srcObject = null;
-    document.getElementById("remoteVideo").srcObject = null;
+  const overlay = document.getElementById("callOverlay");
+  overlay.classList.remove("show");
+  setTimeout(() => {
+    overlay.style.display = "none";
   }, 400);
 }
 </script>
