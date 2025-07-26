@@ -1,0 +1,123 @@
+<!DOCTYPE html><html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Bravo Chat</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+  <style>
+    body, html { margin: 0; padding: 0; font-family: Arial, sans-serif; height: 100%; overflow: hidden; }
+    header { background: #075E54; color: white; padding: 10px; font-size: 18px; display: flex; justify-content: space-between; align-items: center; }
+    .chat-container { display: flex; height: calc(100% - 50px); }
+    .sidebar { width: 30%; background: #e0f2f1; padding: 10px; overflow-y: auto; border-right: 1px solid #ccc; }
+    .sidebar input { width: 100%; padding: 8px; margin-bottom: 10px; }
+    .sidebar button { width: 100%; padding: 10px; margin-bottom: 10px; background: #26a69a; color: white; border: none; border-radius: 4px; cursor: pointer; }
+    .chat-window { flex: 1; display: flex; flex-direction: column; background: #f9fbe7; }
+    .chat-header { background: #128C7E; color: white; padding: 10px; display: flex; justify-content: space-between; align-items: center; }
+    .chat-messages { flex: 1; padding: 10px; overflow-y: auto; display: flex; flex-direction: column; }
+    .msg { margin: 5px; padding: 10px; border-radius: 10px; max-width: 70%; word-wrap: break-word; }
+    .you { align-self: flex-end; background: #dcf8c6; }
+    .them { align-self: flex-start; background: white; }
+    .chat-input { display: flex; border-top: 1px solid #ccc; padding: 10px; background: white; }
+    .chat-input input { flex: 1; padding: 10px; border: 1px solid #ccc; border-radius: 20px; font-size: 14px; }
+    .chat-input button { margin-left: 10px; padding: 10px 20px; background: #25D366; color: white; border: none; border-radius: 20px; cursor: pointer; }
+    .call-buttons { display: flex; gap: 10px; }
+    .call-buttons button { padding: 8px 12px; background: #00796B; color: white; border: none; border-radius: 5px; cursor: pointer; }
+    #callModal { position: fixed; top: 0; left: 0; display: none; width: 100%; height: 100%; background: #000c; z-index: 9999; align-items: center; justify-content: center; flex-direction: column; }
+    #callModal video { width: 90%; max-width: 500px; background: black; }
+    #localVideo { position: absolute; bottom: 20px; right: 20px; width: 100px; border: 2px solid white; border-radius: 10px; }
+    #endCallBtn { margin-top: 20px; padding: 10px 20px; background: red; color: white; border: none; border-radius: 5px; }
+  </style>
+</head>
+<body>
+  <header>
+    <div id="usernameDisplay">Chatting as: </div>
+    <button onclick="logout()">Logout</button>
+  </header>  <div class="chat-container">
+    <div class="sidebar">
+      <input id="searchBox" placeholder="Search user...">
+      <button onclick="startPrivateChat()">Start Chat</button>
+      <div id="userList"></div>
+    </div><div class="chat-window">
+  <div class="chat-header">
+    <span id="chatWith">No chat selected</span>
+    <div class="call-buttons">
+      <button onclick="startCall('voice')">📞 Voice</button>
+      <button onclick="startCall('video')">🎥 Video</button>
+    </div>
+  </div>
+  <div class="chat-messages" id="messages"></div>
+  <div class="chat-input">
+    <input id="msgInput" placeholder="Type a message...">
+    <button onclick="sendMsg()">Send</button>
+  </div>
+</div>
+
+  </div>  <div id="callModal">
+    <video id="remoteVideo" autoplay playsinline></video>
+    <video id="localVideo" muted autoplay playsinline></video>
+    <button id="endCallBtn" onclick="endCall()">End Call</button>
+  </div>  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>  <script>
+    const config = {
+      apiKey: "AIzaSyBfkUJS81minjxj0DFz4pzNnGzCtb5ZJss",
+      authDomain: "locater-42fb4.firebaseapp.com",
+      databaseURL: "https://locater-42fb4-default-rtdb.firebaseio.com",
+      projectId: "locater-42fb4",
+      storageBucket: "locater-42fb4.appspot.com",
+      messagingSenderId: "250348367998",
+      appId: "1:250348367998:web:d734b2b4c735b5684ae82f"
+    };
+    firebase.initializeApp(config);
+    const db = firebase.database();
+
+    let user = sessionStorage.getItem('username');
+    if (!user) location.href = 'index.html';
+    document.getElementById('usernameDisplay').textContent = "Chatting as: " + user;
+
+    const userList = document.getElementById('userList');
+    const messagesDiv = document.getElementById('messages');
+    let currentChat = '';
+    let convoRef = null;
+
+    db.ref('users').on('value', snap => {
+      const users = snap.val() || {};
+      let html = '';
+      Object.keys(users).forEach(u => {
+        if (u !== user) {
+          html += `<button onclick="selectUser('${u}')">${u}</button>`;
+        }
+      });
+      userList.innerHTML = html;
+    });
+
+    function selectUser(other) {
+      currentChat = other;
+      document.getElementById('chatWith').textContent = other;
+      messagesDiv.innerHTML = '';
+      if (convoRef) convoRef.off();
+      const convo = [user, other].sort().join('_');
+      convoRef = db.ref('privateChats/' + convo);
+      convoRef.on('child_added', snap => renderMsg(snap.val()));
+    }
+
+    function renderMsg(m) {
+      const div = document.createElement('div');
+      div.className = 'msg ' + (m.from === user ? 'you' : 'them');
+      div.textContent = m.text;
+      messagesDiv.appendChild(div);
+      messagesDiv.scrollTop = 1e9;
+    }
+
+    function sendMsg() {
+      const txt = document.getElementById('msgInput').value.trim();
+      if (!txt || !currentChat) return;
+      const msg = { from: user, text: txt, ts: Date.now() };
+      const convo = [user, currentChat].sort().join('_');
+      db.ref('privateChats/' + convo).push(msg);
+      document.getElementById('msgInput').value = '';
+    }
+
+    function logout() {
+      sessionStorage.removeItem('username');
+      location.href = 'index.html';
+    }
+  </script>
