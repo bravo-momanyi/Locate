@@ -209,11 +209,7 @@
 }
 
 <!-- Chat title popup -->
-<div id="chatTitleMenu" style="display:none; position:absolute; background:white; border:1px solid #ccc; padding:10px; border-radius:6px; z-index:99999;">
-  <button onclick="leaveGroup()">Leave Group</button><br>
-  <button onclick="blockUser()">Block User</button><br>
-  <button onclick="alert('Coming soon: View members')">View Members</button>
-</div>
+
   </style>
 </head>
 <body>
@@ -246,6 +242,11 @@
       </div>
     </div>
   </div>
+<div id="chatTitleMenu" style="display:none; position:absolute; background:white; border:1px solid #ccc; padding:10px; border-radius:6px; z-index:99999;">
+  <button onclick="leaveGroup()">Leave Group</button><br>
+  <button onclick="blockUser()">Block User</button><br>
+  <button onclick="alert('Coming soon: View members')">View Members</button>
+</div>
   <!-- Add this inside <body> after callOverlay -->
 <video id="localVideo" autoplay muted playsinline style="width: 0; height: 0;"></video>
 <video id="remoteVideo" autoplay playsinline style="width: 0; height: 0;"></video>
@@ -324,7 +325,8 @@ function refreshList() {
     const label = isGroup ? allGroups[id.slice(6)]?.name || "Group" : id;
     const btn = document.createElement("button");
 
-    btn.innerHTML = `${label} ${unreadCount[id] ? '<span class="unread-badge">' + unreadCount[id] + '</span>' : ''}`;
+    const status = isGroup ? '' : `<small style=\"color:gray\">${allUsers[id]?.lastSeen || 'Offline'}</small>`;
+    btn.innerHTML = `${label} ${status} ${unreadCount[id] ? '<span class="unread-badge">' + unreadCount[id] + '</span>' : ''}`;
     btn.onclick = () => {
       if (reopenChatIfSame(id)) {
         isGroup ? openGroup(id.slice(6), label) : openChat(id);
@@ -365,7 +367,8 @@ function refreshList() {
 function openChat(toUser) {
   currentChat = toUser;
   document.getElementById("chatWith").textContent = toUser;
-  
+  const status = allUsers[toUser]?.lastSeen || \"Offline\";
+document.getElementById(\"chatWith\").innerHTML = `${toUser} <small style='font-size:11px;'>(${status})</small>`;
 
 document.addEventListener("click", () => {
   document.getElementById("chatTitleMenu").style.display = "none";
@@ -570,6 +573,8 @@ function showMsgOptions(id, msg, isGroup, groupId, div, x = 100, y = 100) {
   }
 
   m.innerHTML = "";
+  if (x + 240 > window.innerWidth) x = window.innerWidth - 250;
+if (y + 180 > window.innerHeight) y = window.innerHeight - 200;
   m.style.left = x + "px";
   m.style.top = y + "px";
   m.style.display = "block";
