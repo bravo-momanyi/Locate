@@ -30,8 +30,14 @@
       z-index: 1000;
     }
 
+    .top-bar .left {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+
     .top-bar button {
-      background: #e57373;
+      background: #00897b;
       border: none;
       color: white;
       padding: 6px 12px;
@@ -41,7 +47,7 @@
     }
 
     .top-bar button:hover {
-      background: #f44336;
+      background: #00796b;
     }
 
     .side-panel {
@@ -54,13 +60,14 @@
       overflow-y: auto;
       padding: 15px;
       box-shadow: 2px 0 5px rgba(0,0,0,0.1);
+      display: none;
       z-index: 999;
     }
 
     .map-container {
       position: absolute;
       top: 48px;
-      left: 260px;
+      left: 0;
       right: 0;
       bottom: 0;
     }
@@ -93,22 +100,21 @@
       border: 1px solid #ccc;
       border-radius: 4px;
     }
-
-    button {
-      margin-top: 5px;
-    }
   </style>
 </head>
 <body>
 
   <div class="top-bar">
-    <span>Bravo Connect - Live Map | Logged in as <strong id="username"></strong></span>
+    <div class="left">
+      <span>Bravo Connect | <strong id="username"></strong></span>
+      <button onclick="toggleCircles()">🔁 Circles</button>
+    </div>
     <button onclick="goBack()">Back to Dashboard</button>
   </div>
 
-  <div class="side-panel">
+  <div class="side-panel" id="sidePanel">
     <h3>My Circles</h3>
-    <div id="circleList"></div>
+    <div id="circleList">Loading...</div>
     <hr>
     <button onclick="createCircle()">➕ Create New Circle</button>
     <br><br>
@@ -128,12 +134,10 @@
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
 
   <script>
-    // Check login
     const username = sessionStorage.getItem('username');
     if (!username) location.href = 'index.html';
     document.getElementById('username').textContent = username;
 
-    // Firebase Config
     const config = {
       apiKey: "AIzaSyBfkUJS81minjxj0DFz4pzNnGzCtb5ZJss",
       authDomain: "locater-42fb4.firebaseapp.com",
@@ -154,9 +158,17 @@
     const markers = {};
     let currentCircle = null;
     let locationInterval = null;
+    let hasCentered = false;
 
     function goBack() {
       location.href = 'app.html';
+    }
+
+    function toggleCircles() {
+      const panel = document.getElementById('sidePanel');
+      const visible = panel.style.display === 'block';
+      panel.style.display = visible ? 'none' : 'block';
+      if (!visible) loadCircles();
     }
 
     function generateCode(length = 6) {
@@ -173,13 +185,11 @@
       if (!name) return;
 
       const code = generateCode();
-      const circleData = {
+      db.ref('circles/' + code).set({
         name,
         admin: username,
         members: { [username]: true }
-      };
-
-      db.ref('circles/' + code).set(circleData);
+      });
       db.ref('users/' + username + '/circles/' + code).set(true);
       alert("Circle created! Code: " + code);
       loadCircles();
@@ -191,7 +201,6 @@
 
       db.ref('circles/' + code).once('value', snap => {
         if (!snap.exists()) return alert("Invalid code!");
-
         db.ref('circles/' + code + '/members/' + username).set(true);
         db.ref('users/' + username + '/circles/' + code).set(true);
         alert("Joined Circle!");
@@ -221,25 +230,31 @@
 
     function loadCircleMap(circleCode) {
       currentCircle = circleCode;
+      hasCentered = false;
 
-      // Remove old markers
       Object.values(markers).forEach(m => map.removeLayer(m));
       Object.keys(markers).forEach(k => delete markers[k]);
 
-      // Clear existing intervals
       if (locationInterval) clearInterval(locationInterval);
 
-      // Start tracking your location into that circle
+      // Start updating your own location to that circle
       locationInterval = setInterval(() => {
         if (!navigator.geolocation) return;
         navigator.geolocation.getCurrentPosition(pos => {
           const lat = pos.coords.latitude;
           const lng = pos.coords.longitude;
+
           db.ref('locations/' + circleCode + '/' + username).set({ lat, lng });
+
+          // Center on user's location (once)
+          if (!hasCentered) {
+            map.setView([lat, lng], 15);
+            hasCentered = true;
+          }
         });
       }, 5000);
 
-      // Live update all members' markers
+      // Live update members' markers
       db.ref('locations/' + circleCode).on('value', snap => {
         const all = snap.val() || {};
         Object.entries(all).forEach(([user, loc]) => {
@@ -256,9 +271,9 @@
       });
     }
 
-    // Load on page start
-    window.onload = () => loadCircles();
+    window.onload = () => {
+      if (!username) location.href = 'index.html';
+    };
   </script>
-
 </body>
 </html>
