@@ -477,7 +477,7 @@ function renderMessage(id, msg, isGroup = false, groupId = "") {
     e.preventDefault();
     showMsgOptions(id, msg, isGroup, groupId, div, e.pageX, e.pageY);
   });
-  function updateMessageUI(id, msg, isGroup = false, groupId = "") {
+function updateMessageUI(id, msg, isGroup = false, groupId = "") {
   const existing = [...messagesDiv.children].find(div => div.dataset.id === id);
   if (!existing) return; // Not visible currently
 
@@ -486,7 +486,7 @@ function renderMessage(id, msg, isGroup = false, groupId = "") {
 
   // Re-render the updated one
   renderMessage(id, msg, isGroup, groupId);
-  }
+}
 
   // Swipe to reply
   ////////////////////////////
