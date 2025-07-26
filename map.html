@@ -13,11 +13,7 @@
       margin: 0;
       padding: 0;
       height: 100%;
-    }
-
-    #map {
-      width: 100%;
-      height: 100%;
+      font-family: Arial, sans-serif;
     }
 
     .top-bar {
@@ -48,12 +44,58 @@
       background: #f44336;
     }
 
+    .side-panel {
+      position: absolute;
+      top: 48px;
+      left: 0;
+      width: 260px;
+      bottom: 0;
+      background: #f0f0f0;
+      overflow-y: auto;
+      padding: 15px;
+      box-shadow: 2px 0 5px rgba(0,0,0,0.1);
+      z-index: 999;
+    }
+
     .map-container {
       position: absolute;
       top: 48px;
-      bottom: 0;
-      left: 0;
+      left: 260px;
       right: 0;
+      bottom: 0;
+    }
+
+    #map {
+      width: 100%;
+      height: 100%;
+    }
+
+    .circle-btn {
+      margin: 5px 0;
+      padding: 8px;
+      width: 100%;
+      text-align: left;
+      border: none;
+      border-radius: 4px;
+      background: #00897b;
+      color: white;
+      cursor: pointer;
+    }
+
+    .circle-btn:hover {
+      background: #00796b;
+    }
+
+    input[type="text"] {
+      width: 100%;
+      padding: 8px;
+      margin: 6px 0;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+    }
+
+    button {
+      margin-top: 5px;
     }
   </style>
 </head>
@@ -62,6 +104,16 @@
   <div class="top-bar">
     <span>Bravo Connect - Live Map | Logged in as <strong id="username"></strong></span>
     <button onclick="goBack()">Back to Dashboard</button>
+  </div>
+
+  <div class="side-panel">
+    <h3>My Circles</h3>
+    <div id="circleList"></div>
+    <hr>
+    <button onclick="createCircle()">➕ Create New Circle</button>
+    <br><br>
+    <input type="text" id="joinCode" placeholder="Enter Circle Code to Join" />
+    <button onclick="joinCircle()">Join Circle</button>
   </div>
 
   <div class="map-container">
@@ -76,13 +128,12 @@
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
 
   <script>
-    // Redirect if not logged in
+    // Check login
     const username = sessionStorage.getItem('username');
     if (!username) location.href = 'index.html';
-
     document.getElementById('username').textContent = username;
 
-    // Firebase config
+    // Firebase Config
     const config = {
       apiKey: "AIzaSyBfkUJS81minjxj0DFz4pzNnGzCtb5ZJss",
       authDomain: "locater-42fb4.firebaseapp.com",
@@ -95,43 +146,119 @@
     firebase.initializeApp(config);
     const db = firebase.database();
 
-    // Map setup
     const map = L.map('map').setView([0.0, 37.0], 7);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution: '&copy; OpenStreetMap contributors'
     }).addTo(map);
 
     const markers = {};
-
-    // Get user's live location and update to database every 5 seconds
-    setInterval(() => {
-      if (!navigator.geolocation) return;
-
-      navigator.geolocation.getCurrentPosition(pos => {
-        const lat = pos.coords.latitude;
-        const lng = pos.coords.longitude;
-        db.ref('locations/' + username).set({ lat, lng });
-      });
-    }, 5000);
-
-    // Listen for all users' locations and update map
-    db.ref('locations').on('value', snap => {
-      const allLocations = snap.val() || {};
-
-      Object.entries(allLocations).forEach(([user, loc]) => {
-        if (!loc.lat || !loc.lng) return;
-
-        if (markers[user]) {
-          markers[user].setLatLng([loc.lat, loc.lng]);
-        } else {
-          markers[user] = L.marker([loc.lat, loc.lng]).addTo(map).bindPopup(user);
-        }
-      });
-    });
+    let currentCircle = null;
+    let locationInterval = null;
 
     function goBack() {
       location.href = 'app.html';
     }
+
+    function generateCode(length = 6) {
+      const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+      let code = '';
+      for (let i = 0; i < length; i++) {
+        code += chars.charAt(Math.floor(Math.random() * chars.length));
+      }
+      return code;
+    }
+
+    function createCircle() {
+      const name = prompt("Enter Circle Name:");
+      if (!name) return;
+
+      const code = generateCode();
+      const circleData = {
+        name,
+        admin: username,
+        members: { [username]: true }
+      };
+
+      db.ref('circles/' + code).set(circleData);
+      db.ref('users/' + username + '/circles/' + code).set(true);
+      alert("Circle created! Code: " + code);
+      loadCircles();
+    }
+
+    function joinCircle() {
+      const code = document.getElementById('joinCode').value.trim().toUpperCase();
+      if (!code) return alert("Enter a code!");
+
+      db.ref('circles/' + code).once('value', snap => {
+        if (!snap.exists()) return alert("Invalid code!");
+
+        db.ref('circles/' + code + '/members/' + username).set(true);
+        db.ref('users/' + username + '/circles/' + code).set(true);
+        alert("Joined Circle!");
+        loadCircles();
+      });
+    }
+
+    function loadCircles() {
+      const list = document.getElementById('circleList');
+      list.innerHTML = 'Loading...';
+      db.ref('users/' + username + '/circles').once('value', snap => {
+        const data = snap.val() || {};
+        list.innerHTML = '';
+
+        Object.keys(data).forEach(code => {
+          db.ref('circles/' + code).once('value', circleSnap => {
+            const circle = circleSnap.val();
+            const btn = document.createElement('button');
+            btn.className = 'circle-btn';
+            btn.textContent = circle.name + ' (' + code + ')';
+            btn.onclick = () => loadCircleMap(code);
+            list.appendChild(btn);
+          });
+        });
+      });
+    }
+
+    function loadCircleMap(circleCode) {
+      currentCircle = circleCode;
+
+      // Remove old markers
+      Object.values(markers).forEach(m => map.removeLayer(m));
+      Object.keys(markers).forEach(k => delete markers[k]);
+
+      // Clear existing intervals
+      if (locationInterval) clearInterval(locationInterval);
+
+      // Start tracking your location into that circle
+      locationInterval = setInterval(() => {
+        if (!navigator.geolocation) return;
+        navigator.geolocation.getCurrentPosition(pos => {
+          const lat = pos.coords.latitude;
+          const lng = pos.coords.longitude;
+          db.ref('locations/' + circleCode + '/' + username).set({ lat, lng });
+        });
+      }, 5000);
+
+      // Live update all members' markers
+      db.ref('locations/' + circleCode).on('value', snap => {
+        const all = snap.val() || {};
+        Object.entries(all).forEach(([user, loc]) => {
+          if (!loc.lat || !loc.lng) return;
+
+          if (markers[user]) {
+            markers[user].setLatLng([loc.lat, loc.lng]);
+          } else {
+            markers[user] = L.marker([loc.lat, loc.lng])
+              .addTo(map)
+              .bindPopup(user);
+          }
+        });
+      });
+    }
+
+    // Load on page start
+    window.onload = () => loadCircles();
   </script>
+
 </body>
 </html>
