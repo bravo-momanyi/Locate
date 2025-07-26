@@ -937,11 +937,12 @@ db.ref("calls").on("child_added", snap => {
     });
 });
 // Show the overlay
-function showCallOverlay(statusText) {
+function showCallOverlay(text = "Calling...") {
   const overlay = document.getElementById("callOverlay");
-  document.getElementById("callStatus").textContent = statusText;
   overlay.classList.add("show");
   overlay.style.display = "flex";
+  document.getElementById("callStatus").textContent = text;
+}
 }
 function incomingCall(fromUser, type) {
   isCaller = false;
