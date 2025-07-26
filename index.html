@@ -169,6 +169,7 @@
             alert("Login successful!");
             sessionStorage.setItem('loggedIn', 'yes');
             sessionStorage.setItem('username', username);
+            localStorage.setItem('username', username); // new line
             window.location.href = 'app.html';
           } else {
             alert("Wrong password.");
