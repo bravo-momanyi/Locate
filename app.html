@@ -2,318 +2,135 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Bravo Connect - Live Map</title>
-
-  <!-- Leaflet CSS -->
-  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Bravo Connect Dashboard</title>
   <style>
-    body, html {
+    body {
       margin: 0;
       padding: 0;
-      height: 100%;
       font-family: 'Segoe UI', sans-serif;
-    }
-
-    #map {
-      width: 100%;
-      height: 100%;
-    }
-
-    .top-bar {
-      position: absolute;
-      top: 0;
-      width: 100%;
-      background: #00695c;
+      background: linear-gradient(to right, #004d40, #00695c);
       color: white;
-      padding: 10px 15px;
-      font-size: 18px;
+      height: 100vh;
       display: flex;
-      justify-content: space-between;
+      flex-direction: column;
       align-items: center;
-      z-index: 1000;
+      justify-content: center;
     }
 
-    .top-bar button {
-      background: #e57373;
-      border: none;
-      color: white;
-      padding: 6px 12px;
-      border-radius: 5px;
-      cursor: pointer;
-      font-size: 14px;
+    .welcome-box {
+      background: rgba(255, 255, 255, 0.1);
+      padding: 30px;
+      border-radius: 12px;
+      text-align: center;
+      max-width: 500px;
+      box-shadow: 0 0 15px rgba(0,0,0,0.2);
     }
 
-    .top-bar button:hover {
-      background: #f44336;
-    }
-
-    .map-container {
-      position: absolute;
-      top: 48px;
-      bottom: 0;
-      left: 250px;
-      right: 0;
-    }
-
-    .sidebar {
-      position: absolute;
-      top: 48px;
-      left: 0;
-      width: 250px;
-      bottom: 0;
-      background: #e0f2f1;
-      padding: 10px;
-      overflow-y: auto;
-      border-right: 2px solid #004d40;
-      z-index: 999;
-    }
-
-    .circle-title {
-      font-weight: bold;
-      margin: 10px 0 5px;
-    }
-
-    .circle-item {
-      background: #b2dfdb;
-      padding: 5px 10px;
-      border-radius: 5px;
-      margin-bottom: 6px;
-      cursor: pointer;
-    }
-
-    .circle-item:hover {
-      background: #80cbc4;
-    }
-
-    .search-box {
+    h1 {
+      font-size: 32px;
       margin-bottom: 10px;
     }
 
-    .active-circle {
-      position: absolute;
-      top: 50px;
-      left: 260px;
-      background: #004d40;
+    p {
+      font-size: 16px;
+      margin-bottom: 20px;
+    }
+
+    .user {
+      font-weight: bold;
+      color: #a7ffeb;
+    }
+
+    .btn-group {
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
+      margin-top: 20px;
+    }
+
+    .btn {
+      padding: 12px 20px;
+      background: #26a69a;
+      border: none;
       color: white;
-      padding: 5px 10px;
-      border-radius: 0 0 6px 6px;
-      z-index: 1000;
+      font-size: 16px;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background 0.3s;
+      text-decoration: none;
+    }
+
+    .btn:hover {
+      background: #00bfa5;
+    }
+
+    #logout {
+      margin-top: 30px;
+      font-size: 14px;
+      color: #ffab91;
+      background: none;
+      border: none;
+      cursor: pointer;
+      text-decoration: underline;
+    }
+
+    .footer {
+      position: fixed;
+      bottom: 20px;
+      font-size: 12px;
+      color: #ffffff;
+      text-align: center;
     }
   </style>
 </head>
 <body>
 
-  <div class="top-bar">
-    <span>Bravo Connect - Live Map | Logged in as <strong id="username">User</strong></span>
-    <button onclick="goBack()">Back to Dashboard</button>
-  </div>
+  <div class="welcome-box">
+    <h1>Welcome to Bravo Connect</h1>
+    <p>Hello, <span class="user" id="username">User</span>. We're glad to have you here!</p>
 
-  <div class="sidebar">
-    <div class="circle-title">Your Circles</div>
-    <div id="yourCircles"></div>
-
-    <button onclick="createCircle()">+ Create Circle</button>
-    <div style="margin-top: 10px;">
-      <input type="text" id="joinCode" placeholder="Enter circle code" style="width: 100%; padding: 5px;">
-      <button style="width: 100%; margin-top: 5px;" onclick="joinCircle()">Join Circle</button>
+    <div class="btn-group">
+      <a href="map.html" class="btn" onclick="return validateSession()">Go to Live Map</a>
+      <a href="chat.html" class="btn" onclick="return validateSession()">Start Chatting</a>
+      <a href="profile.html" class="btn" onclick="return validateSession()">Manage Profile</a>
     </div>
 
-    <hr>
-    <div class="circle-title">Search Circles</div>
-    <input type="text" id="search" placeholder="Search by name" class="search-box" style="width: 100%; padding: 5px;">
-    <div id="allCircles"></div>
+    <button id="logout" onclick="logout()">Logout</button>
   </div>
 
-  <div class="map-container">
-    <div id="activeCircle" class="active-circle">No Circle Selected</div>
-    <div id="map"></div>
+  <div class="footer">
+    <p>Bravo Connect - Building Connections, One Click at a Time</p>
   </div>
-
-  <!-- Leaflet JS -->
-  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
-
-  <!-- Firebase -->
-  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
 
   <script>
-    // Session check
+    // Validate session
     const username = sessionStorage.getItem('username');
-    if (!username) {
-      alert("Session expired. Please log in again.");
+    const loggedIn = sessionStorage.getItem('loggedIn');
+
+    if (!username || loggedIn !== 'yes') {
       location.href = 'index.html';
     }
+
+    // Set username
     document.getElementById('username').textContent = username;
 
-    // Firebase config
-    const config = {
-      apiKey: "AIzaSyBfkUJS81minjxj0DFz4pzNnGzCtb5ZJss",
-      authDomain: "locater-42fb4.firebaseapp.com",
-      databaseURL: "https://locater-42fb4-default-rtdb.firebaseio.com",
-      projectId: "locater-42fb4",
-      storageBucket: "locater-42fb4.appspot.com",
-      messagingSenderId: "250348367998",
-      appId: "1:250348367998:web:d734b2b4c735b5684ae82f"
-    };
-    firebase.initializeApp(config);
-    const db = firebase.database();
-
-    const map = L.map('map').setView([0.0, 37.0], 7);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '&copy; OpenStreetMap contributors'
-    }).addTo(map);
-
-    const markers = {};
-    let selectedCircle = null;
-
-    function goBack() {
-      location.href = 'app.html';
+    // Logout
+    function logout() {
+      sessionStorage.clear();
+      location.href = 'index.html';
     }
 
-    function generateCode() {
-      return Math.random().toString(36).substring(2, 8).toUpperCase();
+    // Optional: Validate session on link click (in case links open in new tab)
+    function validateSession() {
+      if (!sessionStorage.getItem('username') || sessionStorage.getItem('loggedIn') !== 'yes') {
+        alert("Your session has expired. Please log in again.");
+        location.href = 'index.html';
+        return false;
+      }
+      return true;
     }
-
-    function createCircle() {
-      const name = prompt("Enter Circle Name:");
-      if (!name) return;
-
-      const code = generateCode();
-
-      db.ref('circles/' + code).set({
-        name,
-        code,
-        admin: username,
-        members: { [username]: true }
-      }).then(() => {
-        return db.ref('users/' + username + '/circles/' + code).set(true);
-      }).then(() => {
-        alert(`Circle '${name}' created! Code: ${code}`);
-        loadUserCircles();
-        loadAllCircles();
-      }).catch(e => alert("Failed to create circle: " + e.message));
-    }
-
-    function joinCircle() {
-      const code = document.getElementById('joinCode').value.trim().toUpperCase();
-      if (!code) return;
-
-      db.ref('circles/' + code).once('value', snap => {
-        const circle = snap.val();
-        if (!circle) {
-          alert("Circle not found.");
-          return;
-        }
-
-        if (circle.members && circle.members[username]) {
-          alert("You’re already a member of this circle.");
-          return;
-        }
-
-        const confirmJoin = confirm(`Join circle '${circle.name}'?`);
-        if (!confirmJoin) return;
-
-        db.ref('circles/' + code + '/members/' + username).set(true);
-        db.ref('users/' + username + '/circles/' + code).set(true);
-        alert("Joined circle successfully!");
-        loadUserCircles();
-      });
-    }
-
-    function loadUserCircles() {
-      db.ref('users/' + username + '/circles').once('value', userSnap => {
-        const container = document.getElementById('yourCircles');
-        container.innerHTML = '';
-        const codes = userSnap.val() || {};
-
-        Object.keys(codes).forEach(code => {
-          db.ref('circles/' + code).once('value', circleSnap => {
-            const circle = circleSnap.val();
-            if (!circle) return;
-
-            const div = document.createElement('div');
-            div.className = 'circle-item';
-            div.textContent = circle.name;
-            div.onclick = () => {
-              selectedCircle = code;
-              document.getElementById('activeCircle').textContent = "Active Circle: " + circle.name;
-              alert(`Circle: ${circle.name}\nCode: ${circle.code}`);
-            };
-            container.appendChild(div);
-          });
-        });
-      });
-    }
-
-    function loadAllCircles() {
-      const search = document.getElementById('search');
-      const container = document.getElementById('allCircles');
-      const render = (circles) => {
-        container.innerHTML = '';
-        Object.entries(circles).forEach(([code, c]) => {
-          const div = document.createElement('div');
-          div.className = 'circle-item';
-          div.textContent = c.name;
-          div.onclick = () => {
-            if (c.members && c.members[username]) {
-              alert(`You’re already a member of ${c.name}.`);
-            } else {
-              const confirmJoin = confirm(`Join circle '${c.name}'?`);
-              if (!confirmJoin) return;
-              db.ref('circles/' + code + '/members/' + username).set(true);
-              db.ref('users/' + username + '/circles/' + code).set(true);
-              alert("Joined successfully!");
-              loadUserCircles();
-            }
-          };
-          container.appendChild(div);
-        });
-      };
-
-      db.ref('circles').on('value', snap => {
-        const all = snap.val() || {};
-        render(all);
-
-        search.oninput = () => {
-          const filtered = {};
-          const val = search.value.toLowerCase();
-          Object.entries(all).forEach(([code, c]) => {
-            if (c.name.toLowerCase().includes(val)) filtered[code] = c;
-          });
-          render(filtered);
-        };
-      });
-    }
-
-    setInterval(() => {
-      if (!navigator.geolocation || !selectedCircle) return;
-
-      navigator.geolocation.getCurrentPosition(pos => {
-        const { latitude, longitude } = pos.coords;
-        db.ref('locations/' + selectedCircle + '/' + username).set({ lat: latitude, lng: longitude });
-      });
-    }, 5000);
-
-    db.ref('locations').on('value', snap => {
-      if (!selectedCircle) return;
-      const all = snap.val() || {};
-      const circleLocs = all[selectedCircle] || {};
-
-      Object.entries(circleLocs).forEach(([user, loc]) => {
-        if (!loc.lat || !loc.lng) return;
-
-        if (markers[user]) {
-          markers[user].setLatLng([loc.lat, loc.lng]);
-        } else {
-          markers[user] = L.marker([loc.lat, loc.lng]).addTo(map).bindPopup(user);
-        }
-      });
-    });
-
-    // Initial loads
-    loadUserCircles();
-    loadAllCircles();
   </script>
+
 </body>
 </html>
