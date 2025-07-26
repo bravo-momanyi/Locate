@@ -752,6 +752,17 @@ function attemptJoinGroup(id, name) {
     }
   }
 }
+// Load all users
+db.ref("users").on("value", snap => {
+  allUsers = snap.val() || {};
+  refreshList();
+});
+
+// Load all groups
+db.ref("groups").on("value", snap => {
+  allGroups = snap.val() || {};
+  refreshList();
+});
 
 ////////////////////////////////
 // AUTO START UNREAD TRACKING //
