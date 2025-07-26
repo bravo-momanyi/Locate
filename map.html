@@ -135,10 +135,27 @@
     #suggestions div:hover {
       background: #eee;
     }
+
+    #circleOptions {
+      display: none;
+      position: absolute;
+      top: 110px;
+      right: 20px;
+      background: white;
+      padding: 15px;
+      border-radius: 10px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.2);
+      z-index: 9999;
+      width: 200px;
+    }
+
+    #circleOptions button {
+      width: 100%;
+      margin: 4px 0;
+    }
   </style>
 </head>
 <body>
-
   <div class="top-bar">
     <div class="left">
       <span>Bravo Connect | <strong id="username"></strong></span>
@@ -174,33 +191,30 @@
   <div class="map-container">
     <div id="map"></div>
   </div>
-  <!-- Circle Options Modal -->
-<div id="circleOptions" style="display:none; position:absolute; top:110px; right:20px; background:white; padding:15px; border-radius:10px; box-shadow:0 0 10px rgba(0,0,0,0.2); z-index:9999; width:200px;">
-  <h4 style="margin-top:0;">Circle Options</h4>
-  <div id="circleButtons"></div>
-  <button onclick="closeCircleOptions()" style="margin-top:10px; width:100%; background:#ccc;">Close</button>
-</div>
+
+  <div id="circleOptions">
+    <h4 style="margin-top:0;">Circle Options</h4>
+    <div id="circleButtons"></div>
+    <button onclick="closeCircleOptions()" style="margin-top:10px; background:#ccc;">Close</button>
+  </div>
 
   <!-- Leaflet JS -->
   <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+
   <!-- Firebase -->
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
 
+  <!-- JavaScript Logic -->
   <script>
-    let username = sessionStorage.getItem('username');
+    const username = sessionStorage.getItem('username') || localStorage.getItem('username');
     if (!username) {
-      username = localStorage.getItem('username');
-      if (username) {
-        sessionStorage.setItem('username', username);
-      } else {
-        alert('Session expired. Please log in again.');
-        location.href = 'index.html';
-      }
+      alert('Session expired. Please log in again.');
+      location.href = 'index.html';
     }
     document.getElementById('username').textContent = username;
 
-    const config = {
+    const firebaseConfig = {
       apiKey: "AIzaSyBfkUJS81minjxj0DFz4pzNnGzCtb5ZJss",
       authDomain: "locater-42fb4.firebaseapp.com",
       databaseURL: "https://locater-42fb4-default-rtdb.firebaseio.com",
@@ -209,7 +223,7 @@
       messagingSenderId: "250348367998",
       appId: "1:250348367998:web:d734b2b4c735b5684ae82f"
     };
-    firebase.initializeApp(config);
+    firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
 
     const map = L.map('map').setView([0.0, 37.0], 7);
@@ -218,18 +232,13 @@
     }).addTo(map);
 
     let markers = {};
-    let locationInterval = null;
     let currentCircle = null;
+    let locationInterval = null;
     let centered = false;
     let circleMembers = [];
 
     function goBack() {
-      const user = sessionStorage.getItem('username') || localStorage.getItem('username');
-      if (user) {
-        location.href = 'app.html?user=' + encodeURIComponent(user);
-      } else {
-        location.href = 'index.html';
-      }
+      location.href = 'app.html';
     }
 
     function toggleCircles() {
@@ -298,28 +307,28 @@
       });
     }
 
-    function searchCircles() {
-      const term = document.getElementById('searchCircle').value.toLowerCase();
-      const all = document.getElementById('allCircles').children;
-      for (let el of all) {
-        el.style.display = el.textContent.toLowerCase().includes(term) ? 'block' : 'none';
-      }
-    }
-
     function tryJoinCircle() {
       const code = document.getElementById('joinCode').value.trim().toUpperCase();
       if (!code) return alert("Enter a code");
       db.ref('circles/' + code).once('value', snap => {
         if (!snap.exists()) return alert("Circle not found.");
         const data = snap.val();
-        const confirmed = confirm(`Circle Found: "${data.name}".\nDo you want to join it?`);
+        const confirmed = confirm(`Circle Found: "${data.name}". Join?`);
         if (!confirmed) return;
         db.ref('circles/' + code + '/members/' + username).set(true);
         db.ref('users/' + username + '/circles/' + code).set(true);
-        alert("You joined the circle!");
+        alert("Joined circle!");
         loadUserCircles();
         loadAllCircles();
       });
+    }
+
+    function searchCircles() {
+      const term = document.getElementById('searchCircle').value.toLowerCase();
+      const all = document.getElementById('allCircles').children;
+      for (let el of all) {
+        el.style.display = el.textContent.toLowerCase().includes(term) ? 'block' : 'none';
+      }
     }
 
     function loadCircleMap(code, name) {
@@ -330,7 +339,6 @@
       markers = {};
       if (locationInterval) clearInterval(locationInterval);
 
-      // Load members for autocomplete
       db.ref('circles/' + code + '/members').once('value', snap => {
         const members = snap.val() || {};
         circleMembers = Object.keys(members);
@@ -383,11 +391,11 @@
 
     function searchUser() {
       const query = document.getElementById('userSearch').value.trim();
-      if (!query || !currentCircle) return alert("Please enter a name and select a circle first.");
+      if (!query || !currentCircle) return alert("Enter name & select a circle.");
       db.ref('locations/' + currentCircle + '/' + query).once('value', snap => {
         const loc = snap.val();
         if (!loc || !loc.lat || !loc.lng) {
-          alert("User not found in this circle or no location available.");
+          alert("No location data for user.");
         } else {
           map.setView([loc.lat, loc.lng], 17);
           if (!markers[query]) {
@@ -398,91 +406,54 @@
         }
       });
     }
+
     function showCircleOptions() {
-  if (!currentCircle) return;
-  const box = document.getElementById("circleOptions");
-  const buttons = document.getElementById("circleButtons");
-  buttons.innerHTML = '<button onclick="leaveCircle()" style="width:100%;margin:4px 0;">🚪 Leave Circle</button>' +
-                      '<button onclick="viewMembers()" style="width:100%;margin:4px 0;">👥 Circle Members</button>';
-
-  db.ref("circles/" + currentCircle + "/admin").once("value", snap => {
-    if (snap.val() === username) {
-      buttons.innerHTML += `
-        <button onclick="deleteCircle()" style="width:100%;margin:4px 0;">🗑️ Delete Circle</button>
-        <button onclick="viewLeaveRequests()" style="width:100%;margin:4px 0;">📥 Leave Requests</button>
-        <button onclick="removeMember()" style="width:100%;margin:4px 0;">❌ Remove Member</button>
+      if (!currentCircle) return;
+      const box = document.getElementById("circleOptions");
+      const buttons = document.getElementById("circleButtons");
+      buttons.innerHTML = `
+        <button onclick="leaveCircle()">🚪 Leave Circle</button>
+        <button onclick="viewMembers()">👥 View Members</button>
       `;
-    }
-    box.style.display = 'block';
-  });
-}
-
-function closeCircleOptions() {
-  document.getElementById("circleOptions").style.display = "none";
-}
-
-function leaveCircle() {
-  db.ref("circles/" + currentCircle + "/admin").once("value", snap => {
-    if (snap.val() === username) {
-      // Admin needs confirmation by others
-      db.ref("leaveRequests/" + currentCircle + "/" + username).set({
-        timestamp: Date.now()
+      db.ref("circles/" + currentCircle + "/admin").once("value", snap => {
+        if (snap.val() === username) {
+          buttons.innerHTML += `
+            <button onclick="deleteCircle()">🗑️ Delete Circle</button>
+          `;
+        }
+        box.style.display = 'block';
       });
-      alert("Leave request sent. Another admin must approve it.");
-    } else {
-      // Normal member can leave
+    }
+
+    function closeCircleOptions() {
+      document.getElementById("circleOptions").style.display = "none";
+    }
+
+    function leaveCircle() {
       db.ref("circles/" + currentCircle + "/members/" + username).remove();
       db.ref("users/" + username + "/circles/" + currentCircle).remove();
-      alert("You have left the circle.");
+      alert("You left the circle.");
       closeCircleOptions();
       document.getElementById('circleLabel').textContent = 'No Active Circle Selected';
       currentCircle = null;
     }
-  });
-}
 
-function viewMembers() {
-  db.ref("circles/" + currentCircle + "/members").once("value", snap => {
-    const members = snap.val() || {};
-    alert("Members:\n" + Object.keys(members).join("\n"));
-  });
-}
-
-function deleteCircle() {
-  if (!confirm("Are you sure you want to delete this circle for everyone?")) return;
-  db.ref("circles/" + currentCircle).remove();
-  db.ref("locations/" + currentCircle).remove();
-  alert("Circle deleted.");
-  closeCircleOptions();
-  document.getElementById('circleLabel').textContent = 'No Active Circle Selected';
-  currentCircle = null;
-}
-
-function viewLeaveRequests() {
-  db.ref("leaveRequests/" + currentCircle).once("value", snap => {
-    const requests = snap.val();
-    if (!requests) return alert("No leave requests.");
-    const users = Object.keys(requests);
-    const approve = confirm("Approve the following to leave?\n" + users.join("\n"));
-    if (approve) {
-      users.forEach(user => {
-        db.ref("circles/" + currentCircle + "/members/" + user).remove();
-        db.ref("users/" + user + "/circles/" + currentCircle).remove();
-        db.ref("leaveRequests/" + currentCircle + "/" + user).remove();
+    function viewMembers() {
+      db.ref("circles/" + currentCircle + "/members").once("value", snap => {
+        const members = snap.val() || {};
+        alert("Members:\n" + Object.keys(members).join("\n"));
       });
-      alert("Requests approved and users removed.");
     }
-  });
-}
 
-function removeMember() {
-  const member = prompt("Enter the username to remove:");
-  if (!member || member === username) return alert("Cannot remove this user.");
-  db.ref("circles/" + currentCircle + "/members/" + member).remove();
-  db.ref("users/" + member + "/circles/" + currentCircle).remove();
-  db.ref("locations/" + currentCircle + "/" + member).remove();
-  alert("Member removed.");
-}
+    function deleteCircle() {
+      if (!confirm("Delete circle for everyone?")) return;
+      db.ref("circles/" + currentCircle).remove();
+      db.ref("locations/" + currentCircle).remove();
+      alert("Circle deleted.");
+      closeCircleOptions();
+      document.getElementById('circleLabel').textContent = 'No Active Circle Selected';
+      currentCircle = null;
+    }
   </script>
 </body>
 </html>
