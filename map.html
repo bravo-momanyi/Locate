@@ -5,42 +5,102 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Bravo Connect - Live Map</title>
 
+  <!-- Leaflet CSS -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
   <style>
-    body, html { margin: 0; padding: 0; height: 100%; font-family: Arial, sans-serif; }
+    body, html {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      font-family: Arial, sans-serif;
+    }
+
     .top-bar {
-      position: absolute; top: 0; width: 100%;
-      background: #00695c; color: white;
-      padding: 10px 15px; font-size: 18px;
-      display: flex; justify-content: space-between; align-items: center; z-index: 1000;
+      position: absolute;
+      top: 0;
+      width: 100%;
+      background: #00695c;
+      color: white;
+      padding: 10px 15px;
+      font-size: 18px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      z-index: 1000;
     }
-    .top-bar .left { display: flex; gap: 10px; align-items: center; }
+
+    .top-bar .left {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+
     .top-bar button {
-      background: #00897b; border: none; color: white;
-      padding: 6px 12px; border-radius: 5px; cursor: pointer; font-size: 14px;
+      background: #00897b;
+      border: none;
+      color: white;
+      padding: 6px 12px;
+      border-radius: 5px;
+      cursor: pointer;
+      font-size: 14px;
     }
+
     .side-panel {
-      position: absolute; top: 48px; left: 0; width: 280px; bottom: 0;
-      background: #f0f0f0; overflow-y: auto; padding: 15px;
-      display: none; z-index: 999;
+      position: absolute;
+      top: 48px;
+      left: 0;
+      width: 280px;
+      bottom: 0;
+      background: #f0f0f0;
+      overflow-y: auto;
+      padding: 15px;
+      display: none;
+      z-index: 999;
     }
+
     .map-container {
-      position: absolute; top: 98px; left: 0; right: 0; bottom: 0;
+      position: absolute;
+      top: 98px;
+      left: 0;
+      right: 0;
+      bottom: 0;
     }
-    #map { width: 100%; height: 100%; }
+
+    #map {
+      width: 100%;
+      height: 100%;
+    }
+
     .circle-btn {
-      margin: 5px 0; padding: 8px; width: 100%;
-      text-align: left; border: none; border-radius: 4px;
-      background: #00897b; color: white; cursor: pointer;
+      margin: 5px 0;
+      padding: 8px;
+      width: 100%;
+      text-align: left;
+      border: none;
+      border-radius: 4px;
+      background: #00897b;
+      color: white;
+      cursor: pointer;
     }
+
     input[type="text"] {
-      width: 100%; padding: 8px; margin: 6px 0;
-      border: 1px solid #ccc; border-radius: 4px;
+      width: 100%;
+      padding: 8px;
+      margin: 6px 0;
+      border: 1px solid #ccc;
+      border-radius: 4px;
     }
+
     #activeCircle {
-      position: absolute; top: 48px; left: 0; width: 100%;
-      background: #ffd54f; padding: 6px 15px; font-size: 16px;
-      z-index: 998; text-align: center;
+      position: absolute;
+      top: 48px;
+      left: 0;
+      width: 100%;
+      background: #ffd54f;
+      padding: 6px 15px;
+      font-size: 16px;
+      z-index: 998;
+      text-align: center;
     }
   </style>
 </head>
@@ -76,16 +136,23 @@
     <div id="map"></div>
   </div>
 
+  <!-- Leaflet JS -->
   <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+  <!-- Firebase -->
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
 
   <script>
-    // Get username from session
-    const username = sessionStorage.getItem('username');
-    if (!username || username === 'null') {
-      alert('Session expired. Please log in again.');
-      location.href = 'index.html';
+    // Fix for Phoenix browser losing sessionStorage
+    let username = sessionStorage.getItem('username');
+    if (!username) {
+      username = localStorage.getItem('username');
+      if (username) {
+        sessionStorage.setItem('username', username);
+      } else {
+        alert('Session expired. Please log in again.');
+        location.href = 'index.html';
+      }
     }
     document.getElementById('username').textContent = username;
 
@@ -140,13 +207,12 @@
         name,
         admin: username,
         members: { [username]: true }
-      }).then(() => {
-        return db.ref('users/' + username + '/circles/' + code).set(true);
-      }).then(() => {
-        alert("Circle created! Your code: " + code);
-        loadUserCircles();
-        loadAllCircles();
-      }).catch(err => alert("Error creating circle: " + err.message));
+      });
+
+      db.ref('users/' + username + '/circles/' + code).set(true);
+      alert("Circle created! Code: " + code);
+      loadUserCircles();
+      loadAllCircles();
     }
 
     function loadUserCircles() {
@@ -195,10 +261,11 @@
     function tryJoinCircle() {
       const code = document.getElementById('joinCode').value.trim().toUpperCase();
       if (!code) return alert("Enter a code");
+
       db.ref('circles/' + code).once('value', snap => {
         if (!snap.exists()) return alert("Circle not found.");
         const data = snap.val();
-        const confirmed = confirm(`Join circle "${data.name}"?`);
+        const confirmed = confirm(`Circle Found: "${data.name}".\nDo you want to join it?`);
         if (!confirmed) return;
         db.ref('circles/' + code + '/members/' + username).set(true);
         db.ref('users/' + username + '/circles/' + code).set(true);
@@ -211,7 +278,7 @@
     function loadCircleMap(code, name) {
       currentCircle = code;
       centered = false;
-      document.getElementById('activeCircle').textContent = "Active Circle: " + name + " | Code: " + code;
+      document.getElementById('activeCircle').textContent = "Active Circle: " + name;
       Object.values(markers).forEach(m => map.removeLayer(m));
       markers = {};
       if (locationInterval) clearInterval(locationInterval);
