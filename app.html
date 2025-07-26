@@ -91,9 +91,9 @@
     <p>Hello, <span class="user" id="username">User</span>. We're glad to have you here!</p>
 
     <div class="btn-group">
-      <a href="map.html" class="btn">Go to Live Map</a>
-      <a href="chat.html" class="btn">Start Chatting</a>
-      <a href="profile.html" class="btn">Manage Profile</a>
+      <a href="map.html" class="btn" onclick="return validateSession()">Go to Live Map</a>
+      <a href="chat.html" class="btn" onclick="return validateSession()">Start Chatting</a>
+      <a href="profile.html" class="btn" onclick="return validateSession()">Manage Profile</a>
     </div>
 
     <button id="logout" onclick="logout()">Logout</button>
@@ -104,20 +104,31 @@
   </div>
 
   <script>
-    // Ensure user is logged in
-    if (sessionStorage.getItem('loggedIn') !== 'yes' || !sessionStorage.getItem('username')) {
+    // Validate session
+    const username = sessionStorage.getItem('username');
+    const loggedIn = sessionStorage.getItem('loggedIn');
+
+    if (!username || loggedIn !== 'yes') {
       location.href = 'index.html';
     }
 
-    // Set username on dashboard
-    const username = sessionStorage.getItem('username');
+    // Set username
     document.getElementById('username').textContent = username;
 
-    // Logout functionality
+    // Logout
     function logout() {
-      sessionStorage.removeItem('loggedIn');
-      sessionStorage.removeItem('username');
+      sessionStorage.clear();
       location.href = 'index.html';
+    }
+
+    // Optional: Validate session on link click (in case links open in new tab)
+    function validateSession() {
+      if (!sessionStorage.getItem('username') || sessionStorage.getItem('loggedIn') !== 'yes') {
+        alert("Your session has expired. Please log in again.");
+        location.href = 'index.html';
+        return false;
+      }
+      return true;
     }
   </script>
 
