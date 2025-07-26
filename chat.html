@@ -257,14 +257,18 @@
   <button onclick="endCall()" style="margin-top: 20px; padding: 10px 20px; background:red; border:none; border-radius:5px; color:white;">End Call</button>
   <button onclick="minimizeCall()" style="background:gray;">Minimize</button>
 </div>
+<div id="incomingControls" style="display:none;">
+  <button onclick="acceptCall()">Accept</button>
+  <button onclick="endCall(true)">Reject</button>
+</div>
+<div id="ongoingControls" style="display:none;">
+  <button onclick="endCall()">End Call</button>
+</div>
   <div id="msgMenu" class="msg-menu" style="display:none;"></div>
   <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
 <script>
-  window.onerror = (msg, url, lineNo, columnNo, error) => {
-  alert("JS ERROR:\n" + msg + "\nLine: " + lineNo + ":" + columnNo);
-};
 const firebaseConfig = {
   apiKey: "AIzaSyBfkUJS81minjxj0DFz4pzNnGzCtb5ZJss",
   authDomain: "locater-42fb4.firebaseapp.com",
@@ -951,36 +955,28 @@ function acceptCall() {
   document.getElementById("incomingControls").style.display = "none";
   document.getElementById("ongoingControls").style.display = "block";
   document.getElementById("callStatus").textContent = "In call...";
-
-  // Start peer connection/media stream etc.
-}
-function endCall(force = false) {
-  clearTimeout(callTimeout);
-  document.getElementById("callOverlay").style.display = "none";
-
-  // Stop media stream if running
-  // Close peer connection
-  // Notify other side if necessary
-
-  if (!force && isCaller) {
-    // Optional: notify callee you hung up
-  }
 }
 function minimizeCall() {
   document.getElementById("callOverlay").style.display = "none";
   // You can flash an icon or title or sound to remind user
 }
-function endCall() {
-  const overlay = document.getElementById("callOverlay");
-  overlay.classList.remove("show");
+let activeCallRef = null;
+let localStream = null;
+
+function endCall(force = false) {
+  clearTimeout(callTimeout);
+  document.getElementById("callOverlay").classList.remove("show");
+
   setTimeout(() => {
-    overlay.style.display = "none";
+    document.getElementById("callOverlay").style.display = "none";
     activeCallRef?.remove();
     activeCallRef = null;
+
     if (localStream) {
       localStream.getTracks().forEach(t => t.stop());
       localStream = null;
     }
+
     document.getElementById("localVideo").srcObject = null;
     document.getElementById("remoteVideo").srcObject = null;
   }, 400);
