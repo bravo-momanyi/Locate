@@ -148,7 +148,7 @@
   </div>
 
   <div id="activeCircle">
-    <span id="circleLabel">No Active Circle Selected</span>
+    <span id="circleLabel" style="cursor:pointer; text-decoration:underline;" onclick="showCircleOptions()">No Active Circle Selected</span>
     <div style="position: relative;">
       <input type="text" id="userSearch" placeholder="Search user..." oninput="filterSuggestions()" onkeydown="if(event.key==='Enter')searchUser()">
       <div id="suggestions"></div>
@@ -174,6 +174,12 @@
   <div class="map-container">
     <div id="map"></div>
   </div>
+  <!-- Circle Options Modal -->
+<div id="circleOptions" style="display:none; position:absolute; top:110px; right:20px; background:white; padding:15px; border-radius:10px; box-shadow:0 0 10px rgba(0,0,0,0.2); z-index:9999; width:200px;">
+  <h4 style="margin-top:0;">Circle Options</h4>
+  <div id="circleButtons"></div>
+  <button onclick="closeCircleOptions()" style="margin-top:10px; width:100%; background:#ccc;">Close</button>
+</div>
 
   <!-- Leaflet JS -->
   <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
@@ -392,6 +398,91 @@
         }
       });
     }
+    function showCircleOptions() {
+  if (!currentCircle) return;
+  const box = document.getElementById("circleOptions");
+  const buttons = document.getElementById("circleButtons");
+  buttons.innerHTML = '<button onclick="leaveCircle()" style="width:100%;margin:4px 0;">🚪 Leave Circle</button>' +
+                      '<button onclick="viewMembers()" style="width:100%;margin:4px 0;">👥 Circle Members</button>';
+
+  db.ref("circles/" + currentCircle + "/admin").once("value", snap => {
+    if (snap.val() === username) {
+      buttons.innerHTML += `
+        <button onclick="deleteCircle()" style="width:100%;margin:4px 0;">🗑️ Delete Circle</button>
+        <button onclick="viewLeaveRequests()" style="width:100%;margin:4px 0;">📥 Leave Requests</button>
+        <button onclick="removeMember()" style="width:100%;margin:4px 0;">❌ Remove Member</button>
+      `;
+    }
+    box.style.display = 'block';
+  });
+}
+
+function closeCircleOptions() {
+  document.getElementById("circleOptions").style.display = "none";
+}
+
+function leaveCircle() {
+  db.ref("circles/" + currentCircle + "/admin").once("value", snap => {
+    if (snap.val() === username) {
+      // Admin needs confirmation by others
+      db.ref("leaveRequests/" + currentCircle + "/" + username).set({
+        timestamp: Date.now()
+      });
+      alert("Leave request sent. Another admin must approve it.");
+    } else {
+      // Normal member can leave
+      db.ref("circles/" + currentCircle + "/members/" + username).remove();
+      db.ref("users/" + username + "/circles/" + currentCircle).remove();
+      alert("You have left the circle.");
+      closeCircleOptions();
+      document.getElementById('circleLabel').textContent = 'No Active Circle Selected';
+      currentCircle = null;
+    }
+  });
+}
+
+function viewMembers() {
+  db.ref("circles/" + currentCircle + "/members").once("value", snap => {
+    const members = snap.val() || {};
+    alert("Members:\n" + Object.keys(members).join("\n"));
+  });
+}
+
+function deleteCircle() {
+  if (!confirm("Are you sure you want to delete this circle for everyone?")) return;
+  db.ref("circles/" + currentCircle).remove();
+  db.ref("locations/" + currentCircle).remove();
+  alert("Circle deleted.");
+  closeCircleOptions();
+  document.getElementById('circleLabel').textContent = 'No Active Circle Selected';
+  currentCircle = null;
+}
+
+function viewLeaveRequests() {
+  db.ref("leaveRequests/" + currentCircle).once("value", snap => {
+    const requests = snap.val();
+    if (!requests) return alert("No leave requests.");
+    const users = Object.keys(requests);
+    const approve = confirm("Approve the following to leave?\n" + users.join("\n"));
+    if (approve) {
+      users.forEach(user => {
+        db.ref("circles/" + currentCircle + "/members/" + user).remove();
+        db.ref("users/" + user + "/circles/" + currentCircle).remove();
+        db.ref("leaveRequests/" + currentCircle + "/" + user).remove();
+      });
+      alert("Requests approved and users removed.");
+    }
+  });
+}
+
+function removeMember() {
+  const member = prompt("Enter the username to remove:");
+  if (!member || member === username) return alert("Cannot remove this user.");
+  db.ref("circles/" + currentCircle + "/members/" + member).remove();
+  db.ref("users/" + member + "/circles/" + currentCircle).remove();
+  db.ref("locations/" + currentCircle + "/" + member).remove();
+  alert("Member removed.");
+}
   </script>
 </body>
 </html>
