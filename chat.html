@@ -262,6 +262,9 @@
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
 <script>
+  window.onerror = (msg, url, lineNo, columnNo, error) => {
+  alert("JS ERROR:\n" + msg + "\nLine: " + lineNo + ":" + columnNo);
+};
 const firebaseConfig = {
   apiKey: "AIzaSyBfkUJS81minjxj0DFz4pzNnGzCtb5ZJss",
   authDomain: "locater-42fb4.firebaseapp.com",
