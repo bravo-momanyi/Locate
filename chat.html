@@ -196,6 +196,16 @@
 #callOverlay.show {
   opacity: 1;
 }
+<!-- Add this inside <body> after callOverlay -->
+<video id="localVideo" autoplay muted playsinline style="width: 0; height: 0;"></video>
+<video id="remoteVideo" autoplay playsinline style="width: 0; height: 0;"></video>
+
+<!-- Chat title popup -->
+<div id="chatTitleMenu" style="display:none; position:absolute; background:white; border:1px solid #ccc; padding:10px; border-radius:6px; z-index:99999;">
+  <button onclick="leaveGroup()">Leave Group</button><br>
+  <button onclick="blockUser()">Block User</button><br>
+  <button onclick="alert('Coming soon: View members')">View Members</button>
+</div>
   </style>
 </head>
 <body>
@@ -343,6 +353,15 @@ function refreshList() {
 function openChat(toUser) {
   currentChat = toUser;
   document.getElementById("chatWith").textContent = toUser;
+  document.getElementById("chatWith").onclick = (e) => {
+  const menu = document.getElementById("chatTitleMenu");
+  menu.style.left = e.pageX + "px";
+  menu.style.top = e.pageY + "px";
+  menu.style.display = "block";
+};
+document.addEventListener("click", () => {
+  document.getElementById("chatTitleMenu").style.display = "none";
+});
 
   const chatWindow = document.getElementById("chatWindow");
   chatWindow.classList.add("active");
@@ -385,6 +404,15 @@ function attemptJoinGroup(id, name) {
 function openGroup(id, name) {
   currentChat = "group_" + id;
   document.getElementById("chatWith").textContent = name;
+  document.getElementById("chatWith").onclick = (e) => {
+  const menu = document.getElementById("chatTitleMenu");
+  menu.style.left = e.pageX + "px";
+  menu.style.top = e.pageY + "px";
+  menu.style.display = "block";
+};
+document.addEventListener("click", () => {
+  document.getElementById("chatTitleMenu").style.display = "none";
+});
 
   const chatWindow = document.getElementById("chatWindow");
   chatWindow.classList.add("active");
@@ -642,13 +670,15 @@ function notifyUser(from, text) {
   }
 }
 
-/////////////////////
-// CALLING HANDLER //
-/////////////////////
+function leaveGroup() {
+  const groupId = currentChat.slice(6);
+  db.ref("groups/" + groupId + "/members/" + user).remove();
+  alert("You left the group.");
+  closeChat();
+}
 
-function startCall(type) {
-  const mode = type === "voice" ? "Voice" : "Video";
-  alert(`${mode} calling is under development.\nComing soon!`);
+function blockUser() {
+  alert("User blocked (feature not yet implemented).");
 }
 
 ////////////////////////
@@ -794,24 +824,57 @@ document.addEventListener("click", () => {
 });
 let activeCallRef = null;
 
+let localStream = null;
+let remoteStream = null;
+
 function startCall(type) {
-  if (!currentChat || currentChat.startsWith("group_")) return alert("Calls only work in private chats for now.");
-  
-  const callId = chatId(user, currentChat);
-  const ref = db.ref("calls/" + callId);
+  if (!currentChat) return;
+  const isGroup = currentChat.startsWith("group_");
+  const callId = isGroup ? currentChat : chatId(user, currentChat);
+  const callRef = db.ref("calls/" + callId + "/" + user);
 
-  ref.set({
-    from: user,
-    to: currentChat,
-    type,
-    status: "ringing",
-    ts: Date.now()
-  });
+  navigator.mediaDevices.getUserMedia({ audio: true, video: type === "video" })
+    .then(stream => {
+      localStream = stream;
+      document.getElementById("localVideo").srcObject = stream;
 
-  activeCallRef = ref;
-  showCallOverlay(`Calling ${currentChat} (${type})`);
+      showCallOverlay(`You (${type} call)`);
+
+      // Broadcast to others
+      db.ref("calls/" + callId).set({
+        type,
+        from: user,
+        status: "ringing",
+        ts: Date.now()
+      });
+
+      activeCallRef = callRef;
+    })
+    .catch(err => {
+      alert("Could not access mic/camera: " + err.message);
+    });
 }
 
+// Listen for group or private call
+db.ref("calls").on("child_added", snap => {
+  const callId = snap.key;
+  const call = snap.val();
+
+  if (!call || call.status !== "ringing") return;
+
+  const isGroup = callId.startsWith("group_");
+  const isMeTarget = call.to === user || (isGroup && callId === currentChat);
+
+  if (!isMeTarget) return;
+
+  showCallOverlay(`${call.from} is calling you (${call.type})`);
+
+  navigator.mediaDevices.getUserMedia({ audio: true, video: call.type === "video" })
+    .then(stream => {
+      localStream = stream;
+      document.getElementById("localVideo").srcObject = stream;
+    });
+});
 // Show the overlay
 function showCallOverlay(statusText) {
   const overlay = document.getElementById("callOverlay");
