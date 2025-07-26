@@ -7,7 +7,6 @@
 
   <!-- Leaflet CSS -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
-
   <style>
     body, html {
       margin: 0;
@@ -46,27 +45,22 @@
       font-size: 14px;
     }
 
-    .top-bar button:hover {
-      background: #00796b;
-    }
-
     .side-panel {
       position: absolute;
       top: 48px;
       left: 0;
-      width: 260px;
+      width: 280px;
       bottom: 0;
       background: #f0f0f0;
       overflow-y: auto;
       padding: 15px;
-      box-shadow: 2px 0 5px rgba(0,0,0,0.1);
       display: none;
       z-index: 999;
     }
 
     .map-container {
       position: absolute;
-      top: 48px;
+      top: 98px;
       left: 0;
       right: 0;
       bottom: 0;
@@ -89,16 +83,24 @@
       cursor: pointer;
     }
 
-    .circle-btn:hover {
-      background: #00796b;
-    }
-
     input[type="text"] {
       width: 100%;
       padding: 8px;
       margin: 6px 0;
       border: 1px solid #ccc;
       border-radius: 4px;
+    }
+
+    #activeCircle {
+      position: absolute;
+      top: 48px;
+      left: 0;
+      width: 100%;
+      background: #ffd54f;
+      padding: 6px 15px;
+      font-size: 16px;
+      z-index: 998;
+      text-align: center;
     }
   </style>
 </head>
@@ -107,19 +109,27 @@
   <div class="top-bar">
     <div class="left">
       <span>Bravo Connect | <strong id="username"></strong></span>
-      <button onclick="toggleCircles()">🔁 Circles</button>
+      <button onclick="toggleCircles()">Circles</button>
     </div>
     <button onclick="goBack()">Back to Dashboard</button>
   </div>
 
+  <div id="activeCircle">No Active Circle Selected</div>
+
   <div class="side-panel" id="sidePanel">
-    <h3>My Circles</h3>
-    <div id="circleList">Loading...</div>
+    <h3>Your Circles</h3>
+    <div id="circleList"></div>
     <hr>
-    <button onclick="createCircle()">➕ Create New Circle</button>
-    <br><br>
-    <input type="text" id="joinCode" placeholder="Enter Circle Code to Join" />
-    <button onclick="joinCircle()">Join Circle</button>
+    <h3>Join a Circle</h3>
+    <input type="text" id="joinCode" placeholder="Enter Circle Code" />
+    <button onclick="tryJoinCircle()">Join Circle</button>
+    <hr>
+    <h3>Create New Circle</h3>
+    <button onclick="createCircle()">➕ Create</button>
+    <hr>
+    <h3>All Circles</h3>
+    <input type="text" id="searchCircle" placeholder="Search by name..." oninput="searchCircles()" />
+    <div id="allCircles"></div>
   </div>
 
   <div class="map-container">
@@ -128,7 +138,6 @@
 
   <!-- Leaflet JS -->
   <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
-
   <!-- Firebase -->
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
@@ -155,10 +164,10 @@
       attribution: '&copy; OpenStreetMap contributors'
     }).addTo(map);
 
-    const markers = {};
-    let currentCircle = null;
+    let markers = {};
     let locationInterval = null;
-    let hasCentered = false;
+    let currentCircle = null;
+    let centered = false;
 
     function goBack() {
       location.href = 'app.html';
@@ -166,9 +175,9 @@
 
     function toggleCircles() {
       const panel = document.getElementById('sidePanel');
-      const visible = panel.style.display === 'block';
-      panel.style.display = visible ? 'none' : 'block';
-      if (!visible) loadCircles();
+      panel.style.display = panel.style.display === 'block' ? 'none' : 'block';
+      loadUserCircles();
+      loadAllCircles();
     }
 
     function generateCode(length = 6) {
@@ -183,97 +192,112 @@
     function createCircle() {
       const name = prompt("Enter Circle Name:");
       if (!name) return;
-
       const code = generateCode();
+
       db.ref('circles/' + code).set({
         name,
         admin: username,
         members: { [username]: true }
       });
+
       db.ref('users/' + username + '/circles/' + code).set(true);
       alert("Circle created! Code: " + code);
-      loadCircles();
+      loadUserCircles();
+      loadAllCircles();
     }
 
-    function joinCircle() {
-      const code = document.getElementById('joinCode').value.trim().toUpperCase();
-      if (!code) return alert("Enter a code!");
-
-      db.ref('circles/' + code).once('value', snap => {
-        if (!snap.exists()) return alert("Invalid code!");
-        db.ref('circles/' + code + '/members/' + username).set(true);
-        db.ref('users/' + username + '/circles/' + code).set(true);
-        alert("Joined Circle!");
-        loadCircles();
-      });
-    }
-
-    function loadCircles() {
+    function loadUserCircles() {
       const list = document.getElementById('circleList');
       list.innerHTML = 'Loading...';
       db.ref('users/' + username + '/circles').once('value', snap => {
         const data = snap.val() || {};
         list.innerHTML = '';
-
         Object.keys(data).forEach(code => {
-          db.ref('circles/' + code).once('value', circleSnap => {
-            const circle = circleSnap.val();
+          db.ref('circles/' + code).once('value', csnap => {
+            const c = csnap.val();
             const btn = document.createElement('button');
             btn.className = 'circle-btn';
-            btn.textContent = circle.name + ' (' + code + ')';
-            btn.onclick = () => loadCircleMap(code);
+            btn.textContent = c.name + ' (' + code + ')';
+            btn.onclick = () => loadCircleMap(code, c.name);
             list.appendChild(btn);
           });
         });
       });
     }
 
-    function loadCircleMap(circleCode) {
-      currentCircle = circleCode;
-      hasCentered = false;
-
-      Object.values(markers).forEach(m => map.removeLayer(m));
-      Object.keys(markers).forEach(k => delete markers[k]);
-
-      if (locationInterval) clearInterval(locationInterval);
-
-      // Start updating your own location to that circle
-      locationInterval = setInterval(() => {
-        if (!navigator.geolocation) return;
-        navigator.geolocation.getCurrentPosition(pos => {
-          const lat = pos.coords.latitude;
-          const lng = pos.coords.longitude;
-
-          db.ref('locations/' + circleCode + '/' + username).set({ lat, lng });
-
-          // Center on user's location (once)
-          if (!hasCentered) {
-            map.setView([lat, lng], 15);
-            hasCentered = true;
-          }
-        });
-      }, 5000);
-
-      // Live update members' markers
-      db.ref('locations/' + circleCode).on('value', snap => {
+    function loadAllCircles() {
+      db.ref('circles').once('value', snap => {
         const all = snap.val() || {};
-        Object.entries(all).forEach(([user, loc]) => {
-          if (!loc.lat || !loc.lng) return;
-
-          if (markers[user]) {
-            markers[user].setLatLng([loc.lat, loc.lng]);
-          } else {
-            markers[user] = L.marker([loc.lat, loc.lng])
-              .addTo(map)
-              .bindPopup(user);
+        const container = document.getElementById('allCircles');
+        container.innerHTML = '';
+        Object.entries(all).forEach(([code, circle]) => {
+          if (!circle.members || !circle.members[username]) {
+            const div = document.createElement('div');
+            div.textContent = circle.name + ' (' + code + ')';
+            div.style.marginBottom = '6px';
+            container.appendChild(div);
           }
         });
       });
     }
 
-    window.onload = () => {
-      if (!username) location.href = 'index.html';
-    };
+    function searchCircles() {
+      const term = document.getElementById('searchCircle').value.toLowerCase();
+      const all = document.getElementById('allCircles').children;
+      for (let el of all) {
+        el.style.display = el.textContent.toLowerCase().includes(term) ? 'block' : 'none';
+      }
+    }
+
+    function tryJoinCircle() {
+      const code = document.getElementById('joinCode').value.trim().toUpperCase();
+      if (!code) return alert("Enter a code");
+
+      db.ref('circles/' + code).once('value', snap => {
+        if (!snap.exists()) return alert("Circle not found.");
+        const data = snap.val();
+        const confirmed = confirm(`Circle Found: "${data.name}".\nDo you want to join it?`);
+        if (!confirmed) return;
+        db.ref('circles/' + code + '/members/' + username).set(true);
+        db.ref('users/' + username + '/circles/' + code).set(true);
+        alert("You joined the circle!");
+        loadUserCircles();
+        loadAllCircles();
+      });
+    }
+
+    function loadCircleMap(code, name) {
+      currentCircle = code;
+      centered = false;
+      document.getElementById('activeCircle').textContent = "Active Circle: " + name + " (" + code + ")";
+      Object.values(markers).forEach(m => map.removeLayer(m));
+      markers = {};
+      if (locationInterval) clearInterval(locationInterval);
+
+      locationInterval = setInterval(() => {
+        navigator.geolocation.getCurrentPosition(pos => {
+          const lat = pos.coords.latitude;
+          const lng = pos.coords.longitude;
+          db.ref('locations/' + code + '/' + username).set({ lat, lng });
+          if (!centered) {
+            map.setView([lat, lng], 15);
+            centered = true;
+          }
+        });
+      }, 5000);
+
+      db.ref('locations/' + code).on('value', snap => {
+        const locs = snap.val() || {};
+        Object.entries(locs).forEach(([user, loc]) => {
+          if (!loc.lat || !loc.lng) return;
+          if (markers[user]) {
+            markers[user].setLatLng([loc.lat, loc.lng]);
+          } else {
+            markers[user] = L.marker([loc.lat, loc.lng]).addTo(map).bindPopup(user);
+          }
+        });
+      });
+    }
   </script>
 </body>
 </html>
