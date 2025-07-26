@@ -138,17 +138,18 @@
   border-radius: 10px;
   z-index: 9999;
   box-shadow: 0 4px 12px rgba(0,0,0,0.25);
-  min-width: 180px;
-  font-size: 16px;
+  min-width: 240px;
+  font-size: 17px;
+  padding: 10px;
 }
 
 #msgMenu button {
   width: 100%;
   border: none;
-  padding: 14px 18px;
+  padding: 16px 20px;
   background: white;
   text-align: left;
-  font-size: 15px;
+  font-size: 16px;
   cursor: pointer;
   border-bottom: 1px solid #eee;
 }
@@ -394,8 +395,8 @@ convoRef.on("child_changed", snap => updateMessageUI(snap.key, snap.val(), false
     document.getElementById("typingIndicator").style.display = snap.val() ? "block" : "none";
   });
 
-  recentChats[toUser] = Date.now();
-  localStorage.setItem("recentChats", JSON.stringify(recentChats));
+  recentChats[currentChat] = Date.now();
+localStorage.setItem("recentChats", JSON.stringify(recentChats));
   unreadCount[toUser] = 0;
   db.ref("seen/" + id + "/" + user).set(firebase.database.ServerValue.TIMESTAMP);
 }
@@ -442,8 +443,8 @@ document.addEventListener("click", () => {
   convoRef = db.ref("groupChats/" + id);
 convoRef.on("child_added", snap => renderMessage(snap.key, snap.val(), true, id));
 convoRef.on("child_changed", snap => updateMessageUI(snap.key, snap.val(), true, id));
-  recentChats["group_" + id] = Date.now();
-  localStorage.setItem("recentChats", JSON.stringify(recentChats));
+  recentChats[currentChat] = Date.now();
+localStorage.setItem("recentChats", JSON.stringify(recentChats));
   unreadCount["group_" + id] = 0;
 }
 function renderMessage(id, msg, isGroup = false, groupId = "") {
