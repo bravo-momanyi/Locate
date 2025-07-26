@@ -104,25 +104,32 @@
   </div>
 
   <script>
-    // Validate session
-    const username = sessionStorage.getItem('username');
-    const loggedIn = sessionStorage.getItem('loggedIn');
+    // Recover username from URL if missing
+    const urlParams = new URLSearchParams(window.location.search);
+    const userParam = urlParams.get('user');
+    let username = sessionStorage.getItem('username');
 
-    if (!username || loggedIn !== 'yes') {
-      location.href = 'index.html';
+    if (!username && userParam) {
+      sessionStorage.setItem('username', userParam);
+      localStorage.setItem('username', userParam); // Optional persistent login
+      username = userParam;
     }
 
-    // Set username
-    document.getElementById('username').textContent = username;
+    if (!username || sessionStorage.getItem('loggedIn') !== 'yes') {
+      alert("Please log in again.");
+      location.href = "index.html";
+    } else {
+      document.getElementById('username').textContent = username;
+    }
 
-    // Logout
+    // Logout function
     function logout() {
       sessionStorage.clear();
       localStorage.clear();
       location.href = 'index.html';
     }
 
-    // Optional: Validate session on link click (in case links open in new tab)
+    // Session validator for buttons
     function validateSession() {
       if (!sessionStorage.getItem('username') || sessionStorage.getItem('loggedIn') !== 'yes') {
         alert("Your session has expired. Please log in again.");
@@ -131,24 +138,6 @@
       }
       return true;
     }
-    // Recover username from URL if missing
-const urlParams = new URLSearchParams(window.location.search);
-const userParam = urlParams.get('user');
-let username = sessionStorage.getItem('username');
-
-if (!username && userParam) {
-  sessionStorage.setItem('username', userParam);
-  localStorage.setItem('username', userParam); // Optional: for persistent storage
-  username = userParam;
-}
-
-// Now use `username` as needed
-if (!username) {
-  alert("Please log in again.");
-  location.href = "index.html";
-} else {
-  document.getElementById('username').textContent = username;
-}
   </script>
 
 </body>
