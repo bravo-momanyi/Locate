@@ -109,6 +109,7 @@
   <div class="top-bar">
     <div class="left">
       <span>Bravo Connect | <strong id="username"></strong></span>
+      <input type="text" id="userSearch" placeholder="Search user..." style="padding:4px 6px; font-size:13px; border-radius:5px; border:none; outline:none; width:120px;" onkeydown="if(event.key==='Enter')searchUser()"/>
       <button onclick="toggleCircles()">Circles</button>
     </div>
     <button onclick="goBack()">Back to Dashboard</button>
@@ -311,6 +312,24 @@
           }
         });
       });
+    }
+    function searchUser() {
+  const query = document.getElementById('userSearch').value.trim();
+  if (!query || !currentCircle) return alert("Please enter a name and select a circle first.");
+
+  db.ref('locations/' + currentCircle + '/' + query).once('value', snap => {
+    const loc = snap.val();
+    if (!loc || !loc.lat || !loc.lng) {
+      alert("User not found in this circle or no location available.");
+    } else {
+      map.setView([loc.lat, loc.lng], 17);
+      if (!markers[query]) {
+        markers[query] = L.marker([loc.lat, loc.lng]).addTo(map).bindPopup(query).openPopup();
+      } else {
+        markers[query].bindPopup(query).openPopup();
+      }
+    }
+  });
     }
   </script>
 </body>
