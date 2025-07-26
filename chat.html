@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Bravo Chat</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
   <style>
@@ -104,8 +104,30 @@
         z-index: 100;
       }
     }
+
+    /* Floating options menu (right click) */
+    #msgMenu {
+      display: none;
+      position: absolute;
+      background: white;
+      border: 1px solid #ccc;
+      border-radius: 5px;
+      z-index: 9999;
+    }
+    #msgMenu button {
+      padding: 10px;
+      border: none;
+      width: 100%;
+      text-align: left;
+      background: white;
+      cursor: pointer;
+    }
+    #msgMenu button:hover {
+      background: #f1f1f1;
+    }
   </style>
 </head>
+
 <body>
   <header>
     <div id="currentUser">Welcome</div>
@@ -135,23 +157,51 @@
     </div>
   </div>
 
+  <!-- 🔽 Floating menu for right-click on message -->
+  <div id="msgMenu">
+    <button onclick="deleteMsgForMe()">Delete for Me</button>
+    <button id="deleteForAllBtn" onclick="deleteMsgForEveryone()">Delete for Everyone</button>
+  </div>
+  </div>
+
+    <div id="chatWindow">
+      <div style="padding: 10px; background: #128C7E; color: white;">
+        <span id="chatWith">---</span>
+        <button onclick="startCall('voice')">📞</button>
+        <button onclick="startCall('video')">🎥</button>
+        <button onclick="closeChat()" style="float: right;">✖</button>
+      </div>
+      <div id="messages"></div>
+      <div id="sendBar">
+        <input id="msgInput" placeholder="Type message..." />
+        <button onclick="sendMsg()">Send</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Floating delete menu -->
+  <div id="msgMenu"></div>
+
   <!-- Firebase & Leaflet -->
   <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
 
   <script>
-    // Load user
     let user = sessionStorage.getItem('username');
-    if (!user) {
-      user = prompt("Enter your username:");
-      if (!user) location.href = "index.html";
-      sessionStorage.setItem("username", user);
+    if (!user || user.trim() === "") {
+      try {
+        user = prompt("Enter your username:");
+        if (!user) throw new Error("No username");
+        sessionStorage.setItem("username", user);
+      } catch (e) {
+        location.href = "index.html";
+      }
     }
     document.getElementById("currentUser").textContent = "Welcome, " + user;
 
     function goToDashboard() {
-      sessionStorage.setItem('username', user);
+      sessionStorage.setItem("username", user);
       location.href = "app.html";
     }
 
@@ -168,46 +218,41 @@
     const db = firebase.database();
 
     let currentChat = "", convoRef = null;
+    const userListDiv = document.getElementById("userSection");
+    const groupListDiv = document.getElementById("groupSection");
+    const searchBox = document.getElementById("searchBox");
+    searchBox.addEventListener("input", refreshList);
+
     let allUsers = {}, allGroups = {};
-
-    const userListDiv = document.getElementById('userSection');
-    const groupListDiv = document.getElementById('groupSection');
-    const searchBox = document.getElementById('searchBox');
-
-    searchBox.addEventListener('input', refreshList);
-
-    db.ref('users').on('value', snap => {
+    db.ref("users").on("value", snap => {
       allUsers = snap.val() || {};
       refreshList();
     });
-
-    db.ref('groups').on('value', snap => {
+    db.ref("groups").on("value", snap => {
       allGroups = snap.val() || {};
       refreshList();
     });
 
     function refreshList() {
-      const term = searchBox.value.trim().toLowerCase();
+      const term = searchBox.value.toLowerCase();
       userListDiv.innerHTML = "<h3>Users</h3>";
       groupListDiv.innerHTML = "<h3>Groups</h3>";
-
       for (const u in allUsers) {
         if (u !== user && u.toLowerCase().includes(term)) {
-          const btn = document.createElement('button');
+          const btn = document.createElement("button");
           btn.textContent = u;
           btn.onclick = () => openChat(u);
           userListDiv.appendChild(btn);
         }
       }
-
       for (const id in allGroups) {
         const g = allGroups[id];
-        if (!g || typeof g.name !== 'string') continue;
+        if (!g || typeof g.name !== "string") continue;
         const label = g.public ? `# ${g.name}` : `🔒 ${g.name}`;
         if (g.name.toLowerCase().includes(term)) {
-          const btn = document.createElement('button');
+          const btn = document.createElement("button");
           btn.textContent = label;
-          btn.className = 'group';
+          btn.className = "group";
           btn.onclick = () => attemptJoinGroup(id, g.name);
           groupListDiv.appendChild(btn);
         }
@@ -215,16 +260,11 @@
     }
 
     function createGroup() {
-      let name = prompt("Enter group name:");
+      let name = prompt("Group name?");
       if (!name) return;
-
-      name = name.trim().replace(/[^a-zA-Z0-9 -]/g, '').replace(/\s+/g, '');
-      const type = prompt("Group type (public/private):").toLowerCase();
-      if (type !== 'public' && type !== 'private') return alert("Invalid type.");
-
-      const isPublic = type === 'public';
-      const password = isPublic ? null : prompt("Set a password:");
-
+      name = name.trim().replace(/[^a-zA-Z0-9]/g, "");
+      const isPublic = confirm("Make it public?");
+      const password = isPublic ? null : prompt("Password?");
       const data = {
         name,
         admin: user,
@@ -232,120 +272,117 @@
         password,
         members: { [user]: true }
       };
-
-      const ref = db.ref('groups').push();
+      const ref = db.ref("groups").push();
       ref.set(data);
-      db.ref('groupChats/' + ref.key).push({ from: 'System', text: `${user} created this group.`, ts: Date.now() });
+      db.ref("groupChats/" + ref.key).push({ from: "System", text: `${user} created this group.`, ts: Date.now() });
     }
 
-    function attemptJoinGroup(groupId, name) {
-      db.ref('groups/' + groupId).once('value').then(snap => {
+    function attemptJoinGroup(id, name) {
+      db.ref("groups/" + id).once("value").then(snap => {
         const group = snap.val();
-        if (!group) return;
-        if (group.members && group.members[user]) {
-          openGroup(groupId, name);
-        } else if (!group.public) {
-          const pwd = prompt("Enter group password:");
+        if (group.members && group.members[user]) openGroup(id, name);
+        else if (!group.public) {
+          const pwd = prompt("Group password?");
           if (pwd === group.password) {
-            db.ref('groups/' + groupId + '/members/' + user).set(true);
-            openGroup(groupId, name);
-          } else {
-            alert("Wrong password.");
-          }
+            db.ref("groups/" + id + "/members/" + user).set(true);
+            openGroup(id, name);
+          } else alert("Wrong password.");
         } else {
-          if (confirm("Join this public group?")) {
-            db.ref('groups/' + groupId + '/members/' + user).set(true);
-            openGroup(groupId, name);
+          if (confirm("Join this group?")) {
+            db.ref("groups/" + id + "/members/" + user).set(true);
+            openGroup(id, name);
           }
         }
       });
     }
-  </script>
-  <script>
+
+    function chatId(a, b) {
+      return [a, b].sort().join("_");
+    }
+
     function openChat(username) {
       currentChat = username;
       document.getElementById("chatWith").textContent = username;
       document.getElementById("chatWindow").style.display = "flex";
       document.getElementById("messages").innerHTML = "";
       if (convoRef) convoRef.off();
-
-      convoRef = db.ref('chats/' + chatId(user, username));
-      convoRef.on('child_added', snap => {
-        renderMessage(snap.key, snap.val());
-      });
+      convoRef = db.ref("chats/" + chatId(user, username));
+      convoRef.on("child_added", snap => renderMsg(snap.key, snap.val(), false, ""));
     }
 
-    function openGroup(groupId, groupName) {
-      currentChat = groupId;
-      document.getElementById("chatWith").textContent = groupName;
+    function openGroup(id, name) {
+      currentChat = id;
+      document.getElementById("chatWith").textContent = name;
       document.getElementById("chatWindow").style.display = "flex";
       document.getElementById("messages").innerHTML = "";
       if (convoRef) convoRef.off();
-
-      convoRef = db.ref('groupChats/' + groupId);
-      convoRef.on('child_added', snap => {
-        renderMessage(snap.key, snap.val(), true, groupId);
-      });
+      convoRef = db.ref("groupChats/" + id);
+      convoRef.on("child_added", snap => renderMsg(snap.key, snap.val(), true, id));
     }
 
-    function chatId(a, b) {
-      return [a, b].sort().join('_');
-    }
-
-    function renderMessage(id, msg, isGroup = false, groupId = "") {
-      if (!msg || msg.deletedFor && msg.deletedFor[user]) return;
-
-      const div = document.createElement('div');
-      div.className = 'msg ' + (msg.from === user ? 'you' : 'them');
-      div.textContent = (isGroup && msg.from !== user ? `${msg.from}: ` : "") + msg.text;
+    function renderMsg(id, msg, isGroup = false, groupId = "") {
+      if (!msg || (msg.deletedFor && msg.deletedFor[user])) return;
+      const div = document.createElement("div");
+      div.className = "msg " + (msg.from === user ? "you" : "them");
+      div.textContent = (isGroup && msg.from !== user ? msg.from + ": " : "") + msg.text;
       div.dataset.id = id;
-      div.dataset.from = msg.from;
       div.dataset.ts = msg.ts;
-      div.title = new Date(msg.ts).toLocaleTimeString();
-
-      div.addEventListener('contextmenu', e => {
-        e.preventDefault();
-        showMessageOptions(id, msg, isGroup, groupId, div);
-      });
-
+      div.dataset.from = msg.from;
+      div.dataset.isGroup = isGroup;
+      div.dataset.groupId = groupId;
+      div.addEventListener("contextmenu", showPopup);
       document.getElementById("messages").appendChild(div);
-      document.getElementById("messages").scrollTop = 9999999;
+      document.getElementById("messages").scrollTop = 999999;
     }
 
-    function showMessageOptions(id, msg, isGroup, groupId, div) {
-      const options = [];
-      if (msg.from === user && Date.now() - msg.ts <= 60000) {
-        options.push("Delete for Everyone");
-      }
-      options.push("Delete for Me");
+    function showPopup(e) {
+      e.preventDefault();
+      const div = e.target;
+      const id = div.dataset.id;
+      const ts = parseInt(div.dataset.ts);
+      const from = div.dataset.from;
+      const isGroup = div.dataset.isGroup === "true";
+      const groupId = div.dataset.groupId;
+      const menu = document.getElementById("msgMenu");
+      menu.innerHTML = "";
+      const now = Date.now();
 
-      const choice = prompt("Options:\n" + options.join("\n"));
-      if (choice === "Delete for Everyone") {
-        const ref = isGroup ? db.ref(`groupChats/${groupId}/${id}`) : db.ref(`chats/${chatId(user, currentChat)}/${id}`);
-        ref.set({ text: "This message was deleted", from: msg.from, ts: msg.ts, deleted: true });
-      } else if (choice === "Delete for Me") {
+      if (from === user && now - ts < 60000) {
+        const btn1 = document.createElement("button");
+        btn1.textContent = "Delete for Everyone";
+        btn1.onclick = () => {
+          const ref = isGroup ? db.ref(`groupChats/${groupId}/${id}`) : db.ref(`chats/${chatId(user, currentChat)}/${id}`);
+          ref.set({ from, text: "This message was deleted", ts, deleted: true });
+          menu.style.display = "none";
+        };
+        menu.appendChild(btn1);
+      }
+
+      const btn2 = document.createElement("button");
+      btn2.textContent = "Delete for Me";
+      btn2.onclick = () => {
         div.remove();
-        const loc = `deletedFor/${user}`;
-        const ref = isGroup ? db.ref(`groupChats/${groupId}/${id}/${loc}`) : db.ref(`chats/${chatId(user, currentChat)}/${id}/${loc}`);
+        const ref = isGroup ? db.ref(`groupChats/${groupId}/${id}/deletedFor/${user}`) : db.ref(`chats/${chatId(user, currentChat)}/${id}/deletedFor/${user}`);
         ref.set(true);
-      }
+        menu.style.display = "none";
+      };
+      menu.appendChild(btn2);
+
+      menu.style.left = e.pageX + "px";
+      menu.style.top = e.pageY + "px";
+      menu.style.display = "block";
     }
+
+    window.onclick = () => {
+      document.getElementById("msgMenu").style.display = "none";
+    };
 
     function sendMsg() {
       const text = document.getElementById("msgInput").value.trim();
       if (!text || !currentChat) return;
-
-      const msg = {
-        from: user,
-        text,
-        ts: Date.now()
-      };
-
-      if (currentChat.length < 20) {
-        db.ref('chats/' + chatId(user, currentChat)).push(msg);
-      } else {
-        db.ref('groupChats/' + currentChat).push(msg);
-      }
+      const msg = { from: user, text, ts: Date.now() };
+      const ref = currentChat.length < 20 ? db.ref("chats/" + chatId(user, currentChat)) : db.ref("groupChats/" + currentChat);
+      ref.push(msg);
       document.getElementById("msgInput").value = "";
     }
 
@@ -355,48 +392,38 @@
     }
 
     function startCall(type) {
-      alert(`${type === 'voice' ? "Voice" : "Video"} call feature coming soon.`);
+      alert(type + " call coming soon!");
     }
 
-    // Clickable header options
-    document.getElementById("chatWith").onclick = function () {
+    document.getElementById("chatWith").onclick = () => {
       if (!currentChat) return;
       if (currentChat.length < 20) {
-        const choice = prompt("Options:\n1. Block User\n2. Delete Chat");
-        if (choice === "1") {
-          alert("User blocked (locally)");
-        } else if (choice === "2") {
-          if (confirm("Delete entire chat with " + currentChat + "?")) {
-            db.ref('chats/' + chatId(user, currentChat)).remove();
-            closeChat();
-          }
+        const choice = prompt("Options:\n1. Block\n2. Delete Chat");
+        if (choice === "2" && confirm("Delete chat with " + currentChat + "?")) {
+          db.ref("chats/" + chatId(user, currentChat)).remove();
+          closeChat();
         }
       } else {
-        db.ref('groups/' + currentChat).once('value').then(snap => {
+        db.ref("groups/" + currentChat).once("value").then(snap => {
           const g = snap.val();
           const isAdmin = g.admin === user;
-          let options = "1. View Members\n2. Leave Group";
-          if (isAdmin) options += "\n3. Remove Member\n4. Delete Group";
-
-          const choice = prompt("Group Options:\n" + options);
-          if (choice === "1") {
-            let members = Object.keys(g.members || {}).join("\n");
-            alert("Members:\n" + members);
-          } else if (choice === "2") {
-            if (confirm("Leave group?")) {
-              db.ref(`groups/${currentChat}/members/${user}`).remove();
-              closeChat();
-            }
-          } else if (choice === "3" && isAdmin) {
+          let menu = "1. View Members\n2. Leave Group";
+          if (isAdmin) menu += "\n3. Remove Member\n4. Delete Group";
+          const opt = prompt("Group Options:\n" + menu);
+          if (opt === "1") alert("Members:\n" + Object.keys(g.members).join("\n"));
+          else if (opt === "2" && confirm("Leave group?")) {
+            db.ref(`groups/${currentChat}/members/${user}`).remove();
+            closeChat();
+          } else if (opt === "3" && isAdmin) {
             const who = prompt("Remove who?");
-            db.ref(`groups/${currentChat}/members/${who}`).remove();
-            db.ref(`groupChats/${currentChat}`).push({ from: "System", text: `${who} was removed.`, ts: Date.now() });
-          } else if (choice === "4" && isAdmin) {
-            if (confirm("Delete group permanently?")) {
-              db.ref('groups/' + currentChat).remove();
-              db.ref('groupChats/' + currentChat).remove();
-              closeChat();
+            if (who) {
+              db.ref(`groups/${currentChat}/members/${who}`).remove();
+              db.ref(`groupChats/${currentChat}`).push({ from: "System", text: `${who} was removed.`, ts: Date.now() });
             }
+          } else if (opt === "4" && isAdmin && confirm("Delete group?")) {
+            db.ref("groups/" + currentChat).remove();
+            db.ref("groupChats/" + currentChat).remove();
+            closeChat();
           }
         });
       }
