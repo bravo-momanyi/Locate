@@ -121,3 +121,133 @@
       location.href = 'index.html';
     }
   </script>
+  <!-- Call Modal -->
+<div id="callModal" style="
+  display: none;
+  position: fixed;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  background: #000c;
+  z-index: 9999;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+">
+  <video id="remoteVideo" autoplay playsinline style="width: 90%; max-width: 500px; background: black;"></video>
+  <video id="localVideo" muted autoplay playsinline style="
+    position: absolute;
+    bottom: 20px;
+    right: 20px;
+    width: 100px;
+    border: 2px solid white;
+    border-radius: 10px;
+  "></video>
+  <button onclick="endCall()" style="
+    margin-top: 20px;
+    padding: 10px 20px;
+    background: red;
+    color: white;
+    border: none;
+    border-radius: 5px;
+  ">End Call</button>
+</div>
+
+<script>
+let localStream, peer, callChannel;
+const callUI = document.getElementById('callModal');
+const localVideo = document.getElementById('localVideo');
+const remoteVideo = document.getElementById('remoteVideo');
+
+function startCall(type) {
+  if (!currentChat || currentChat.startsWith('group__')) {
+    return alert("Only private calls are allowed.");
+  }
+
+  navigator.mediaDevices.getUserMedia({
+    audio: true,
+    video: type === 'video'
+  }).then(stream => {
+    localStream = stream;
+    localVideo.srcObject = stream;
+    callUI.style.display = 'flex';
+
+    const chatId = [user, currentChat].sort().join('_');
+    peer = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
+
+    // Add stream tracks
+    stream.getTracks().forEach(track => peer.addTrack(track, stream));
+
+    peer.ontrack = e => {
+      if (e.streams && e.streams[0]) {
+        remoteVideo.srcObject = e.streams[0];
+      }
+    };
+
+    // Signal exchange
+    callChannel = db.ref('calls/' + chatId);
+    callChannel.remove();
+
+    peer.onicecandidate = e => {
+      if (e.candidate) {
+        callChannel.push({ sender: user, ice: e.candidate });
+      }
+    };
+
+    peer.createOffer().then(offer => {
+      peer.setLocalDescription(offer);
+      callChannel.push({ sender: user, sdp: offer });
+    });
+
+    // Handle remote answers and ICE
+    callChannel.on('child_added', snap => {
+      const data = snap.val();
+      if (data.sender === user) return;
+
+      if (data.sdp) {
+        peer.setRemoteDescription(new RTCSessionDescription(data.sdp)).then(() => {
+          if (data.sdp.type === 'offer') {
+            navigator.mediaDevices.getUserMedia({
+              audio: true,
+              video: type === 'video'
+            }).then(remoteStream => {
+              localStream = remoteStream;
+              localVideo.srcObject = remoteStream;
+              callUI.style.display = 'flex';
+
+              remoteStream.getTracks().forEach(track => peer.addTrack(track, remoteStream));
+
+              peer.createAnswer().then(answer => {
+                peer.setLocalDescription(answer);
+                callChannel.push({ sender: user, sdp: answer });
+              });
+            });
+          }
+        });
+      } else if (data.ice) {
+        peer.addIceCandidate(new RTCIceCandidate(data.ice));
+      }
+    });
+  }).catch(err => {
+    alert("Error starting call: " + err.message);
+  });
+}
+
+function endCall() {
+  callUI.style.display = 'none';
+  if (peer) {
+    peer.close();
+    peer = null;
+  }
+  if (localStream) {
+    localStream.getTracks().forEach(t => t.stop());
+    localStream = null;
+  }
+  remoteVideo.srcObject = null;
+  localVideo.srcObject = null;
+
+  if (callChannel) {
+    callChannel.off();
+    callChannel.remove();
+  }
+}
+</script>
