@@ -379,9 +379,8 @@ function refreshList() {
 function openChat(toUser) {
   currentChat = toUser;
   document.getElementById("chatWith").textContent = toUser;
-  const status = allUsers[toUser]?.lastSeen || \"Offline\";
-document.getElementById(\"chatWith\").innerHTML = `${toUser} <small style='font-size:11px;'>(${status})</small>`;
-
+const status = allUsers[toUser]?.lastSeen || "Offline";
+document.getElementById("chatWith").innerHTML = `${toUser} <small style='font-size:11px;'>(${status})</small>`;
 document.addEventListener("click", () => {
   document.getElementById("chatTitleMenu").style.display = "none";
 });
