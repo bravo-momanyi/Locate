@@ -276,6 +276,18 @@ const db = firebase.database();
 let user = sessionStorage.getItem('username');
 if (!user) location.href = "index.html";
 document.getElementById("currentUser").textContent = "Welcome, " + user;
+  // ✅ Load all users
+db.ref("users").on("value", snap => {
+  allUsers = snap.val() || {};
+  refreshList();
+  trackUnreadMessages(); // Ensure this is triggered only after users are loaded
+});
+
+// ✅ Load all groups
+db.ref("groups").on("value", snap => {
+  allGroups = snap.val() || {};
+  refreshList();
+});
 
 let currentChat = "", convoRef = null, typingRef = null;
 let allUsers = {}, allGroups = {}, unreadCount = {}, replyingTo = null;
