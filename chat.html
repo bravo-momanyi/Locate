@@ -255,6 +255,7 @@
 <div id="callOverlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:#000000cc; color:white; z-index:99999; justify-content:center; align-items:center; flex-direction:column;">
   <h2 id="callStatus">Calling...</h2>
   <button onclick="endCall()" style="margin-top: 20px; padding: 10px 20px; background:red; border:none; border-radius:5px; color:white;">End Call</button>
+  <button onclick="minimizeCall()" style="background:gray;">Minimize</button>
 </div>
   <div id="msgMenu" class="msg-menu" style="display:none;"></div>
   <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
@@ -318,7 +319,8 @@ function createGroup() {
     });
   }
 }
-
+let callTimeout = null;
+let isCaller = false;
 // Group chats and users
 function refreshList() {
   const term = document.getElementById("searchBox").value.toLowerCase();
@@ -893,6 +895,14 @@ function startCall(type) {
     .catch(err => {
       alert("Could not access mic/camera: " + err.message);
     });
+  // Setup your signaling or Firebase logic here
+  callTimeout = setTimeout(() => {
+    if (isCaller) {
+      endCall(true);  // true = timed out or rejected
+      alert("Call not answered. Hanging up.");
+    }
+  }, 120000); // 2 minutes
+  }
 }
 
 // Listen for group or private call
@@ -922,7 +932,41 @@ function showCallOverlay(statusText) {
   overlay.classList.add("show");
   overlay.style.display = "flex";
 }
+function incomingCall(fromUser, type) {
+  isCaller = false;
+  showOverlay(`Incoming ${type} call from ${fromUser}`);
+  document.getElementById("incomingControls").style.display = "flex";
+  document.getElementById("ongoingControls").style.display = "none";
 
+  callTimeout = setTimeout(() => {
+    endCall(true); // timeout
+    alert("Missed call.");
+  }, 120000);
+}
+function acceptCall() {
+  clearTimeout(callTimeout);
+  document.getElementById("incomingControls").style.display = "none";
+  document.getElementById("ongoingControls").style.display = "block";
+  document.getElementById("callStatus").textContent = "In call...";
+
+  // Start peer connection/media stream etc.
+}
+function endCall(force = false) {
+  clearTimeout(callTimeout);
+  document.getElementById("callOverlay").style.display = "none";
+
+  // Stop media stream if running
+  // Close peer connection
+  // Notify other side if necessary
+
+  if (!force && isCaller) {
+    // Optional: notify callee you hung up
+  }
+}
+function minimizeCall() {
+  document.getElementById("callOverlay").style.display = "none";
+  // You can flash an icon or title or sound to remind user
+}
 function endCall() {
   const overlay = document.getElementById("callOverlay");
   overlay.classList.remove("show");
