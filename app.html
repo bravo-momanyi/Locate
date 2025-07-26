@@ -130,6 +130,24 @@
       }
       return true;
     }
+    // Recover username from URL if missing
+const urlParams = new URLSearchParams(window.location.search);
+const userParam = urlParams.get('user');
+let username = sessionStorage.getItem('username');
+
+if (!username && userParam) {
+  sessionStorage.setItem('username', userParam);
+  localStorage.setItem('username', userParam); // Optional: for persistent storage
+  username = userParam;
+}
+
+// Now use `username` as needed
+if (!username) {
+  alert("Please log in again.");
+  location.href = "index.html";
+} else {
+  document.getElementById('username').textContent = username;
+}
   </script>
 
 </body>
