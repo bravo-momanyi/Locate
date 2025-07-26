@@ -365,14 +365,7 @@ function refreshList() {
 function openChat(toUser) {
   currentChat = toUser;
   document.getElementById("chatWith").textContent = toUser;
-  const chatTitle = document.getElementById("chatWith");
-chatTitle.onclick = (e) => {
-  e.stopPropagation(); // Prevent auto-close
-  const menu = document.getElementById("chatTitleMenu");
-  menu.style.left = e.pageX + "px";
-  menu.style.top = e.pageY + "px";
-  menu.style.display = "block";
-};
+  
 
 document.addEventListener("click", () => {
   document.getElementById("chatTitleMenu").style.display = "none";
@@ -420,14 +413,7 @@ function attemptJoinGroup(id, name) {
 function openGroup(id, name) {
   currentChat = "group_" + id;
   document.getElementById("chatWith").textContent = name;
-  const chatTitle = document.getElementById("chatWith");
-chatTitle.onclick = (e) => {
-  e.stopPropagation(); // Prevent auto-close
-  const menu = document.getElementById("chatTitleMenu");
-  menu.style.left = e.pageX + "px";
-  menu.style.top = e.pageY + "px";
-  menu.style.display = "block";
-};
+  
 
 document.addEventListener("click", () => {
   document.getElementById("chatTitleMenu").style.display = "none";
@@ -491,7 +477,13 @@ function renderMessage(id, msg, isGroup = false, groupId = "") {
   ////////////////////////////
 // SWIPE TO REPLY FEEDBACK
 ////////////////////////////
-
+document.getElementById("chatWith").onclick = (e) => {
+  e.stopPropagation();
+  const menu = document.getElementById("chatTitleMenu");
+  menu.style.left = e.pageX + "px";
+  menu.style.top = e.pageY + "px";
+  menu.style.display = "block";
+};
 let swipeTarget = null;
 document.addEventListener("touchstart", e => {
   swipeTarget = e.target.closest(".msg");
@@ -875,6 +867,7 @@ function startCall(type) {
       db.ref("calls/" + callId).set({
         type,
         from: user,
+        to: currentChat,
         status: "ringing",
         ts: Date.now()
       });
