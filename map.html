@@ -188,24 +188,30 @@
       }
       return code;
     }
-
     function createCircle() {
-      const name = prompt("Enter Circle Name:");
-      if (!name) return;
-      const code = generateCode();
+  const name = prompt("Enter Circle Name:");
+  if (!name) return;
+  const code = generateCode();
 
-      db.ref('circles/' + code).set({
-        name,
-        admin: username,
-        members: { [username]: true }
-      });
-
-      db.ref('users/' + username + '/circles/' + code).set(true);
-      alert("Circle created! Code: " + code);
+  // Step 1: Create circle in /circles/
+  db.ref('circles/' + code).set({
+    name,
+    admin: username,
+    members: { [username]: true }
+  }).then(() => {
+    // Step 2: Link circle to user in /users/
+    return db.ref('users/' + username + '/circles/' + code).set(true);
+  }).then(() => {
+    alert("Circle created! Code: " + code);
+    // Step 3: Reload both lists after short delay to sync
+    setTimeout(() => {
       loadUserCircles();
       loadAllCircles();
+    }, 300);
+  }).catch(error => {
+    alert("Failed to create circle: " + error.message);
+  });
     }
-
     function loadUserCircles() {
       const list = document.getElementById('circleList');
       list.innerHTML = 'Loading...';
