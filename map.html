@@ -16,37 +16,21 @@
     }
 
     .top-bar {
-      position: absolute;
+      position: fixed;
       top: 0;
-      width: 100%;
+      left: 0;
+      right: 0;
       background: #00695c;
       color: white;
       padding: 10px 15px;
-      font-size: 18px;
       display: flex;
       justify-content: space-between;
       align-items: center;
       z-index: 1000;
     }
 
-    .top-bar .left {
-      display: flex;
-      gap: 10px;
-      align-items: center;
-    }
-
-    .top-bar button {
-      background: #00897b;
-      border: none;
-      color: white;
-      padding: 6px 12px;
-      border-radius: 5px;
-      cursor: pointer;
-      font-size: 14px;
-    }
-
     .side-panel {
-      position: absolute;
+      position: fixed;
       top: 48px;
       left: 0;
       width: 280px;
@@ -91,51 +75,6 @@
       border-radius: 4px;
     }
 
-    #activeCircle {
-      position: absolute;
-      top: 48px;
-      left: 0;
-      width: 100%;
-      background: #ffd54f;
-      padding: 6px 15px;
-      font-size: 16px;
-      z-index: 998;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-
-    #userSearch {
-      padding: 4px 6px;
-      font-size: 14px;
-      border-radius: 5px;
-      border: none;
-      outline: none;
-      width: 150px;
-    }
-
-    #suggestions {
-      position: absolute;
-      background: white;
-      max-height: 150px;
-      overflow-y: auto;
-      width: 150px;
-      border-radius: 4px;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.2);
-      display: none;
-      z-index: 1000;
-      margin-top: 2px;
-    }
-
-    #suggestions div {
-      padding: 6px;
-      cursor: pointer;
-    }
-
-    #suggestions div:hover {
-      background: #eee;
-    }
-
     #circleOptions {
       display: none;
       position: absolute;
@@ -157,19 +96,9 @@
 </head>
 <body>
   <div class="top-bar">
-    <div class="left">
-      <span>Bravo Connect | <strong id="username"></strong></span>
-      <button onclick="toggleCircles()">Circles</button>
-    </div>
-    <button onclick="goBack()">Back to Dashboard</button>
-  </div>
-
-  <div id="activeCircle">
-    <span id="circleLabel" style="cursor:pointer; text-decoration:underline;" onclick="showCircleOptions()">No Active Circle Selected</span>
-    <div style="position: relative;">
-      <input type="text" id="userSearch" placeholder="Search user..." oninput="filterSuggestions()" onkeydown="if(event.key==='Enter')searchUser()">
-      <div id="suggestions"></div>
-    </div>
+    <span>Bravo Connect | <strong id="username"></strong></span>
+    <button onclick="toggleCircles()">Circles</button>
+    <button onclick="goBack()">Dashboard</button>
   </div>
 
   <div class="side-panel" id="sidePanel">
@@ -178,13 +107,13 @@
     <hr>
     <h3>Join a Circle</h3>
     <input type="text" id="joinCode" placeholder="Enter Circle Code" />
-    <button onclick="tryJoinCircle()">Join Circle</button>
+    <button onclick="tryJoinCircle()">Join</button>
     <hr>
-    <h3>Create New Circle</h3>
+    <h3>Create Circle</h3>
     <button onclick="createCircle()">➕ Create</button>
     <hr>
     <h3>All Circles</h3>
-    <input type="text" id="searchCircle" placeholder="Search by name..." oninput="searchCircles()" />
+    <input type="text" id="searchCircle" placeholder="Search..." oninput="searchCircles()" />
     <div id="allCircles"></div>
   </div>
 
@@ -193,9 +122,9 @@
   </div>
 
   <div id="circleOptions">
-    <h4 style="margin-top:0;">Circle Options</h4>
+    <h4>Circle Options</h4>
     <div id="circleButtons"></div>
-    <button onclick="closeCircleOptions()" style="margin-top:10px; background:#ccc;">Close</button>
+    <button onclick="closeCircleOptions()">Close</button>
   </div>
 
   <!-- Leaflet JS -->
@@ -205,11 +134,10 @@
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
 
-  <!-- JavaScript Logic -->
   <script>
     const username = sessionStorage.getItem('username') || localStorage.getItem('username');
     if (!username) {
-      alert('Session expired. Please log in again.');
+      alert('Session expired');
       location.href = 'index.html';
     }
     document.getElementById('username').textContent = username;
@@ -231,11 +159,9 @@
       attribution: '&copy; OpenStreetMap contributors'
     }).addTo(map);
 
-    let markers = {};
     let currentCircle = null;
     let locationInterval = null;
-    let centered = false;
-    let circleMembers = [];
+    let markers = {};
 
     function goBack() {
       location.href = 'app.html';
@@ -248,78 +174,93 @@
       loadAllCircles();
     }
 
-    function generateCode(length = 6) {
-      const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-      let code = '';
-      for (let i = 0; i < length; i++) {
-        code += chars.charAt(Math.floor(Math.random() * chars.length));
+    // Hide side panel on outside click
+    document.addEventListener('click', function (e) {
+      const panel = document.getElementById('sidePanel');
+      const button = document.querySelector('.top-bar button');
+      if (panel.style.display === 'block' && !panel.contains(e.target) && !button.contains(e.target)) {
+        panel.style.display = 'none';
       }
-      return code;
-    }
+    });
 
     function createCircle() {
       const name = prompt("Enter Circle Name:");
       if (!name) return;
-      const code = generateCode();
+      const code = Math.random().toString(36).substring(2, 8).toUpperCase();
       db.ref('circles/' + code).set({
         name,
         admin: username,
         members: { [username]: true }
       });
       db.ref('users/' + username + '/circles/' + code).set(true);
-      alert("Circle created! Code: " + code);
-      loadUserCircles();
-      loadAllCircles();
+      alert("Created Circle. Code: " + code);
     }
 
     function loadUserCircles() {
       const list = document.getElementById('circleList');
       list.innerHTML = 'Loading...';
       db.ref('users/' + username + '/circles').once('value', snap => {
-        const data = snap.val() || {};
+        const codes = snap.val() || {};
         list.innerHTML = '';
-        Object.keys(data).forEach(code => {
+        Object.keys(codes).forEach(code => {
           db.ref('circles/' + code).once('value', csnap => {
-            const c = csnap.val();
+            const circle = csnap.val();
             const btn = document.createElement('button');
             btn.className = 'circle-btn';
-            btn.textContent = c.name;
-            btn.onclick = () => loadCircleMap(code, c.name);
+            btn.textContent = circle.name;
+            btn.onclick = () => loadCircle(code, circle.name);
             list.appendChild(btn);
           });
         });
       });
     }
 
-    function loadAllCircles() {
-      db.ref('circles').once('value', snap => {
-        const all = snap.val() || {};
-        const container = document.getElementById('allCircles');
-        container.innerHTML = '';
-        Object.entries(all).forEach(([code, circle]) => {
-          if (!circle.members || !circle.members[username]) {
-            const div = document.createElement('div');
-            div.textContent = circle.name;
-            div.style.marginBottom = '6px';
-            container.appendChild(div);
-          }
-        });
+    function tryJoinCircle() {
+      const code = document.getElementById('joinCode').value.trim().toUpperCase();
+      if (!code) return alert("Enter code");
+      db.ref('circles/' + code).once('value', snap => {
+        if (!snap.exists()) return alert("Not found");
+        db.ref('circles/' + code + '/members/' + username).set(true);
+        db.ref('users/' + username + '/circles/' + code).set(true);
+        alert("Joined Circle");
+        loadUserCircles();
+        loadAllCircles();
       });
     }
 
-    function tryJoinCircle() {
-      const code = document.getElementById('joinCode').value.trim().toUpperCase();
-      if (!code) return alert("Enter a code");
-      db.ref('circles/' + code).once('value', snap => {
-        if (!snap.exists()) return alert("Circle not found.");
-        const data = snap.val();
-        const confirmed = confirm(`Circle Found: "${data.name}". Join?`);
-        if (!confirmed) return;
-        db.ref('circles/' + code + '/members/' + username).set(true);
-        db.ref('users/' + username + '/circles/' + code).set(true);
-        alert("Joined circle!");
-        loadUserCircles();
-        loadAllCircles();
+    function loadAllCircles() {
+      const container = document.getElementById('allCircles');
+      container.innerHTML = 'Loading...';
+      db.ref('circles').once('value', snap => {
+        const all = snap.val() || {};
+        container.innerHTML = '';
+        Object.entries(all).forEach(([code, circle]) => {
+          const div = document.createElement('div');
+          div.textContent = circle.name + (circle.members && circle.members[username] ? " (Joined)" : "");
+          div.style.padding = '6px';
+          div.style.marginBottom = '5px';
+          div.style.cursor = 'pointer';
+          div.style.background = '#eee';
+          div.style.borderRadius = '5px';
+          div.onclick = () => {
+            if (circle.members && circle.members[username]) {
+              loadCircle(code, circle.name);
+              document.getElementById('sidePanel').style.display = 'none';
+            } else {
+              const input = prompt(`To join "${circle.name}", enter the code:`);
+              if (input && input.toUpperCase() === code) {
+                db.ref('circles/' + code + '/members/' + username).set(true);
+                db.ref('users/' + username + '/circles/' + code).set(true);
+                alert("Joined circle");
+                loadUserCircles();
+                loadAllCircles();
+              } else {
+                alert("Incorrect code");
+              }
+            }
+          };
+          container.appendChild(div);
+        });
       });
     }
 
@@ -331,28 +272,19 @@
       }
     }
 
-    function loadCircleMap(code, name) {
+    function loadCircle(code, name) {
       currentCircle = code;
-      centered = false;
-      document.getElementById('circleLabel').textContent = "Active Circle: " + name;
-      Object.values(markers).forEach(m => map.removeLayer(m));
-      markers = {};
-      if (locationInterval) clearInterval(locationInterval);
-
-      db.ref('circles/' + code + '/members').once('value', snap => {
-        const members = snap.val() || {};
-        circleMembers = Object.keys(members);
+      clearInterval(locationInterval);
+      map.eachLayer(layer => {
+        if (layer instanceof L.Marker) map.removeLayer(layer);
       });
+      markers = {};
 
       locationInterval = setInterval(() => {
         navigator.geolocation.getCurrentPosition(pos => {
           const lat = pos.coords.latitude;
           const lng = pos.coords.longitude;
           db.ref('locations/' + code + '/' + username).set({ lat, lng });
-          if (!centered) {
-            map.setView([lat, lng], 15);
-            centered = true;
-          }
         });
       }, 5000);
 
@@ -369,90 +301,8 @@
       });
     }
 
-    function filterSuggestions() {
-      const input = document.getElementById('userSearch').value.toLowerCase();
-      const box = document.getElementById('suggestions');
-      box.innerHTML = '';
-      if (!input) return box.style.display = 'none';
-      const matched = circleMembers.filter(name => name.toLowerCase().includes(input));
-      if (matched.length === 0) return box.style.display = 'none';
-      matched.forEach(name => {
-        const div = document.createElement('div');
-        div.textContent = name;
-        div.onclick = () => {
-          document.getElementById('userSearch').value = name;
-          box.style.display = 'none';
-          searchUser();
-        };
-        box.appendChild(div);
-      });
-      box.style.display = 'block';
-    }
-
-    function searchUser() {
-      const query = document.getElementById('userSearch').value.trim();
-      if (!query || !currentCircle) return alert("Enter name & select a circle.");
-      db.ref('locations/' + currentCircle + '/' + query).once('value', snap => {
-        const loc = snap.val();
-        if (!loc || !loc.lat || !loc.lng) {
-          alert("No location data for user.");
-        } else {
-          map.setView([loc.lat, loc.lng], 17);
-          if (!markers[query]) {
-            markers[query] = L.marker([loc.lat, loc.lng]).addTo(map).bindPopup(query).openPopup();
-          } else {
-            markers[query].bindPopup(query).openPopup();
-          }
-        }
-      });
-    }
-
-    function showCircleOptions() {
-      if (!currentCircle) return;
-      const box = document.getElementById("circleOptions");
-      const buttons = document.getElementById("circleButtons");
-      buttons.innerHTML = `
-        <button onclick="leaveCircle()">🚪 Leave Circle</button>
-        <button onclick="viewMembers()">👥 View Members</button>
-      `;
-      db.ref("circles/" + currentCircle + "/admin").once("value", snap => {
-        if (snap.val() === username) {
-          buttons.innerHTML += `
-            <button onclick="deleteCircle()">🗑️ Delete Circle</button>
-          `;
-        }
-        box.style.display = 'block';
-      });
-    }
-
     function closeCircleOptions() {
       document.getElementById("circleOptions").style.display = "none";
-    }
-
-    function leaveCircle() {
-      db.ref("circles/" + currentCircle + "/members/" + username).remove();
-      db.ref("users/" + username + "/circles/" + currentCircle).remove();
-      alert("You left the circle.");
-      closeCircleOptions();
-      document.getElementById('circleLabel').textContent = 'No Active Circle Selected';
-      currentCircle = null;
-    }
-
-    function viewMembers() {
-      db.ref("circles/" + currentCircle + "/members").once("value", snap => {
-        const members = snap.val() || {};
-        alert("Members:\n" + Object.keys(members).join("\n"));
-      });
-    }
-
-    function deleteCircle() {
-      if (!confirm("Delete circle for everyone?")) return;
-      db.ref("circles/" + currentCircle).remove();
-      db.ref("locations/" + currentCircle).remove();
-      alert("Circle deleted.");
-      closeCircleOptions();
-      document.getElementById('circleLabel').textContent = 'No Active Circle Selected';
-      currentCircle = null;
     }
   </script>
 </body>
