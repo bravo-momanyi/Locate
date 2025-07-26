@@ -1,11 +1,12 @@
+<!-- Due to response length limits, I will split the full HTML/JS into parts -->
+<!-- PART 1: Head, styles, and layout -->
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Bravo Connect - Live Map</title>
-
-  <!-- Leaflet CSS -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
   <style>
     body, html {
@@ -14,7 +15,6 @@
       height: 100%;
       font-family: Arial, sans-serif;
     }
-
     .top-bar {
       position: fixed;
       top: 0;
@@ -28,7 +28,6 @@
       align-items: center;
       z-index: 1000;
     }
-
     .header-bar {
       position: fixed;
       top: 48px;
@@ -41,7 +40,6 @@
       justify-content: space-between;
       align-items: center;
     }
-
     .side-panel {
       position: fixed;
       top: 98px;
@@ -54,7 +52,6 @@
       display: none;
       z-index: 998;
     }
-
     .map-container {
       position: absolute;
       top: 98px;
@@ -62,12 +59,10 @@
       right: 0;
       bottom: 0;
     }
-
     #map {
       width: 100%;
       height: 100%;
     }
-
     .circle-btn {
       margin: 5px 0;
       padding: 8px;
@@ -79,18 +74,15 @@
       color: white;
       cursor: pointer;
     }
-
-    input[type="text"] {
+    input[type=\"text\"] {
       padding: 6px;
       border-radius: 5px;
       border: 1px solid #ccc;
       outline: none;
     }
-
     #userSearch {
       width: 150px;
     }
-
     #circleOptions {
       display: none;
       position: absolute;
@@ -103,12 +95,10 @@
       z-index: 9999;
       width: 200px;
     }
-
     #circleOptions button {
       width: 100%;
       margin: 4px 0;
     }
-
     #suggestions {
       position: absolute;
       background: white;
@@ -121,17 +111,16 @@
       z-index: 1000;
       margin-top: 2px;
     }
-
     #suggestions div {
       padding: 6px;
       cursor: pointer;
     }
-
     #suggestions div:hover {
       background: #eee;
     }
   </style>
 </head>
+
 <body>
   <!-- Top Navigation -->
   <div class="top-bar">
@@ -142,7 +131,7 @@
     </div>
   </div>
 
-  <!-- Header with Active Circle and Search -->
+  <!-- Header -->
   <div class="header-bar">
     <span id="circleLabel" style="cursor:pointer;" onclick="showCircleOptions()">No Active Circle Selected</span>
     <div style="position: relative;">
@@ -168,7 +157,7 @@
     <div id="allCircles"></div>
   </div>
 
-  <!-- Map Display -->
+  <!-- Map Container -->
   <div class="map-container">
     <div id="map"></div>
   </div>
@@ -180,250 +169,301 @@
     <button onclick="closeCircleOptions()">Close</button>
   </div>
 
-  <!-- Leaflet + Firebase -->
-  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
+<!-- Next: Script & Firebase logic (continued in next part) -->
+  <!-- Firebase + Leaflet + Script Logic -->
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
 
-  <script>
-    const username = sessionStorage.getItem('username') || localStorage.getItem('username');
-    if (!username) {
-      alert('Session expired');
-      location.href = 'index.html';
+<script>
+  const username = sessionStorage.getItem('username') || localStorage.getItem('username');
+  if (!username) {
+    alert('Session expired');
+    location.href = 'index.html';
+  }
+  document.getElementById('username').textContent = username;
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyBfkUJS81minjxj0DFz4pzNnGzCtb5ZJss",
+    authDomain: "locater-42fb4.firebaseapp.com",
+    databaseURL: "https://locater-42fb4-default-rtdb.firebaseio.com",
+    projectId: "locater-42fb4",
+    storageBucket: "locater-42fb4.appspot.com",
+    messagingSenderId: "250348367998",
+    appId: "1:250348367998:web:d734b2b4c735b5684ae82f"
+  };
+  firebase.initializeApp(firebaseConfig);
+  const db = firebase.database();
+
+  const map = L.map('map').setView([0.0, 37.0], 7);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+
+  let currentCircle = null;
+  let locationInterval = null;
+  let markers = {};
+  let circleMembers = [];
+  let currentCircleName = "";
+  let currentAdmin = "";
+
+  function goBack() {
+    location.href = 'app.html';
+  }
+
+  function toggleCircles() {
+    const panel = document.getElementById('sidePanel');
+    panel.style.display = panel.style.display === 'block' ? 'none' : 'block';
+    loadUserCircles();
+    loadAllCircles();
+  }
+
+  document.addEventListener('click', function (e) {
+    const panel = document.getElementById('sidePanel');
+    if (panel.style.display === 'block' &&
+       !panel.contains(e.target) &&
+       !e.target.closest('.top-bar button')) {
+      panel.style.display = 'none';
     }
-    document.getElementById('username').textContent = username;
+  });
 
-    const firebaseConfig = {
-      apiKey: "AIzaSyBfkUJS81minjxj0DFz4pzNnGzCtb5ZJss",
-      authDomain: "locater-42fb4.firebaseapp.com",
-      databaseURL: "https://locater-42fb4-default-rtdb.firebaseio.com",
-      projectId: "locater-42fb4",
-      storageBucket: "locater-42fb4.appspot.com",
-      messagingSenderId: "250348367998",
-      appId: "1:250348367998:web:d734b2b4c735b5684ae82f"
-    };
-    firebase.initializeApp(firebaseConfig);
-    const db = firebase.database();
+  function createCircle() {
+    const name = prompt("Enter Circle Name:");
+    if (!name) return;
+    const code = Math.random().toString(36).substring(2, 8).toUpperCase();
+    db.ref('circles/' + code).set({
+      name,
+      admin: username,
+      members: { [username]: true }
+    });
+    db.ref('users/' + username + '/circles/' + code).set(true);
+    alert("Circle created!");
+  }
 
-    const map = L.map('map').setView([0.0, 37.0], 7);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+  function loadUserCircles() {
+    const list = document.getElementById('circleList');
+    list.innerHTML = 'Loading...';
+    db.ref('users/' + username + '/circles').once('value', snap => {
+      const codes = snap.val() || {};
+      list.innerHTML = '';
+      Object.keys(codes).forEach(code => {
+        db.ref('circles/' + code).once('value', csnap => {
+          const circle = csnap.val();
+          const btn = document.createElement('button');
+          btn.className = 'circle-btn';
+          btn.textContent = circle.name;
+          btn.onclick = () => loadCircle(code, circle.name);
+          list.appendChild(btn);
+        });
+      });
+    });
+  }
 
-    let currentCircle = null;
-    let locationInterval = null;
-    let markers = {};
-    let circleMembers = [];
+  function loadAllCircles() {
+    const container = document.getElementById('allCircles');
+    container.innerHTML = 'Loading...';
+    db.ref('circles').once('value', snap => {
+      const all = snap.val() || {};
+      container.innerHTML = '';
+      Object.entries(all).forEach(([code, circle]) => {
+        const div = document.createElement('div');
+        div.textContent = circle.name + (circle.members && circle.members[username] ? " (Joined)" : "");
+        div.style.padding = '6px';
+        div.style.marginBottom = '5px';
+        div.style.cursor = 'pointer';
+        div.style.background = '#eee';
+        div.style.borderRadius = '5px';
+        div.onclick = () => {
+          if (circle.members && circle.members[username]) {
+            loadCircle(code, circle.name);
+            document.getElementById('sidePanel').style.display = 'none';
+          } else {
+            const input = prompt(`To join "${circle.name}", enter code:`);
+            if (input && input.toUpperCase() === code) {
+              db.ref('circles/' + code + '/members/' + username).set(true);
+              db.ref('users/' + username + '/circles/' + code).set(true);
+              alert("Joined!");
+              loadUserCircles();
+              loadAllCircles();
+            } else {
+              alert("Wrong code.");
+            }
+          }
+        };
+        container.appendChild(div);
+      });
+    });
+  }
 
-    function goBack() {
-      location.href = 'app.html';
-    }
-
-    function toggleCircles() {
-      const panel = document.getElementById('sidePanel');
-      panel.style.display = panel.style.display === 'block' ? 'none' : 'block';
+  function tryJoinCircle() {
+    const code = document.getElementById('joinCode').value.trim().toUpperCase();
+    if (!code) return alert("Enter a code");
+    db.ref('circles/' + code).once('value', snap => {
+      if (!snap.exists()) return alert("Not found");
+      db.ref('circles/' + code + '/members/' + username).set(true);
+      db.ref('users/' + username + '/circles/' + code).set(true);
+      alert("Joined!");
       loadUserCircles();
       loadAllCircles();
-    }
+    });
+  }
 
-    // Close side panel when clicking outside
-    document.addEventListener('click', function (e) {
-      const panel = document.getElementById('sidePanel');
-      if (panel.style.display === 'block' &&
-         !panel.contains(e.target) &&
-         !e.target.closest('.top-bar button')) {
-        panel.style.display = 'none';
-      }
+  function loadCircle(code, name) {
+    currentCircle = code;
+    currentCircleName = name;
+    document.getElementById('circleLabel').textContent = "Active Circle: " + name;
+    clearInterval(locationInterval);
+    map.eachLayer(layer => {
+      if (layer instanceof L.Marker) map.removeLayer(layer);
+    });
+    markers = {};
+    locationInterval = setInterval(() => {
+      navigator.geolocation.getCurrentPosition(pos => {
+        const lat = pos.coords.latitude;
+        const lng = pos.coords.longitude;
+        db.ref('locations/' + code + '/' + username).set({ lat, lng });
+      });
+    }, 5000);
+
+    db.ref('locations/' + code).on('value', snap => {
+      const locs = snap.val() || {};
+      Object.entries(locs).forEach(([user, loc]) => {
+        if (!loc.lat || !loc.lng) return;
+        if (markers[user]) {
+          markers[user].setLatLng([loc.lat, loc.lng]);
+        } else {
+          markers[user] = L.marker([loc.lat, loc.lng]).addTo(map).bindPopup(user);
+        }
+      });
     });
 
-    function createCircle() {
-      const name = prompt("Enter Circle Name:");
-      if (!name) return;
-      const code = Math.random().toString(36).substring(2, 8).toUpperCase();
-      db.ref('circles/' + code).set({
-        name,
-        admin: username,
-        members: { [username]: true }
-      });
-      db.ref('users/' + username + '/circles/' + code).set(true);
-      alert("Circle created!");
-    }
+    db.ref('circles/' + code + '/members').once('value', snap => {
+      circleMembers = Object.keys(snap.val() || {});
+    });
 
-    function loadUserCircles() {
-      const list = document.getElementById('circleList');
-      list.innerHTML = 'Loading...';
-      db.ref('users/' + username + '/circles').once('value', snap => {
-        const codes = snap.val() || {};
-        list.innerHTML = '';
-        Object.keys(codes).forEach(code => {
-          db.ref('circles/' + code).once('value', csnap => {
-            const circle = csnap.val();
-            const btn = document.createElement('button');
-            btn.className = 'circle-btn';
-            btn.textContent = circle.name;
-            btn.onclick = () => loadCircle(code, circle.name);
-            list.appendChild(btn);
-          });
-        });
-      });
-    }
+    db.ref('circles/' + code + '/admin').once('value', snap => {
+      currentAdmin = snap.val();
+    });
+  }
 
-    function loadAllCircles() {
-      const container = document.getElementById('allCircles');
-      container.innerHTML = 'Loading...';
-      db.ref('circles').once('value', snap => {
-        const all = snap.val() || {};
-        container.innerHTML = '';
-        Object.entries(all).forEach(([code, circle]) => {
-          const div = document.createElement('div');
-          div.textContent = circle.name + (circle.members && circle.members[username] ? " (Joined)" : "");
-          div.style.padding = '6px';
-          div.style.marginBottom = '5px';
-          div.style.cursor = 'pointer';
-          div.style.background = '#eee';
-          div.style.borderRadius = '5px';
-          div.onclick = () => {
-            if (circle.members && circle.members[username]) {
-              loadCircle(code, circle.name);
-              document.getElementById('sidePanel').style.display = 'none';
-            } else {
-              const input = prompt(`To join "${circle.name}", enter code:`);
-              if (input && input.toUpperCase() === code) {
-                db.ref('circles/' + code + '/members/' + username).set(true);
-                db.ref('users/' + username + '/circles/' + code).set(true);
-                alert("Joined!");
-                loadUserCircles();
-                loadAllCircles();
-              } else {
-                alert("Wrong code.");
-              }
-            }
-          };
-          container.appendChild(div);
-        });
-      });
-    }
+  function filterSuggestions() {
+    const input = document.getElementById('userSearch').value.toLowerCase();
+    const box = document.getElementById('suggestions');
+    box.innerHTML = '';
+    if (!input) return box.style.display = 'none';
+    const matched = circleMembers.filter(name => name.toLowerCase().includes(input));
+    matched.forEach(name => {
+      const div = document.createElement('div');
+      div.textContent = name;
+      div.onclick = () => {
+        document.getElementById('userSearch').value = name;
+        box.style.display = 'none';
+        searchUser();
+      };
+      box.appendChild(div);
+    });
+    box.style.display = 'block';
+  }
 
-    function tryJoinCircle() {
-      const code = document.getElementById('joinCode').value.trim().toUpperCase();
-      if (!code) return alert("Enter a code");
-      db.ref('circles/' + code).once('value', snap => {
-        if (!snap.exists()) return alert("Not found");
-        db.ref('circles/' + code + '/members/' + username).set(true);
-        db.ref('users/' + username + '/circles/' + code).set(true);
-        alert("Joined!");
-        loadUserCircles();
-        loadAllCircles();
-      });
-    }
+  function searchUser() {
+    const query = document.getElementById('userSearch').value.trim();
+    if (!query || !currentCircle) return alert("No circle selected or user empty.");
+    db.ref('locations/' + currentCircle + '/' + query).once('value', snap => {
+      const loc = snap.val();
+      if (loc && loc.lat && loc.lng) {
+        map.setView([loc.lat, loc.lng], 17);
+        if (markers[query]) markers[query].bindPopup(query).openPopup();
+      } else {
+        alert("Location not found");
+      }
+    });
+  }
 
-    function loadCircle(code, name) {
-      currentCircle = code;
-      document.getElementById('circleLabel').textContent = "Active Circle: " + name;
-      clearInterval(locationInterval);
-      map.eachLayer(layer => {
-        if (layer instanceof L.Marker) map.removeLayer(layer);
-      });
-      markers = {};
-      locationInterval = setInterval(() => {
-        navigator.geolocation.getCurrentPosition(pos => {
-          const lat = pos.coords.latitude;
-          const lng = pos.coords.longitude;
-          db.ref('locations/' + code + '/' + username).set({ lat, lng });
-        });
-      }, 5000);
+  function showCircleOptions() {
+    if (!currentCircle) return;
+    const box = document.getElementById("circleOptions");
+    const buttons = document.getElementById("circleButtons");
+    buttons.innerHTML = `
+      <button onclick="copyCode()">📋 Copy Code</button>
+      <button onclick="viewMembers()">👥 View Members</button>
+    `;
 
-      db.ref('locations/' + code).on('value', snap => {
-        const locs = snap.val() || {};
-        Object.entries(locs).forEach(([user, loc]) => {
-          if (!loc.lat || !loc.lng) return;
-          if (markers[user]) {
-            markers[user].setLatLng([loc.lat, loc.lng]);
-          } else {
-            markers[user] = L.marker([loc.lat, loc.lng]).addTo(map).bindPopup(user);
-          }
-        });
-      });
-
-      db.ref('circles/' + code + '/members').once('value', snap => {
-        circleMembers = Object.keys(snap.val() || {});
-      });
-    }
-
-    function filterSuggestions() {
-      const input = document.getElementById('userSearch').value.toLowerCase();
-      const box = document.getElementById('suggestions');
-      box.innerHTML = '';
-      if (!input) return box.style.display = 'none';
-      const matched = circleMembers.filter(name => name.toLowerCase().includes(input));
-      matched.forEach(name => {
-        const div = document.createElement('div');
-        div.textContent = name;
-        div.onclick = () => {
-          document.getElementById('userSearch').value = name;
-          box.style.display = 'none';
-          searchUser();
-        };
-        box.appendChild(div);
-      });
-      box.style.display = 'block';
-    }
-
-    function searchUser() {
-      const query = document.getElementById('userSearch').value.trim();
-      if (!query || !currentCircle) return alert("No circle selected or user empty.");
-      db.ref('locations/' + currentCircle + '/' + query).once('value', snap => {
-        const loc = snap.val();
-        if (loc && loc.lat && loc.lng) {
-          map.setView([loc.lat, loc.lng], 17);
-          if (markers[query]) markers[query].bindPopup(query).openPopup();
-        } else {
-          alert("Location not found");
-        }
-      });
-    }
-
-    function showCircleOptions() {
-      if (!currentCircle) return;
-      const box = document.getElementById("circleOptions");
-      const buttons = document.getElementById("circleButtons");
-      buttons.innerHTML = `
-        <button onclick="leaveCircle()">🚪 Leave</button>
-        <button onclick="viewMembers()">👥 View Members</button>
+    if (currentAdmin === username) {
+      buttons.innerHTML += `
+        <button onclick="viewLeaveRequests()">📩 Leave Requests</button>
+        <button onclick="deleteCircle()">🗑️ Delete Circle</button>
       `;
-      db.ref("circles/" + currentCircle + "/admin").once("value", snap => {
-        if (snap.val() === username) {
-          buttons.innerHTML += `<button onclick="deleteCircle()">🗑️ Delete</button>`;
+    } else {
+      buttons.innerHTML += `<button onclick="requestLeave()">🚪 Request Leave</button>`;
+    }
+
+    box.style.display = 'block';
+  }
+
+  function copyCode() {
+    navigator.clipboard.writeText(currentCircle).then(() => {
+      alert("Code copied: " + currentCircle);
+    });
+  }
+
+  function closeCircleOptions() {
+    document.getElementById("circleOptions").style.display = "none";
+  }
+
+  function requestLeave() {
+    db.ref("circles/" + currentCircle + "/leaveRequests/" + username).set(true);
+    alert("Leave request sent to admin.");
+  }
+
+  function viewLeaveRequests() {
+    db.ref("circles/" + currentCircle + "/leaveRequests").once("value", snap => {
+      const reqs = snap.val();
+      if (!reqs) return alert("No leave requests.");
+      const users = Object.keys(reqs);
+      const msg = users.map(user => `• ${user}`).join('\n');
+      if (confirm("Approve all?\n" + msg)) {
+        users.forEach(user => {
+          db.ref("circles/" + currentCircle + "/members/" + user).remove();
+          db.ref("users/" + user + "/circles/" + currentCircle).remove();
+        });
+        db.ref("circles/" + currentCircle + "/leaveRequests").remove();
+        alert("Approved and removed.");
+      }
+    });
+  }
+
+  function viewMembers() {
+    db.ref("circles/" + currentCircle + "/members").once("value", snap => {
+      const members = Object.keys(snap.val() || {});
+      let options = members.map(m =>
+        m === currentAdmin
+          ? `👑 ${m}`
+          : `${m} — [R]emove / [A]dmin / [C]ancel`
+      ).join('\n');
+
+      let action = prompt("Members:\n" + options + "\n\nType username then R/A to act (e.g. john R):");
+      if (action) {
+        const [target, cmd] = action.trim().split(/\s+/);
+        if (!target || !cmd) return alert("Invalid input");
+
+        if (cmd.toUpperCase() === 'R') {
+          db.ref("circles/" + currentCircle + "/members/" + target).remove();
+          db.ref("users/" + target + "/circles/" + currentCircle).remove();
+          alert("Removed.");
+        } else if (cmd.toUpperCase() === 'A') {
+          db.ref("circles/" + currentCircle + "/admin").set(target);
+          alert("Made new admin: " + target);
         }
-        box.style.display = 'block';
-      });
-    }
+      }
+    });
+  }
 
-    function closeCircleOptions() {
-      document.getElementById("circleOptions").style.display = "none";
-    }
-
-    function leaveCircle() {
-      db.ref("circles/" + currentCircle + "/members/" + username).remove();
-      db.ref("users/" + username + "/circles/" + currentCircle).remove();
-      alert("Left the circle.");
-      currentCircle = null;
-      document.getElementById('circleLabel').textContent = "No Active Circle Selected";
-    }
-
-    function viewMembers() {
-      db.ref("circles/" + currentCircle + "/members").once("value", snap => {
-        const members = Object.keys(snap.val() || {});
-        alert("Members:\n" + members.join("\n"));
-      });
-    }
-
-    function deleteCircle() {
-      if (!confirm("Delete circle?")) return;
-      db.ref("circles/" + currentCircle).remove();
-      db.ref("locations/" + currentCircle).remove();
-      alert("Deleted.");
-      currentCircle = null;
-      document.getElementById('circleLabel').textContent = "No Active Circle Selected";
-    }
-  </script>
+  function deleteCircle() {
+    if (!confirm("Delete this circle permanently?")) return;
+    db.ref("circles/" + currentCircle).remove();
+    db.ref("locations/" + currentCircle).remove();
+    alert("Circle deleted.");
+    currentCircle = null;
+    document.getElementById('circleLabel').textContent = "No Active Circle Selected";
+  }
+</script>
 </body>
 </html>
