@@ -265,8 +265,8 @@ if (!user) location.href = "index.html";
 document.getElementById("currentUser").textContent = "Welcome, " + user;
 
 let currentChat = "", convoRef = null, typingRef = null;
-let allUsers = {}, allGroups = {}, recentChats = {}, unreadCount = {}, replyingTo = null;
-
+let allUsers = {}, allGroups = {}, unreadCount = {}, replyingTo = null;
+let recentChats = JSON.parse(localStorage.getItem("recentChats")) || {};
 const msgBox = document.getElementById("msgInput");
 const messagesDiv = document.getElementById("messages");
 const msgMenu = document.getElementById("msgMenu");
@@ -373,14 +373,15 @@ document.addEventListener("click", () => {
 
   const id = chatId(user, toUser);
   convoRef = db.ref("chats/" + id);
-  convoRef.on("child_added", snap => renderMessage(snap.key, snap.val(), false, id));
-
+convoRef.on("child_added", snap => renderMessage(snap.key, snap.val(), false, id));
+convoRef.on("child_changed", snap => updateMessageUI(snap.key, snap.val(), false, id));
   typingRef = db.ref(`typing/${id}/${toUser}`);
   typingRef.on("value", snap => {
     document.getElementById("typingIndicator").style.display = snap.val() ? "block" : "none";
   });
 
   recentChats[toUser] = Date.now();
+  localStorage.setItem("recentChats", JSON.stringify(recentChats));
   unreadCount[toUser] = 0;
   db.ref("seen/" + id + "/" + user).set(firebase.database.ServerValue.TIMESTAMP);
 }
@@ -422,9 +423,10 @@ document.addEventListener("click", () => {
   if (convoRef) convoRef.off();
 
   convoRef = db.ref("groupChats/" + id);
-  convoRef.on("child_added", snap => renderMessage(snap.key, snap.val(), true, id));
-
+convoRef.on("child_added", snap => renderMessage(snap.key, snap.val(), true, id));
+convoRef.on("child_changed", snap => updateMessageUI(snap.key, snap.val(), true, id));
   recentChats["group_" + id] = Date.now();
+  localStorage.setItem("recentChats", JSON.stringify(recentChats));
   unreadCount["group_" + id] = 0;
 }
 function renderMessage(id, msg, isGroup = false, groupId = "") {
@@ -465,6 +467,16 @@ function renderMessage(id, msg, isGroup = false, groupId = "") {
     e.preventDefault();
     showMsgOptions(id, msg, isGroup, groupId, div, e.pageX, e.pageY);
   });
+  function updateMessageUI(id, msg, isGroup = false, groupId = "") {
+  const existing = [...messagesDiv.children].find(div => div.dataset.id === id);
+  if (!existing) return; // Not visible currently
+
+  // Remove old one
+  existing.remove();
+
+  // Re-render the updated one
+  renderMessage(id, msg, isGroup, groupId);
+  }
 
   // Swipe to reply
   ////////////////////////////
@@ -890,6 +902,12 @@ function endCall() {
     overlay.style.display = "none";
     activeCallRef?.remove();
     activeCallRef = null;
+    if (localStream) {
+      localStream.getTracks().forEach(t => t.stop());
+      localStream = null;
+    }
+    document.getElementById("localVideo").srcObject = null;
+    document.getElementById("remoteVideo").srcObject = null;
   }, 400);
 }
 </script>
