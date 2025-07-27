@@ -359,8 +359,9 @@
           const btn = document.createElement("button");
           btn.innerHTML = `${u} <small style='color:gray'>${allUsers[u].lastSeen || 'Offline'}</small>`;
           btn.onclick = () => {
-            if (reopenChatIfSame(u)) openChat(u);
-          };
+  closeChat();
+  setTimeout(() => openChat(u), 310);
+};
           users.appendChild(btn);
         });
 
@@ -374,8 +375,9 @@
           btn.className = "group";
           btn.innerHTML = `${g.public ? "# " : "🔒 "}${g.name}`;
           btn.onclick = () => {
-            if (reopenChatIfSame("group_" + id)) attemptJoinGroup(id, g.name);
-          };
+  closeChat();
+  setTimeout(() => openChat(u), 310);
+};
           groups.appendChild(btn);
         });
     }
