@@ -343,10 +343,13 @@
         const status = isGroup ? "" : `<small style='color:gray'>${allUsers[id]?.lastSeen || 'Offline'}</small>`;
         btn.innerHTML = `${label} ${status} ${unreadCount[id] ? '<span class="unread-badge">' + unreadCount[id] + '</span>' : ''}`;
         btn.onclick = () => {
-          if (reopenChatIfSame(id)) {
-            isGroup ? openGroup(id.slice(6), label) : openChat(id);
-          }
-        };
+    if (currentChat !== id) {
+      closeChat();
+      setTimeout(() => {
+        isGroup ? openGroup(id.slice(6), label) : openChat(id);
+      }, 310);
+    }
+  };
         recent.appendChild(btn);
       });
 
