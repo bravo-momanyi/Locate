@@ -487,16 +487,6 @@ Object.keys(allGroups)
       db.ref("recentChats/" + user).set(recentChats);
       unreadCount["group_" + id] = 0;
     }
-    messagesDiv.addEventListener("scroll", () => {
-  const labels = [...messagesDiv.querySelectorAll(".date-label")];
-  let floatingText = "";
-  for (let i = labels.length - 1; i >= 0; i--) {
-    const label = labels[i];
-    if (label.offsetTop - messagesDiv.scrollTop < 50) {
-      floatingText = label.textContent;
-      break;
-    }
-  }
   document.getElementById("floatingDate").textContent = floatingText;
 });
   
@@ -773,6 +763,23 @@ document.addEventListener("click", (e) => {
   if (menu && !menu.contains(e.target) && e.target.id !== "chatWith") {
     menu.style.display = "none";
   }
+});
+messagesDiv.addEventListener("scroll", () => {
+  const labels = [...messagesDiv.querySelectorAll(".date-label")];
+  let current = "";
+
+  for (let i = labels.length - 1; i >= 0; i--) {
+    const label = labels[i];
+    const rect = label.getBoundingClientRect();
+    const parentRect = messagesDiv.getBoundingClientRect();
+
+    if (rect.top <= parentRect.top + 5) {
+      current = label.textContent;
+      break;
+    }
+  }
+
+  document.getElementById("floatingDate").textContent = current;
 });
 </script>
 </body>
