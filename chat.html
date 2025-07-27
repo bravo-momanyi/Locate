@@ -318,6 +318,7 @@ db.ref("recentChats/" + user).once("value", snap => {
     function goToDashboard() {
       location.href = "app.html";
     }
+    let lastRenderedDate = "";
 
     // ➕ Create a new group
     function createGroup() {
@@ -461,6 +462,7 @@ Object.keys(allGroups)
       unreadCount[toUser] = 0;
 
       db.ref("seen/" + id + "/" + user).set(firebase.database.ServerValue.TIMESTAMP);
+      lastRenderedDate = "";
     }
 
     // 📂 Open group chat
@@ -495,7 +497,9 @@ Object.keys(allGroups)
     }
   }
   document.getElementById("floatingDate").textContent = floatingText;
+  lastRenderedDate = "";
 });
+  
 
     // ❌ Close chat
     function closeChat() {
@@ -518,18 +522,15 @@ Object.keys(allGroups)
     // 🧾 Render individual message
     function renderMessage(id, msg, isGroup = false, groupId = "") {
       if (!msg || msg.deletedFor?.[user]) return;
-      const msgDate = new Date(msg.ts);
-const msgDateStr = msgDate.toDateString();  // Standardized format
-const lastMsg = messagesDiv.lastElementChild;
-const lastDateHeader = lastMsg?.classList?.contains("date-header") ? lastMsg : null;
+      const msgDateStr = msgDate.toDateString();
 
-if (!lastDateHeader || lastDateHeader.dataset.date !== msgDate) {
-  const header = document.createElement("div");
-  header.className = "date-header";
-  header.dataset.date = msgDate;
-  header.textContent = formatChatDate(msg.ts);
-  messagesDiv.appendChild(header);
-    }
+if (msgDateStr !== lastRenderedDate) {
+  const label = document.createElement("div");
+  label.className = "date-label";
+  label.textContent = formatDateLabel(msgDate); // Shows 'Today', 'Yesterday', etc.
+  messagesDiv.appendChild(label);
+  lastRenderedDate = msgDateStr;
+}
       const div = document.createElement("div");
       div.className = "msg " + (msg.from === user ? "you" : "them");
 
