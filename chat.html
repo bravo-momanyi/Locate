@@ -4,50 +4,128 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Bravo Chat</title>
-  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
   <style>
-    body, html { margin: 0; padding: 0; height: 100%; font-family: Arial, sans-serif; background: #fff; }
-    header { display: flex; justify-content: space-between; align-items: center; background: #075E54; color: white; padding: 10px; }
-    header button { background: #25D366; border: none; padding: 6px 12px; color: white; border-radius: 5px; cursor: pointer; }
-    #userList { width: 30%; overflow-y: auto; padding: 10px; border-right: 1px solid #ccc; }
-    #userList input, #msgInput { width: 100%; padding: 8px; border-radius: 4px; border: 1px solid #ccc; margin-bottom: 10px; }
-    #chatWindow { flex: 1; display: none; flex-direction: column; height: 100%; }
-    #chatWindow.active { display: flex; }
-    #messages { flex: 1; padding: 10px; overflow-y: auto; background: #f0f0f0; display: flex; flex-direction: column; }
-    .msg { padding: 10px; margin: 6px; border-radius: 10px; max-width: 70%; word-wrap: break-word; }
-    .you { background: #dcf8c6; align-self: flex-end; }
+    body, html {
+      margin: 0; padding: 0; height: 100%;
+      font-family: Arial, sans-serif;
+      background: #fff;
+      overflow: hidden;
+    }
+    header {
+      display: flex; justify-content: space-between; align-items: center;
+      background: #075E54; color: white; padding: 10px;
+    }
+    header button {
+      background: #25D366; border: none; padding: 6px 12px;
+      color: white; border-radius: 5px; cursor: pointer;
+    }
+    #userList {
+      width: 30%; overflow-y: auto; padding: 10px; border-right: 1px solid #ccc;
+    }
+    #userList input {
+      width: 100%; padding: 8px; margin-bottom: 10px;
+      border-radius: 4px; border: 1px solid #ccc;
+    }
+    #userList button {
+      width: 100%; margin-bottom: 6px; padding: 8px;
+      border: none; border-radius: 4px; cursor: pointer;
+      background: #e0f7fa;
+    }
+    #userList button.group {
+      background: #dcedc8; font-weight: bold;
+    }
+    .unread-badge {
+      background: red; color: white; font-size: 10px;
+      padding: 2px 6px; border-radius: 10px;
+      float: right; margin-top: -15px;
+    }
+    #chatWindow {
+      display: none; flex-direction: column; flex: 1; height: 100%;
+      transition: opacity 0.3s ease-in-out, transform 0.3s ease;
+      opacity: 0; transform: translateX(100%);
+    }
+    #chatWindow.active {
+      opacity: 1; transform: translateX(0);
+    }
+    #messages {
+      flex: 1; padding: 10px; overflow-y: auto;
+      background: #f5f5f5; display: flex; flex-direction: column;
+    }
+    .msg {
+      padding: 8px; margin: 6px; border-radius: 7px;
+      max-width: 70%; position: relative; word-wrap: break-word;
+      animation: slideIn 0.3s ease forwards;
+    }
+    .you { background: #dcf8c6; align-self: flex-end; text-align: right; }
     .them { background: white; align-self: flex-start; }
-    .msg-time { font-size: 10px; color: #999; margin-top: 4px; text-align: right; }
-    .unread-badge { background: red; color: white; padding: 2px 5px; font-size: 10px; border-radius: 12px; float: right; }
-    #sendBar { display: flex; padding: 10px; border-top: 1px solid #ccc; }
-    #sendBar input { flex: 1; }
-    #sendBar button { margin-left: 5px; padding: 10px; background: #25D366; color: white; border: none; border-radius: 5px; }
-    .group { background: #dcedc8; font-weight: bold; }
-    .status { font-size: 12px; color: gray; }
+    .msg-time {
+      font-size: 10px; color: #999; margin-top: 4px;
+    }
+    #sendBar {
+      display: flex; padding: 10px; background: white;
+    }
+    #sendBar input {
+      flex: 1; padding: 8px; border-radius: 20px;
+      border: 1px solid #ccc;
+    }
+    #sendBar button {
+      margin-left: 5px; padding: 8px 14px; background: #25D366;
+      border: none; color: white; border-radius: 20px; cursor: pointer;
+    }
+    .date-label {
+      text-align: center; color: gray; font-size: 12px;
+      margin: 10px 0 5px;
+    }
+    #floatingDate {
+      position: sticky; top: 0; background: #f0f0f0;
+      text-align: center; font-size: 13px; color: gray;
+      z-index: 10; padding: 4px 0;
+    }
+    @keyframes slideIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    @media (max-width: 600px) {
+      #userList {
+        width: 100%; height: 40%;
+        overflow-y: auto;
+      }
+      #chatWindow {
+        position: absolute; top: 0; left: 0; width: 100%;
+        background: white; z-index: 100;
+      }
+    }
   </style>
 </head>
 <body>
   <header>
     <div id="currentUser">Welcome</div>
-    <button onclick="location.href='app.html'">Dashboard</button>
+    <button onclick="goToDashboard()">Dashboard</button>
   </header>
+
   <div style="display: flex; height: calc(100% - 50px);">
     <div id="userList">
-      <input id="searchBox" placeholder="Search users/groups..." oninput="refreshList()" />
+      <input id="searchBox" placeholder="Search users/groups..." />
       <button onclick="createGroup()">Create Group</button>
-      <div id="recentChats"><h4>Recent</h4></div>
+      <div id="recentChats"><h4>Recent Chats</h4></div>
       <div id="userSection"><h4>All Users</h4></div>
       <div id="groupSection"><h4>All Groups</h4></div>
     </div>
+
     <div id="chatWindow">
-      <div style="padding: 10px; background: #128C7E; color: white;">
+      <div style="padding: 10px; background: #128C7E; color: white; display: flex; justify-content: space-between;">
         <span id="chatWith">---</span>
-        <div class="status" id="chatStatus"></div>
+        <div>
+          <button onclick="startCall('voice')">📞</button>
+          <button onclick="startCall('video')">🎥</button>
+          <button onclick="closeChat()">✖</button>
+        </div>
       </div>
-      <div id="typing" class="status" style="padding-left: 12px; display:none;">Typing...</div>
+      <div id="floatingDate"></div>
       <div id="messages"></div>
       <div id="sendBar">
-        <input id="msgInput" placeholder="Type a message..." oninput="setTyping()" />
+        <input id="msgInput" placeholder="Type message..." />
         <button onclick="sendMsg()">Send</button>
       </div>
     </div>
@@ -69,142 +147,127 @@
     const db = firebase.database();
 
     let user = sessionStorage.getItem("username");
-    if (!user) location.href = "index.html";
+    if (!user) {
+      alert("No session found. Redirecting...");
+      location.href = "index.html";
+    }
     document.getElementById("currentUser").textContent = "Welcome, " + user;
 
-    let currentChat = "", chatRef = null, typingRef = null;
-    let allUsers = {}, allGroups = {}, recentChats = {}, unread = {};
+    // Helper functions
+    function goToDashboard() { location.href = "app.html"; }
 
-    db.ref("users").on("value", snap => {
-      allUsers = snap.val() || {};
-      refreshList();
-    });
-
-    db.ref("groups").on("value", snap => {
-      allGroups = snap.val() || {};
-      refreshList();
-    });
-
-    db.ref("recentChats/" + user).on("value", snap => {
-      recentChats = snap.val() || {};
-      refreshList();
-    });
-
-    function chatId(a, b) {
-      return [a, b].sort().join("_");
-    }
-
-    function refreshList() {
-      const search = document.getElementById("searchBox").value.toLowerCase();
-      const rc = document.getElementById("recentChats");
-      const us = document.getElementById("userSection");
-      const gs = document.getElementById("groupSection");
-      rc.innerHTML = "<h4>Recent</h4>";
-      us.innerHTML = "<h4>All Users</h4>";
-      gs.innerHTML = "<h4>All Groups</h4>";
-
-      Object.keys(recentChats).forEach(id => {
-        const btn = document.createElement("button");
-        const isGroup = id.startsWith("group_");
-        const label = isGroup ? allGroups[id.slice(6)]?.name : id;
-        btn.innerHTML = `${label} ${unread[id] ? "<span class='unread-badge'>" + unread[id] + "</span>" : ""}`;
-        btn.onclick = () => openChat(id, isGroup);
-        rc.appendChild(btn);
-      });
-
-      Object.keys(allUsers).filter(u => u !== user && u.toLowerCase().includes(search)).forEach(u => {
-        const btn = document.createElement("button");
-        btn.innerHTML = `${u} <div class="status">${formatLastSeen(allUsers[u]?.lastSeen)}</div>`;
-        btn.onclick = () => openChat(u, false);
-        us.appendChild(btn);
-      });
-
-      Object.keys(allGroups).filter(g => allGroups[g].name.toLowerCase().includes(search)).forEach(g => {
-        const group = allGroups[g];
-        const btn = document.createElement("button");
-        btn.className = "group";
-        btn.textContent = `${group.name}`;
-        btn.onclick = () => {
-          db.ref("groups/" + g + "/members/" + user).set(true);
-          openChat("group_" + g, true);
-        };
-        gs.appendChild(btn);
-      });
+    function formatTime(ts) {
+      const date = new Date(ts);
+      return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     }
 
     function formatLastSeen(ts) {
-      if (!ts) return "Offline";
-      const d = new Date(ts);
-      return d.toLocaleDateString() + " " + d.toLocaleTimeString();
+      if (!ts || isNaN(ts)) return 'Offline';
+      const date = new Date(ts);
+      if (isNaN(date.getTime())) return 'Unknown';
+      const now = new Date();
+      const isToday = date.toDateString() === now.toDateString();
+      const time = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      const fullDate = date.toLocaleDateString();
+      return isToday ? `Today at ${time}` : `${fullDate} at ${time}`;
     }
 
-    function openChat(id, isGroup) {
-      currentChat = id;
-      document.getElementById("chatWindow").classList.add("active");
-      document.getElementById("messages").innerHTML = "";
-      document.getElementById("chatWith").textContent = isGroup ? allGroups[id.slice(6)].name : id;
-      document.getElementById("chatStatus").textContent = isGroup ? "Group" : formatLastSeen(allUsers[id]?.lastSeen);
-
-      if (chatRef) chatRef.off();
-      if (typingRef) typingRef.off();
-
-      chatRef = isGroup ? db.ref("groupChats/" + id.slice(6)) : db.ref("chats/" + chatId(user, id));
-      chatRef.on("child_added", snap => renderMsg(snap.key, snap.val(), isGroup));
-      chatRef.on("child_changed", snap => renderMsg(snap.key, snap.val(), isGroup));
-
-      if (!isGroup) {
-        typingRef = db.ref("typing/" + chatId(user, id) + "/" + id);
-        typingRef.on("value", s => {
-          document.getElementById("typing").style.display = s.val() ? "block" : "none";
-        });
-      }
-
-      db.ref("recentChats/" + user + "/" + id).set(Date.now());
-      db.ref("seen/" + (isGroup ? id.slice(6) : chatId(user, id)) + "/" + user).set(firebase.database.ServerValue.TIMESTAMP);
-    }
-
-    function renderMsg(id, msg, isGroup) {
-      if (!msg || msg.deletedFor?.[user]) return;
-      const div = document.createElement("div");
-      div.className = "msg " + (msg.from === user ? "you" : "them");
-      div.innerHTML = msg.text + `<div class="msg-time">${new Date(msg.ts).toLocaleTimeString()}</div>`;
-      document.getElementById("messages").appendChild(div);
-      document.getElementById("messages").scrollTop = 999999;
-    }
-
-    function sendMsg() {
-      const input = document.getElementById("msgInput");
-      const text = input.value.trim();
-      if (!text || !currentChat) return;
-      const msg = { from: user, text, ts: Date.now() };
-
-      if (currentChat.startsWith("group_")) {
-        db.ref("groupChats/" + currentChat.slice(6)).push(msg);
-      } else {
-        db.ref("chats/" + chatId(user, currentChat)).push(msg);
-      }
-
-      input.value = "";
-    }
-
-    function setTyping() {
-      if (!currentChat || currentChat.startsWith("group_")) return;
-      const ref = db.ref("typing/" + chatId(user, currentChat) + "/" + user);
-      ref.set(true);
-      setTimeout(() => ref.set(false), 1500);
+    function formatDateLabel(date) {
+      const now = new Date();
+      const diffDays = Math.floor((now - date) / (1000 * 60 * 60 * 24));
+      if (diffDays === 0) return "Today";
+      if (diffDays === 1) return "Yesterday";
+      return date.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
     }
 
     function createGroup() {
-      const name = prompt("Group name:");
+      const name = prompt("Enter group name:");
       if (!name) return;
-      const type = prompt("Type (public/private):");
+      const type = prompt("Enter group type: public or private").toLowerCase();
       let password = "";
       if (type === "private") {
-        password = prompt("Password:");
-        if (!password) return;
+        password = prompt("Enter group password:");
+        if (!password) return alert("Password required for private group.");
       }
       const id = db.ref("groups").push().key;
-      db.ref("groups/" + id).set({ name, type, password, createdBy: user, members: { [user]: true } });
+      db.ref("groups/" + id).set({
+        name, type, password, createdBy: user,
+        members: { [user]: true }
+      });
+    }
+
+    function sendMsg() {
+      const text = document.getElementById("msgInput").value.trim();
+      if (!text || !currentChat) return;
+      const msg = { from: user, text, ts: Date.now() };
+      db.ref("chats/" + currentChat).push(msg);
+      document.getElementById("msgInput").value = "";
+    }
+
+    let currentChat = "";
+    function openChat(chatId, partnerName) {
+      currentChat = chatId;
+      document.getElementById("chatWith").innerHTML = partnerName;
+      document.getElementById("chatWindow").style.display = "flex";
+      document.getElementById("chatWindow").classList.add("active");
+      const messagesDiv = document.getElementById("messages");
+      messagesDiv.innerHTML = "";
+      db.ref("chats/" + chatId).on("child_added", snap => {
+        const msg = snap.val();
+        const div = document.createElement("div");
+        const msgDate = new Date(msg.ts);
+        const label = formatDateLabel(msgDate);
+
+        if (!messagesDiv.querySelector(`[data-label="${label}"]`)) {
+          const dateTag = document.createElement("div");
+          dateTag.className = "date-label";
+          dateTag.dataset.label = label;
+          dateTag.textContent = label;
+          messagesDiv.appendChild(dateTag);
+        }
+
+        div.className = "msg " + (msg.from === user ? "you" : "them");
+        div.innerHTML = `
+          ${msg.text}
+          <div class="msg-time">${formatTime(msg.ts)}</div>
+        `;
+        div.oncontextmenu = e => {
+          e.preventDefault();
+          if (confirm("Delete this message?")) {
+            db.ref("chats/" + chatId + "/" + snap.key).remove();
+            div.remove();
+          }
+        };
+
+        div.addEventListener("touchstart", e => {
+          div.startX = e.touches[0].clientX;
+        });
+
+        div.addEventListener("touchend", e => {
+          const endX = e.changedTouches[0].clientX;
+          if (endX - div.startX > 60) {
+            const text = prompt("Reply to this message:");
+            if (text) sendMsg(); // Implement reply logic if needed
+          }
+        });
+
+        messagesDiv.appendChild(div);
+        messagesDiv.scrollTop = messagesDiv.scrollHeight;
+      });
+    }
+
+    function closeChat() {
+      document.getElementById("chatWindow").classList.remove("active");
+      setTimeout(() => {
+        document.getElementById("chatWindow").style.display = "none";
+        document.getElementById("messages").innerHTML = "";
+        currentChat = "";
+      }, 300);
+    }
+
+    function startCall(type) {
+      alert(`Starting ${type} call...`);
+      // You’d integrate WebRTC or other real-time media tech here
     }
   </script>
 </body>
