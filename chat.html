@@ -216,7 +216,9 @@
         </div>
       </div>
       <div id="typingIndicator">Typing...</div>
-      <div id="messages"></div>
+      <div>
+    
+      </div>id="messages"></div>
       <div id="sendBar">
         <input id="msgInput" placeholder="Type message..." />
         <button onclick="sendMsg()">Send</button>
@@ -466,6 +468,18 @@ Object.keys(allGroups)
       db.ref("recentChats/" + user).set(recentChats);
       unreadCount["group_" + id] = 0;
     }
+    messagesDiv.addEventListener("scroll", () => {
+  const labels = [...messagesDiv.querySelectorAll(".date-label")];
+  let floatingText = "";
+  for (let i = labels.length - 1; i >= 0; i--) {
+    const label = labels[i];
+    if (label.offsetTop - messagesDiv.scrollTop < 50) {
+      floatingText = label.textContent;
+      break;
+    }
+  }
+  document.getElementById("floatingDate").textContent = floatingText;
+});
 
     // ❌ Close chat
     function closeChat() {
@@ -488,7 +502,8 @@ Object.keys(allGroups)
     // 🧾 Render individual message
     function renderMessage(id, msg, isGroup = false, groupId = "") {
       if (!msg || msg.deletedFor?.[user]) return;
-      const msgDate = new Date(msg.ts).toDateString();
+      const msgDate = new Date(msg.ts);
+const msgDateStr = msgDate.toDateString();  // Standardized format
 const lastMsg = messagesDiv.lastElementChild;
 const lastDateHeader = lastMsg?.classList?.contains("date-header") ? lastMsg : null;
 
@@ -659,6 +674,13 @@ if (!lastDateHeader || lastDateHeader.dataset.date !== msgDate) {
         });
       }
     }
+    function formatDateLabel(date) {
+  const now = new Date();
+  const diffDays = Math.floor((now - date) / (1000 * 60 * 60 * 24));
+  if (diffDays === 0) return "Today";
+  if (diffDays === 1) return "Yesterday";
+  return date.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
+    }
 
     // 🔄 Re-render updated message
     function updateMessageUI(id, msg, isGroup = false, groupId = "") {
@@ -667,9 +689,17 @@ if (!lastDateHeader || lastDateHeader.dataset.date !== msgDate) {
       existing.remove();
       renderMessage(id, msg, isGroup, groupId);
           }
+    if (msgDateStr !== lastRenderedDate) {
+  const label = document.createElement("div");
+  label.className = "date-label";
+  label.textContent = formatDateLabel(msgDate); // Format as 'Today', 'Yesterday', etc.
+  messagesDiv.appendChild(label);
+  lastRenderedDate = msgDateStr;
+    }
     /////////////////////////////
     // 🔔 UNREAD COUNTERS & TRACKING
     /////////////////////////////
+    
 
     function trackUnreadMessages() {
       const allChatIds = Object.keys(allUsers).map(u => chatId(u, user));
