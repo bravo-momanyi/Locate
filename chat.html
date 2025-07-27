@@ -460,14 +460,14 @@ document.getElementById("chatWith").innerHTML =
       typingRef = db.ref(`typing/${id}/${toUser}`);
       typingRef.on("value", snap => {
         document.getElementById("typingIndicator").style.display = snap.val() ? "block" : "none";
-      });
 
       recentChats[currentChat] = Date.now();
       db.ref("recentChats/" + user).set(recentChats);
       unreadCount[toUser] = 0;
 
       db.ref("seen/" + id + "/" + user).set(firebase.database.ServerValue.TIMESTAMP);
-    }
+      }
+    });
 
     // 📂 Open group chat
     function openGroup(id, name) {
@@ -491,7 +491,6 @@ document.getElementById("chatWith").innerHTML =
       db.ref("recentChats/" + user).set(recentChats);
       unreadCount["group_" + id] = 0;
     }
-  document.getElementById("floatingDate").textContent = floatingText;
 });
   
 
