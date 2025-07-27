@@ -324,30 +324,110 @@ function sendToDb(msg) {
     db.ref("chats/" + id).push(msg);
   }
 }
+</script>
+<script>
+let lastRenderedDate = "";
 
-// 🧾 Render message in chat
-function renderMessage(msg) {
-  if (!msg) return;
+function renderMessage(msg, id = "", groupId = "") {
+  if (!msg || msg.deletedFor?.[user]) return;
+
+  const msgDate = new Date(msg.ts);
+  const msgDateStr = msgDate.toDateString();
+
+  if (msgDateStr !== lastRenderedDate) {
+    const label = document.createElement("div");
+    label.className = "date-label";
+    label.textContent = formatDateLabel(msgDate);
+    messagesDiv.appendChild(label);
+    lastRenderedDate = msgDateStr;
+  }
+
   const div = document.createElement("div");
   div.className = "msg " + (msg.from === user ? "you" : "them");
 
-  let content = msg.text || "";
+  let inner = "";
 
-  if (msg.media) {
-    if (msg.media.type.startsWith("image/")) {
-      content += `<div><img src="${msg.media.data}" style="max-width:200px; border-radius:10px;"/></div>`;
-    } else {
-      content += `<div><a href="${msg.media.data}" download="${msg.media.name}">📎 ${msg.media.name}</a></div>`;
+  if (msg.deleted) {
+    inner = "<i>This message was deleted</i>";
+  } else {
+    if (msg.replyTo) {
+      inner += `<div style="font-size:12px;color:gray;border-left:3px solid #ccc;padding-left:5px">
+        <b>${msg.replyTo.from}</b>: ${msg.replyTo.text}</div>`;
+    }
+
+    if (groupId && msg.from !== user) inner += `<b>${msg.from}:</b> `;
+    inner += msg.text || "";
+
+    if (msg.media) {
+      if (msg.media.type.startsWith("image/")) {
+        inner += `<div><img src="${msg.media.data}" style="max-width:200px; border-radius:10px;"/></div>`;
+      } else {
+        inner += `<div><a href="${msg.media.data}" download="${msg.media.name}">📎 ${msg.media.name}</a></div>`;
+      }
     }
   }
 
-  const time = new Date(msg.ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  content += `<div class="msg-time">${time}</div>`;
-  div.innerHTML = content;
+  const ts = new Date(msg.ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const status = msg.from === user
+    ? (msg.readBy?.[currentChat] ? "✓✓✓" : msg.deliveredTo?.[currentChat] ? "✓✓" : "✓")
+    : "";
+
+  inner += `<div class="msg-time">${ts}<span class="msg-status">${status}</span></div>`;
+  div.innerHTML = inner;
+
+  div.dataset.id = id;
+  div.dataset.ts = msg.ts;
+  div.dataset.from = msg.from;
+  div.dataset.text = msg.text;
+
+  // 📋 Right-click for edit/delete
+  div.addEventListener("contextmenu", e => {
+    e.preventDefault();
+    showMsgOptions(id, msg, groupId);
+  });
+
+  // 📱 Swipe to reply (mobile)
+  let swipeTarget = null;
+  div.addEventListener("touchstart", e => {
+    swipeTarget = div;
+    swipeTarget.startX = e.touches[0].clientX;
+  });
+
+  div.addEventListener("touchend", e => {
+    const endX = e.changedTouches[0].clientX;
+    if (endX - swipeTarget.startX > 80) {
+      swipeTarget.style.borderLeft = "4px solid #25D366";
+      replyingTo = {
+        from: swipeTarget.dataset.from,
+        text: swipeTarget.dataset.text,
+        ts: swipeTarget.dataset.ts
+      };
+    }
+    swipeTarget = null;
+  });
+
   messagesDiv.appendChild(div);
   messagesDiv.scrollTop = messagesDiv.scrollHeight;
-}
 
+  // ✅ Mark as read
+  if (msg.from !== user && !msg.readBy?.[user]) {
+    const ref = groupId
+      ? db.ref("groupChats/" + groupId + "/" + id + "/readBy/" + user)
+      : db.ref("chats/" + [user, currentChat].sort().join("_") + "/" + id + "/readBy/" + user);
+    ref.set(true);
+  }
+}
+</script>
+<script>
+function formatDateLabel(date) {
+  const today = new Date();
+  const yesterday = new Date(Date.now() - 86400000);
+  if (date.toDateString() === today.toDateString()) return "Today";
+  if (date.toDateString() === yesterday.toDateString()) return "Yesterday";
+  return date.toLocaleDateString();
+}
+</script>
+<script>
 // 🔔 Ask for push notification permission
 if ("Notification" in window && Notification.permission !== "granted") {
   Notification.requestPermission().then(permission => {
@@ -355,6 +435,44 @@ if ("Notification" in window && Notification.permission !== "granted") {
       console.log("Push notifications enabled");
     }
   });
+}
+</script>
+<script>
+function showMsgOptions(id, msg, groupId = "") {
+  const menu = document.getElementById("msgMenu");
+  menu.innerHTML = "";
+
+  if (msg.from === user && !msg.deleted) {
+    const editBtn = document.createElement("button");
+    editBtn.textContent = "Edit Message";
+    editBtn.onclick = () => {
+      const newText = prompt("Edit your message:", msg.text);
+      if (newText !== null) {
+        const ref = groupId
+          ? db.ref("groupChats/" + groupId + "/" + id)
+          : db.ref("chats/" + [user, currentChat].sort().join("_") + "/" + id);
+        ref.update({ text: newText });
+        menu.style.display = "none";
+      }
+    };
+    menu.appendChild(editBtn);
+  }
+
+  const deleteBtn = document.createElement("button");
+  deleteBtn.textContent = "Delete";
+  deleteBtn.onclick = () => {
+    const ref = groupId
+      ? db.ref("groupChats/" + groupId + "/" + id + "/deletedFor/" + user)
+      : db.ref("chats/" + [user, currentChat].sort().join("_") + "/" + id + "/deletedFor/" + user);
+    ref.set(true);
+    menu.style.display = "none";
+  };
+  menu.appendChild(deleteBtn);
+
+  // Show context menu near pointer
+  menu.style.left = event.pageX + "px";
+  menu.style.top = event.pageY + "px";
+  menu.style.display = "block";
 }
 </script>
 <script>
