@@ -2,9 +2,10 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Bravo Chat</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+
   <style>
     body, html {
       margin: 0;
@@ -70,6 +71,13 @@
       flex-direction: column;
       flex: 1;
       height: 100%;
+      transition: opacity 0.3s ease-in-out, transform 0.3s ease;
+      opacity: 0;
+      transform: translateX(100%);
+    }
+    #chatWindow.active {
+      opacity: 1;
+      transform: translateX(0);
     }
     #messages {
       flex: 1;
@@ -86,17 +94,16 @@
       max-width: 70%;
       position: relative;
       word-wrap: break-word;
+      animation: slideIn 0.3s ease forwards;
     }
     .you {
       background: #dcf8c6;
       align-self: flex-end;
-      margin-left: auto;
       text-align: right;
     }
     .them {
       background: white;
       align-self: flex-start;
-      margin-right: auto;
     }
     .msg-time {
       font-size: 10px;
@@ -131,36 +138,33 @@
       display: none;
     }
     #msgMenu {
-  display: none;
-  position: absolute;
-  background: white;
-  border: 2px solid #888;
-  border-radius: 10px;
-  z-index: 9999;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.25);
-  min-width: 240px;
-  font-size: 17px;
-  padding: 10px;
-}
-
-#msgMenu button {
-  width: 100%;
-  border: none;
-  padding: 16px 20px;
-  background: white;
-  text-align: left;
-  font-size: 16px;
-  cursor: pointer;
-  border-bottom: 1px solid #eee;
-}
-
-#msgMenu button:last-child {
-  border-bottom: none;
-}
-
-#msgMenu button:hover {
-  background: #f2f2f2;
-}
+      display: none;
+      position: absolute;
+      background: white;
+      border: 2px solid #888;
+      border-radius: 10px;
+      z-index: 9999;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+      min-width: 240px;
+      font-size: 17px;
+      padding: 10px;
+    }
+    #msgMenu button {
+      width: 100%;
+      border: none;
+      padding: 16px 20px;
+      background: white;
+      text-align: left;
+      font-size: 16px;
+      cursor: pointer;
+      border-bottom: 1px solid #eee;
+    }
+    #msgMenu button:last-child {
+      border-bottom: none;
+    }
+    #msgMenu button:hover {
+      background: #f2f2f2;
+    }
     @media (max-width: 600px) {
       #userList {
         width: 100%;
@@ -170,45 +174,21 @@
         top: 0;
         left: 0;
         width: 100%;
-        display: none;
         background: white;
         z-index: 100;
       }
     }
-    /* Smooth fade-in for chat window */
-#chatWindow {
-  transition: opacity 0.3s ease-in-out, transform 0.3s ease;
-  opacity: 0;
-  transform: translateX(100%);
-}
-
-/* When active (displayed) */
-#chatWindow.active {
-  opacity: 1;
-  transform: translateX(0);
-}
-
-/* Animate new message appearance */
-.msg {
-  animation: slideIn 0.3s ease forwards;
-}
-
-@keyframes slideIn {
-  from { opacity: 0; transform: translateY(10px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
-/* Overlay smooth appearance */
-#callOverlay {
-  opacity: 0;
-  transition: opacity 0.4s ease;
-}
-
-#callOverlay.show {
-  opacity: 1;
-}
-
-
+    @keyframes slideIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    #callOverlay {
+      opacity: 0;
+      transition: opacity 0.4s ease;
+    }
+    #callOverlay.show {
+      opacity: 1;
+    }
   </style>
 </head>
 <body>
@@ -216,6 +196,7 @@
     <div id="currentUser">Welcome</div>
     <button onclick="goToDashboard()">Dashboard</button>
   </header>
+
   <div style="display: flex; height: calc(100% - 50px);">
     <div id="userList">
       <input id="searchBox" placeholder="Search users/groups..." />
@@ -224,6 +205,7 @@
       <div id="userSection"><h4>All Users</h4></div>
       <div id="groupSection"><h4>All Groups</h4></div>
     </div>
+
     <div id="chatWindow">
       <div style="padding: 10px; background: #128C7E; color: white; display: flex; justify-content: space-between;">
         <span id="chatWith">---</span>
@@ -241,751 +223,463 @@
       </div>
     </div>
   </div>
-<div id="chatTitleMenu" style="display:none; position:absolute; background:white; border:1px solid #ccc; padding:10px; border-radius:6px; z-index:99999;">
-  <button onclick="leaveGroup()">Leave Group</button><br>
-  <button onclick="blockUser()">Block User</button><br>
-  <button onclick="alert('Coming soon: View members')">View Members</button>
-</div>
-  <!-- Add this inside <body> after callOverlay -->
-<video id="localVideo" autoplay muted playsinline style="width: 0; height: 0;"></video>
-<video id="remoteVideo" autoplay playsinline style="width: 0; height: 0;"></video>
-  
+
+  <!-- Chat title context menu -->
+  <div id="chatTitleMenu" style="display:none; position:absolute; background:white; border:1px solid #ccc; padding:10px; border-radius:6px; z-index:99999;">
+    <button onclick="leaveGroup()">Leave Group</button><br>
+    <button onclick="blockUser()">Block User</button><br>
+    <button onclick="alert('Coming soon: View members')">View Members</button>
+  </div>
+
+  <!-- Hidden video elements for call functionality -->
+  <video id="localVideo" autoplay muted playsinline style="width: 0; height: 0;"></video>
+  <video id="remoteVideo" autoplay playsinline style="width: 0; height: 0;"></video>
+
   <!-- Call UI Overlay -->
-<div id="callOverlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:#000000cc; color:white; z-index:99999; justify-content:center; align-items:center; flex-direction:column;">
-  <h2 id="callStatus">Calling...</h2>
-  <button onclick="endCall()" style="margin-top: 20px; padding: 10px 20px; background:red; border:none; border-radius:5px; color:white;">End Call</button>
-  <button onclick="minimizeCall()" style="background:gray;">Minimize</button>
-</div>
-<div id="incomingControls" style="display:none;">
-  <button onclick="acceptCall()">Accept</button>
-  <button onclick="endCall(true)">Reject</button>
-</div>
-<div id="ongoingControls" style="display:none;">
-  <button onclick="endCall()">End Call</button>
-</div>
+  <div id="callOverlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:#000000cc; color:white; z-index:99999; justify-content:center; align-items:center; flex-direction:column;">
+    <h2 id="callStatus">Calling...</h2>
+    <button onclick="endCall()" style="margin-top: 20px; padding: 10px 20px; background:red; border:none; border-radius:5px; color:white;">End Call</button>
+    <button onclick="minimizeCall()" style="background:gray;">Minimize</button>
+  </div>
+
+  <!-- Incoming call controls -->
+  <div id="incomingControls" style="display:none;">
+    <button onclick="acceptCall()">Accept</button>
+    <button onclick="endCall(true)">Reject</button>
+  </div>
+
+  <!-- Ongoing call controls -->
+  <div id="ongoingControls" style="display:none;">
+    <button onclick="endCall()">End Call</button>
+  </div>
+
+  <!-- Message context menu -->
   <div id="msgMenu" class="msg-menu" style="display:none;"></div>
+  <!-- External Scripts -->
   <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
-<script>
-const firebaseConfig = {
-  apiKey: "AIzaSyBfkUJS81minjxj0DFz4pzNnGzCtb5ZJss",
-  authDomain: "locater-42fb4.firebaseapp.com",
-  databaseURL: "https://locater-42fb4-default-rtdb.firebaseio.com",
-  projectId: "locater-42fb4",
-  storageBucket: "locater-42fb4.appspot.com",
-  messagingSenderId: "250348367998",
-  appId: "1:250348367998:web:d734b2b4c735b5684ae82f"
-};
-firebase.initializeApp(firebaseConfig);
-const db = firebase.database();
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
 
-let user = sessionStorage.getItem('username');
-if (!user) location.href = "index.html";
-document.getElementById("currentUser").textContent = "Welcome, " + user;
-  // ✅ Load all users
-db.ref("users").on("value", snap => {
-  allUsers = snap.val() || {};
-  refreshList();
-  trackUnreadMessages(); // Ensure this is triggered only after users are loaded
-});
-
-// ✅ Load all groups
-db.ref("groups").on("value", snap => {
-  allGroups = snap.val() || {};
-  refreshList();
-});
-
-let currentChat = "", convoRef = null, typingRef = null;
-let allUsers = {}, allGroups = {}, unreadCount = {}, replyingTo = null;
-let recentChats = JSON.parse(localStorage.getItem("recentChats")) || {};
-const msgBox = document.getElementById("msgInput");
-const messagesDiv = document.getElementById("messages");
-const msgMenu = document.getElementById("msgMenu");
-
-function chatId(a, b) {
-  return [a, b].sort().join("_");
-}
-
-// Go to Dashboard
-function goToDashboard() {
-  location.href = "app.html";
-}
-
-// Create Group (placeholder)
-function createGroup() {
-  const name = prompt("Enter group name:");
-  if (name) {
-    const id = db.ref("groups").push().key;
-    db.ref("groups/" + id).set({
-      name,
-      public: true,
-      createdBy: user,
-      members: { [user]: true }
-    });
-  }
-}
-let callTimeout = null;
-let isCaller = false;
-// Group chats and users
-function refreshList() {
-  const term = document.getElementById("searchBox").value.toLowerCase();
-  const recent = document.getElementById("recentChats");
-  const users = document.getElementById("userSection");
-  const groups = document.getElementById("groupSection");
-
-  recent.innerHTML = "<h4>Recent Chats & Groups</h4>";
-  users.innerHTML = "<h4>All Users</h4>";
-  groups.innerHTML = "<h4>All Groups</h4>";
-
-  const sortedRecent = Object.entries(recentChats).sort((a, b) => b[1] - a[1]);
-
-  sortedRecent.forEach(([id]) => {
-    const isGroup = id.startsWith("group_");
-    const label = isGroup ? allGroups[id.slice(6)]?.name || "Group" : id;
-    const btn = document.createElement("button");
-
-    const status = isGroup ? '' : `<small style=\"color:gray\">${allUsers[id]?.lastSeen || 'Offline'}</small>`;
-    btn.innerHTML = `${label} ${status} ${unreadCount[id] ? '<span class="unread-badge">' + unreadCount[id] + '</span>' : ''}`;
-    btn.onclick = () => {
-      if (reopenChatIfSame(id)) {
-        isGroup ? openGroup(id.slice(6), label) : openChat(id);
-      }
+  <script>
+    // 🔐 Firebase Configuration
+    const firebaseConfig = {
+      apiKey: "AIzaSyBfkUJS81minjxj0DFz4pzNnGzCtb5ZJss",
+      authDomain: "locater-42fb4.firebaseapp.com",
+      databaseURL: "https://locater-42fb4-default-rtdb.firebaseio.com",
+      projectId: "locater-42fb4",
+      storageBucket: "locater-42fb4.appspot.com",
+      messagingSenderId: "250348367998",
+      appId: "1:250348367998:web:d734b2b4c735b5684ae82f"
     };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
 
-    recent.appendChild(btn);
-  });
+    // 👤 Get current user from session
+    let user = sessionStorage.getItem('username');
+    if (!user) location.href = "index.html";
+    document.getElementById("currentUser").textContent = "Welcome, " + user;
 
-  Object.keys(allUsers)
-    .filter(u => u !== user && u.toLowerCase().includes(term))
-    .sort()
-    .forEach(u => {
-      const btn = document.createElement("button");
-      btn.innerHTML = `${u} <small style="color:gray">${allUsers[u].lastSeen || "Offline"}</small>`;
-      btn.onclick = () => {
-        if (reopenChatIfSame(u)) openChat(u);
-      };
-      users.appendChild(btn);
-    });
+    // 🧠 App State
+    let currentChat = "", convoRef = null, typingRef = null;
+    let allUsers = {}, allGroups = {}, unreadCount = {}, replyingTo = null;
+    let recentChats = JSON.parse(localStorage.getItem("recentChats") || "{}");
+    const msgBox = document.getElementById("msgInput");
+    const messagesDiv = document.getElementById("messages");
+    const msgMenu = document.getElementById("msgMenu");
 
-  Object.keys(allGroups)
-    .filter(id => allGroups[id]?.name && allGroups[id].name.toLowerCase().includes(term))
-    .sort((a, b) => allGroups[a].name.localeCompare(allGroups[b].name))
-    .forEach(id => {
-      const g = allGroups[id];
-      const btn = document.createElement("button");
-      btn.className = "group";
-      btn.innerHTML = `${g.public ? "# " : "🔒 "}${g.name}`;
-      btn.onclick = () => {
-        if (reopenChatIfSame("group_" + id)) attemptJoinGroup(id, g.name);
-      };
-      groups.appendChild(btn);
-    });
-}
-
-// Chat open/close
-function openChat(toUser) {
-  currentChat = toUser;
-  document.getElementById("chatWith").textContent = toUser;
-const status = allUsers[toUser]?.lastSeen || "Offline";
-document.getElementById("chatWith").innerHTML = `${toUser} <small style='font-size:11px;'>(${status})</small>`;
-document.addEventListener("click", () => {
-  document.getElementById("chatTitleMenu").style.display = "none";
-});
-
-  const chatWindow = document.getElementById("chatWindow");
-  chatWindow.classList.add("active");
-  chatWindow.style.display = "flex";
-  messagesDiv.innerHTML = "";
-
-  if (convoRef) convoRef.off();
-  if (typingRef) typingRef.off();
-
-  const id = chatId(user, toUser);
-  convoRef = db.ref("chats/" + id);
-convoRef.on("child_added", snap => renderMessage(snap.key, snap.val(), false, id));
-convoRef.on("child_changed", snap => updateMessageUI(snap.key, snap.val(), false, id));
-  typingRef = db.ref(`typing/${id}/${toUser}`);
-  typingRef.on("value", snap => {
-    document.getElementById("typingIndicator").style.display = snap.val() ? "block" : "none";
-  });
-
-  recentChats[currentChat] = Date.now();
-localStorage.setItem("recentChats", JSON.stringify(recentChats));
-  unreadCount[toUser] = 0;
-  db.ref("seen/" + id + "/" + user).set(firebase.database.ServerValue.TIMESTAMP);
-}
-
-function closeChat() {
-  const chatWindow = document.getElementById("chatWindow");
-  chatWindow.classList.remove("active");
-  setTimeout(() => {
-    chatWindow.style.display = "none";
-    messagesDiv.innerHTML = "";
-    currentChat = "";
-  }, 300); // wait for transition
-}
-
-// Join group (if private in future)
-function attemptJoinGroup(id, name) {
-  db.ref("groups/" + id + "/members/" + user).set(true);
-  openGroup(id, name);
-}
-
-function openGroup(id, name) {
-  currentChat = "group_" + id;
-  document.getElementById("chatWith").textContent = name;
-  
-
-document.addEventListener("click", () => {
-  document.getElementById("chatTitleMenu").style.display = "none";
-});
-
-  const chatWindow = document.getElementById("chatWindow");
-  chatWindow.classList.add("active");
-  chatWindow.style.display = "flex";
-  messagesDiv.innerHTML = "";
-
-  if (convoRef) convoRef.off();
-
-  convoRef = db.ref("groupChats/" + id);
-convoRef.on("child_added", snap => renderMessage(snap.key, snap.val(), true, id));
-convoRef.on("child_changed", snap => updateMessageUI(snap.key, snap.val(), true, id));
-  recentChats[currentChat] = Date.now();
-localStorage.setItem("recentChats", JSON.stringify(recentChats));
-  unreadCount["group_" + id] = 0;
-}
-function renderMessage(id, msg, isGroup = false, groupId = "") {
-  if (!msg || msg.deletedFor?.[user]) return;
-
-  const div = document.createElement("div");
-  div.className = "msg " + (msg.from === user ? "you" : "them");
-
-  let inner = "";
-
-  if (msg.deleted) {
-    inner = "<i>This message was deleted</i>";
-  } else {
-    if (msg.replyTo) {
-      inner += `<div style="font-size:12px;color:gray;border-left:3px solid #ccc;padding-left:5px">
-        <b>${msg.replyTo.from}</b>: ${msg.replyTo.text}</div>`;
+    // 🔑 Utility to create consistent chat IDs
+    function chatId(a, b) {
+      return [a, b].sort().join("_");
     }
-    if (isGroup && msg.from !== user) inner += `<b>${msg.from}:</b> `;
-    inner += msg.text;
-  }
 
-  const status = msg.from === user ? (
-    msg.readBy?.[currentChat] ? "✓✓✓" :
-    msg.deliveredTo?.[currentChat] ? "✓✓" : "✓"
-  ) : "";
-
-  const ts = new Date(msg.ts).toLocaleTimeString();
-  inner += `<div class="msg-time">${ts}<span class="msg-status">${status}</span></div>`;
-
-  div.innerHTML = inner;
-  div.dataset.id = id;
-  div.dataset.ts = msg.ts;
-  div.dataset.from = msg.from;
-  div.dataset.text = msg.text;
-
-  // Right-click for options (custom context menu)
-  div.addEventListener("contextmenu", e => {
-    e.preventDefault();
-    showMsgOptions(id, msg, isGroup, groupId, div, e.pageX, e.pageY);
-  });
-
-
-  // Swipe to reply
-  ////////////////////////////
-// SWIPE TO REPLY FEEDBACK
-////////////////////////////
-document.getElementById("chatWith").onclick = (e) => {
-  e.stopPropagation();
-  const menu = document.getElementById("chatTitleMenu");
-  menu.style.left = e.pageX + "px";
-  menu.style.top = e.pageY + "px";
-  menu.style.display = "block";
-};
-let swipeTarget = null;
-document.addEventListener("touchstart", e => {
-  swipeTarget = e.target.closest(".msg");
-  if (swipeTarget) swipeTarget.startX = e.touches[0].clientX;
-});
-
-document.addEventListener("touchend", e => {
-  if (!swipeTarget) return;
-  const endX = e.changedTouches[0].clientX;
-  if (endX - swipeTarget.startX > 80) {
-    swipeTarget.style.borderLeft = "4px solid #25D366";
-    replyingTo = {
-      from: swipeTarget.dataset.from,
-      text: swipeTarget.dataset.text,
-      ts: swipeTarget.dataset.ts
-    };
-  }
-  swipeTarget = null;
-});
-
-  messagesDiv.appendChild(div);
-  messagesDiv.scrollTop = messagesDiv.scrollHeight;
-
-  // Mark as read
-  if (msg.from !== user && !msg.readBy?.[user]) {
-    const ref = isGroup
-      ? db.ref("groupChats/" + groupId + "/" + id + "/readBy/" + user)
-      : db.ref("chats/" + chatId(user, currentChat) + "/" + id + "/readBy/" + user);
-    ref.set(true);
-  }
-}
-
-// Typing indicator handling
-msgBox.addEventListener("input", () => {
-  if (!currentChat || currentChat.startsWith("group_")) return;
-  const id = chatId(user, currentChat);
-  db.ref("typing/" + id + "/" + user).set(true);
-  setTimeout(() => db.ref("typing/" + id + "/" + user).set(false), 1500);
-});
-
-// Send message
-function sendMsg() {
-  const text = msgBox.value.trim();
-  if (!text || !currentChat) return;
-
-  const msg = {
-    from: user,
-    text,
-    ts: Date.now()
-  };
-
-  if (replyingTo) {
-    msg.replyTo = {
-      from: replyingTo.from,
-      text: replyingTo.text,
-      ts: replyingTo.ts
-    };
-  }
-
-  if (currentChat.startsWith("group_")) {
-    db.ref("groupChats/" + currentChat.slice(6)).push(msg);
-  } else {
-    db.ref("chats/" + chatId(user, currentChat)).push(msg);
-  }
-
-  msgBox.value = "";
-  replyingTo = null;
-}
-
-// Show message options with buttons
-function showMsgOptions(id, msg, isGroup, groupId, div, x = 100, y = 100) {
-  let m = document.getElementById("msgMenu");
-  if (!m) {
-    m = document.createElement("div");
-    m.id = "msgMenu";
-    m.style.position = "absolute";
-    m.style.background = "white";
-    m.style.border = "1px solid #ccc";
-    m.style.borderRadius = "5px";
-    m.style.padding = "5px";
-    m.style.zIndex = 9999;
-    m.style.boxShadow = "0 2px 6px rgba(0,0,0,0.2)";
-    document.body.appendChild(m);
-  }
-
-  m.innerHTML = "";
-  if (x + 240 > window.innerWidth) x = window.innerWidth - 250;
-if (y + 180 > window.innerHeight) y = window.innerHeight - 200;
-  m.style.left = x + "px";
-  m.style.top = y + "px";
-  m.style.display = "block";
-
-  const closeMenu = () => m.style.display = "none";
-
-  const addBtn = (text, cb) => {
-    const b = document.createElement("button");
-    b.textContent = text;
-    b.style.display = "block";
-    b.style.width = "100%";
-    b.style.border = "none";
-    b.style.background = "none";
-    b.style.padding = "5px";
-    b.style.cursor = "pointer";
-    b.onmouseover = () => b.style.background = "#f0f0f0";
-    b.onmouseout = () => b.style.background = "none";
-    b.onclick = () => {
-      closeMenu();
-      cb();
-    };
-    m.appendChild(b);
-  };
-
-  if (msg.from === user && Date.now() - msg.ts < 60000) {
-    addBtn("Edit", () => {
-      const newText = prompt("Edit your message:", msg.text);
-      if (newText && newText !== msg.text) {
-        const ref = isGroup
-          ? db.ref("groupChats/" + groupId + "/" + id)
-          : db.ref("chats/" + chatId(user, currentChat) + "/" + id);
-        ref.update({ text: newText });
-      }
-    });
-  }
-
-  addBtn("Reply", () => {
-    replyingTo = msg;
-  });
-
-  addBtn("Delete for Me", () => {
-    const ref = isGroup
-      ? db.ref("groupChats/" + groupId + "/" + id + "/deletedFor/" + user)
-      : db.ref("chats/" + chatId(user, currentChat) + "/" + id + "/deletedFor/" + user);
-    ref.set(true);
-    div.remove();
-  });
-
-  if (msg.from === user) {
-    addBtn("Delete for Everyone", () => {
-      const ref = isGroup
-        ? db.ref("groupChats/" + groupId + "/" + id)
-        : db.ref("chats/" + chatId(user, currentChat) + "/" + id);
-      ref.set({ from: user, ts: msg.ts, deleted: true });
-    });
-  }
-
-  document.addEventListener("click", closeMenu, { once: true });
-}
-function updateMessageUI(id, msg, isGroup = false, groupId = "") {
-  const existing = [...messagesDiv.children].find(div => div.dataset.id === id);
-  if (!existing) return; // Not visible currently
-
-  // Remove old one
-  existing.remove();
-
-  // Re-render the updated one
-  renderMessage(id, msg, isGroup, groupId);
-}
-  /////////////////////////////
-// UNREAD COUNTER & NOTIFS //
-/////////////////////////////
-
-function trackUnreadMessages() {
-  const allChatIds = Object.keys(allUsers).map(u => chatId(u, user));
-
-  allChatIds.forEach(id => {
-    db.ref("chats/" + id).on("child_added", snap => {
-      const msg = snap.val();
-      const partner = id.split("_").find(n => n !== user);
-      if (!partner || msg.from === user || msg.deletedFor?.[user]) return;
-
-      if (!msg.readBy || !msg.readBy[user]) {
-        unreadCount[partner] = (unreadCount[partner] || 0) + 1;
-        refreshList();
-        notifyUser(msg.from, msg.text);
-      }
-    });
-  });
-
-  for (let groupId in allGroups) {
-    db.ref("groupChats/" + groupId).on("child_added", snap => {
-      const msg = snap.val();
-      if (!msg || msg.from === user || msg.deletedFor?.[user]) return;
-
-      if (!msg.readBy || !msg.readBy[user]) {
-        const key = "group_" + groupId;
-        unreadCount[key] = (unreadCount[key] || 0) + 1;
-        refreshList();
-        notifyUser(allGroups[groupId].name, msg.text);
-      }
-    });
-  }
-}
-
-////////////////////
-// NOTIFICATION API
-////////////////////
-
-if ("Notification" in window && Notification.permission !== "granted") {
-  Notification.requestPermission();
-}
-
-function notifyUser(from, text) {
-  if (document.hasFocus()) return;
-  if (Notification.permission === "granted") {
-    new Notification(`New message from ${from}`, {
-      body: text,
-      icon: "chat-icon.png"
-    });
-  }
-}
-
-function leaveGroup() {
-  const groupId = currentChat.slice(6);
-  db.ref("groups/" + groupId + "/members/" + user).remove();
-  alert("You left the group.");
-  closeChat();
-}
-
-function blockUser() {
-  alert("User blocked (feature not yet implemented).");
-}
-
-////////////////////////
-// USER STATUS TRACKER
-////////////////////////
-
-// Update lastSeen as 'Online' or time
-setInterval(() => {
-  db.ref("users/" + user + "/lastSeen").set("Online");
-  setTimeout(() => {
-    db.ref("users/" + user + "/lastSeen").set(new Date().toLocaleTimeString());
-  }, 15000);
-}, 10000);
-
-// Update "Offline" on disconnect
-db.ref("users/" + user + "/lastSeen").onDisconnect().set(new Date().toLocaleTimeString());
-
-// Display Last Seen in User List
-function displayLastSeen() {
-  for (let u in allUsers) {
-    const el = [...document.querySelectorAll("#userSection button")].find(btn => btn.textContent.includes(u));
-    if (el && allUsers[u]?.lastSeen) {
-      const parts = el.textContent.split(" ")[0];
-      el.innerHTML = `${parts} <small style="color:gray">${allUsers[u].lastSeen}</small>`;
+    // 📦 Go to dashboard
+    function goToDashboard() {
+      location.href = "app.html";
     }
-  }
-}
-setInterval(displayLastSeen, 5000);
 
-//////////////////////////////
-// TYPING INDICATOR BUBBLES //
-//////////////////////////////
-
-const typingDiv = document.getElementById("typingIndicator");
-typingDiv.innerHTML = '<span class="dot"></span><span class="dot"></span><span class="dot"></span>';
-
-const dotsStyle = document.createElement("style");
-dotsStyle.textContent = `
-.dot {
-  height: 6px;
-  width: 6px;
-  margin: 0 1px;
-  background-color: #bbb;
-  border-radius: 50%;
-  display: inline-block;
-  animation: dotPulse 1.4s infinite ease-in-out both;
-}
-.dot:nth-child(2) {
-  animation-delay: 0.2s;
-}
-.dot:nth-child(3) {
-  animation-delay: 0.4s;
-}
-@keyframes dotPulse {
-  0%, 80%, 100% { transform: scale(0); }
-  40% { transform: scale(1); }
-}`;
-document.head.appendChild(dotsStyle);
-  ////////////////////////
-// CLOSE CHAT BUTTON //
-////////////////////////
-
-function closeChat() {
-  const chatWindow = document.getElementById("chatWindow");
-  chatWindow.classList.remove("active");
-  setTimeout(() => {
-    chatWindow.style.display = "none";
-    messagesDiv.innerHTML = "";
-    currentChat = "";
-  }, 300); // wait for transition
-}
-
-//////////////////////////////////////
-// CLICK ON CURRENT CHAT = REFRESH //
-//////////////////////////////////////
-
-function reopenChatIfSame(target) {
-  if (currentChat === target) {
-    messagesDiv.scrollTop = 999999;
-    return;
-  }
-  return true;
-}
-
-///////////////////////////
-// GROUP JOIN LOGIC FIX //
-///////////////////////////
-
-function attemptJoinGroup(id, name) {
-  const group = allGroups[id];
-  if (!group) return;
-
-  // If public or already a member
-  if (group.public || (group.members && group.members[user])) {
-    openGroup(id, name);
-  } else {
-    const answer = prompt(`Request access to group "${name}"?\n(Ask an admin to add you if private)`);
-    if (answer !== null) {
-      db.ref("groupRequests/" + id + "/" + user).set(true);
-      alert("Join request sent to group admins.");
-    }
-  }
-}
-// Load all users
-db.ref("users").on("value", snap => {
-  allUsers = snap.val() || {};
-  refreshList();
-});
-
-// Load all groups
-db.ref("groups").on("value", snap => {
-  allGroups = snap.val() || {};
-  refreshList();
-});
-
-////////////////////////////////
-// AUTO START UNREAD TRACKING //
-////////////////////////////////
-
-setTimeout(trackUnreadMessages, 2000);
-  // Listen for incoming calls
-db.ref("calls").on("child_added", snap => {
-  const call = snap.val();
-  const id = snap.key;
-
-  if (call?.to === user && call.status === "ringing") {
-    showCallOverlay(`${call.from} is calling you (${call.type})`);
-
-    activeCallRef = db.ref("calls/" + id);
-
-    // Auto remove call after 30 seconds if not answered
-    setTimeout(() => {
-      if (activeCallRef) {
-        activeCallRef.remove();
-        document.getElementById("callOverlay").style.display = "none";
-        activeCallRef = null;
+    // ➕ Create a new group
+    function createGroup() {
+      const name = prompt("Enter group name:");
+      if (name) {
+        const id = db.ref("groups").push().key;
+        db.ref("groups/" + id).set({
+          name,
+          public: true,
+          createdBy: user,
+          members: { [user]: true }
+        });
       }
-    }, 30000);
-  }
-});
-document.addEventListener("click", () => {
-  document.getElementById("msgMenu").style.display = "none";
-});
-let activeCallRef = null;
+    }
 
-let localStream = null;
-let remoteStream = null;
+    // 🔄 Load all users
+    db.ref("users").on("value", snap => {
+      allUsers = snap.val() || {};
+      refreshList();
+      trackUnreadMessages(); // track after users load
+    });
 
-function startCall(type) {
-  if (!currentChat) return;
-  const isGroup = currentChat.startsWith("group_");
-  const callId = isGroup ? currentChat : chatId(user, currentChat);
-  const callRef = db.ref("calls/" + callId + "/" + user);
+    // 🔄 Load all groups
+    db.ref("groups").on("value", snap => {
+      allGroups = snap.val() || {};
+      refreshList();
+    });
+    // 🧾 Refresh chat list (users, groups, recent)
+    function refreshList() {
+      const term = document.getElementById("searchBox").value.toLowerCase();
+      const recent = document.getElementById("recentChats");
+      const users = document.getElementById("userSection");
+      const groups = document.getElementById("groupSection");
 
-  navigator.mediaDevices.getUserMedia({ audio: true, video: type === "video" })
-    .then(stream => {
-      localStream = stream;
-      document.getElementById("localVideo").srcObject = stream;
+      recent.innerHTML = "<h4>Recent Chats & Groups</h4>";
+      users.innerHTML = "<h4>All Users</h4>";
+      groups.innerHTML = "<h4>All Groups</h4>";
 
-      showCallOverlay(`You (${type} call)`);
-
-      // Broadcast to others
-      db.ref("calls/" + callId).set({
-        type,
-        from: user,
-        to: currentChat,
-        status: "ringing",
-        ts: Date.now()
+      // Recent
+      const sortedRecent = Object.entries(recentChats).sort((a, b) => b[1] - a[1]);
+      sortedRecent.forEach(([id]) => {
+        const isGroup = id.startsWith("group_");
+        const label = isGroup ? allGroups[id.slice(6)]?.name || "Group" : id;
+        const btn = document.createElement("button");
+        const status = isGroup ? "" : `<small style='color:gray'>${allUsers[id]?.lastSeen || 'Offline'}</small>`;
+        btn.innerHTML = `${label} ${status} ${unreadCount[id] ? '<span class="unread-badge">' + unreadCount[id] + '</span>' : ''}`;
+        btn.onclick = () => {
+          if (reopenChatIfSame(id)) {
+            isGroup ? openGroup(id.slice(6), label) : openChat(id);
+          }
+        };
+        recent.appendChild(btn);
       });
 
-      activeCallRef = callRef;
-    })
-    .catch(err => {
-      alert("Could not access mic/camera: " + err.message);
-    });
-  // Show ongoing call controls
-document.getElementById("incomingControls").style.display = "none";
-document.getElementById("ongoingControls").style.display = "flex";
-const overlay = document.getElementById("callOverlay");
-overlay.style.display = "flex";
-overlay.classList.add("show");
-  // Setup your signaling or Firebase logic here
-  callTimeout = setTimeout(() => {
-    if (isCaller) {
-      endCall(true);  // true = timed out or rejected
-      alert("Call not answered. Hanging up.");
+      // All users
+      Object.keys(allUsers)
+        .filter(u => u !== user && u.toLowerCase().includes(term))
+        .sort()
+        .forEach(u => {
+          const btn = document.createElement("button");
+          btn.innerHTML = `${u} <small style='color:gray'>${allUsers[u].lastSeen || 'Offline'}</small>`;
+          btn.onclick = () => {
+            if (reopenChatIfSame(u)) openChat(u);
+          };
+          users.appendChild(btn);
+        });
+
+      // All groups
+      Object.keys(allGroups)
+        .filter(id => allGroups[id]?.name && allGroups[id].name.toLowerCase().includes(term))
+        .sort((a, b) => allGroups[a].name.localeCompare(allGroups[b].name))
+        .forEach(id => {
+          const g = allGroups[id];
+          const btn = document.createElement("button");
+          btn.className = "group";
+          btn.innerHTML = `${g.public ? "# " : "🔒 "}${g.name}`;
+          btn.onclick = () => {
+            if (reopenChatIfSame("group_" + id)) attemptJoinGroup(id, g.name);
+          };
+          groups.appendChild(btn);
+        });
     }
-  }, 120000); // 2 minutes
-  }
-}
 
-// Listen for group or private call
-db.ref("calls").on("child_added", snap => {
-  const callId = snap.key;
-  const call = snap.val();
+    // 🚪 Attempt to join a group and open it
+    function attemptJoinGroup(id, name) {
+      db.ref("groups/" + id + "/members/" + user).set(true);
+      openGroup(id, name);
+    }
 
-  if (!call || call.status !== "ringing") return;
+    // 📂 Open private chat
+    function openChat(toUser) {
+      currentChat = toUser;
+      document.getElementById("chatWith").innerHTML = `${toUser} <small style='font-size:11px;'>(${allUsers[toUser]?.lastSeen || "Offline"})</small>`;
+      document.getElementById("chatTitleMenu").style.display = "none";
 
-  const isGroup = callId.startsWith("group_");
-  const isMeTarget = call.to === user || (isGroup && callId === currentChat);
+      const chatWindow = document.getElementById("chatWindow");
+      chatWindow.classList.add("active");
+      chatWindow.style.display = "flex";
+      messagesDiv.innerHTML = "";
 
-  if (!isMeTarget) return;
+      if (convoRef) convoRef.off();
+      if (typingRef) typingRef.off();
 
-  showCallOverlay(`${call.from} is calling you (${call.type})`);
+      const id = chatId(user, toUser);
+      convoRef = db.ref("chats/" + id);
+      convoRef.on("child_added", snap => renderMessage(snap.key, snap.val(), false, id));
+      convoRef.on("child_changed", snap => updateMessageUI(snap.key, snap.val(), false, id));
 
-  navigator.mediaDevices.getUserMedia({ audio: true, video: call.type === "video" })
-    .then(stream => {
-      localStream = stream;
-      document.getElementById("localVideo").srcObject = stream;
+      typingRef = db.ref(`typing/${id}/${toUser}`);
+      typingRef.on("value", snap => {
+        document.getElementById("typingIndicator").style.display = snap.val() ? "block" : "none";
+      });
+
+      recentChats[currentChat] = Date.now();
+      localStorage.setItem("recentChats", JSON.stringify(recentChats));
+      unreadCount[toUser] = 0;
+
+      db.ref("seen/" + id + "/" + user).set(firebase.database.ServerValue.TIMESTAMP);
+    }
+
+    // 📂 Open group chat
+    function openGroup(id, name) {
+      currentChat = "group_" + id;
+      document.getElementById("chatWith").textContent = name;
+      document.getElementById("chatTitleMenu").style.display = "none";
+
+      const chatWindow = document.getElementById("chatWindow");
+      chatWindow.classList.add("active");
+      chatWindow.style.display = "flex";
+      messagesDiv.innerHTML = "";
+
+      if (convoRef) convoRef.off();
+
+      convoRef = db.ref("groupChats/" + id);
+      convoRef.on("child_added", snap => renderMessage(snap.key, snap.val(), true, id));
+      convoRef.on("child_changed", snap => updateMessageUI(snap.key, snap.val(), true, id));
+
+      recentChats[currentChat] = Date.now();
+      localStorage.setItem("recentChats", JSON.stringify(recentChats));
+      unreadCount["group_" + id] = 0;
+    }
+
+    // ❌ Close chat
+    function closeChat() {
+      const chatWindow = document.getElementById("chatWindow");
+      chatWindow.classList.remove("active");
+      setTimeout(() => {
+        chatWindow.style.display = "none";
+        messagesDiv.innerHTML = "";
+        currentChat = "";
+      }, 300); // smooth transition
+    }
+
+    // ✍️ Typing indicator (only for 1-on-1 chats)
+    msgBox.addEventListener("input", () => {
+      if (!currentChat || currentChat.startsWith("group_")) return;
+      const id = chatId(user, currentChat);
+      db.ref("typing/" + id + "/" + user).set(true);
+      setTimeout(() => db.ref("typing/" + id + "/" + user).set(false), 1500);
     });
-});
-// Show the overlay
-function showCallOverlay(text = "Calling...") {
-  const overlay = document.getElementById("callOverlay");
-  overlay.classList.add("show");
-  overlay.style.display = "flex";
-  document.getElementById("callStatus").textContent = text;
-}
-}
-function incomingCall(fromUser, type) {
-  isCaller = false;
-  showOverlay(`Incoming ${type} call from ${fromUser}`);
-  document.getElementById("incomingControls").style.display = "flex";
-  document.getElementById("ongoingControls").style.display = "none";
+    // 🧾 Render individual message
+    function renderMessage(id, msg, isGroup = false, groupId = "") {
+      if (!msg || msg.deletedFor?.[user]) return;
 
-  callTimeout = setTimeout(() => {
-    endCall(true); // timeout
-    alert("Missed call.");
-  }, 120000);
-}
-function acceptCall() {
-  clearTimeout(callTimeout);
-  document.getElementById("incomingControls").style.display = "none";
-  document.getElementById("ongoingControls").style.display = "block";
-  document.getElementById("callStatus").textContent = "In call...";
-}
-function minimizeCall() {
-  document.getElementById("callOverlay").style.display = "none";
-  // You can flash an icon or title or sound to remind user
-}
-let activeCallRef = null;
-let localStream = null;
+      const div = document.createElement("div");
+      div.className = "msg " + (msg.from === user ? "you" : "them");
 
-function endCall(force = false) {
-  if (activeCallRef) {
-    activeCallRef.remove();
-    activeCallRef = null;
-  }
+      let inner = "";
 
-  if (localStream) {
-    localStream.getTracks().forEach(track => track.stop());
-    localStream = null;
-  }
+      if (msg.deleted) {
+        inner = "<i>This message was deleted</i>";
+      } else {
+        if (msg.replyTo) {
+          inner += `<div style="font-size:12px;color:gray;border-left:3px solid #ccc;padding-left:5px">
+            <b>${msg.replyTo.from}</b>: ${msg.replyTo.text}</div>`;
+        }
+        if (isGroup && msg.from !== user) inner += `<b>${msg.from}:</b> `;
+        inner += msg.text;
+      }
 
-  const overlay = document.getElementById("callOverlay");
-  overlay.classList.remove("show");
-  setTimeout(() => {
-    overlay.style.display = "none";
-  }, 400);
-}
-  </script>
+      const status = msg.from === user
+        ? (msg.readBy?.[currentChat] ? "✓✓✓" : msg.deliveredTo?.[currentChat] ? "✓✓" : "✓")
+        : "";
+
+      const ts = new Date(msg.ts).toLocaleTimeString();
+      inner += `<div class="msg-time">${ts}<span class="msg-status">${status}</span></div>`;
+
+      div.innerHTML = inner;
+      div.dataset.id = id;
+      div.dataset.ts = msg.ts;
+      div.dataset.from = msg.from;
+      div.dataset.text = msg.text;
+
+      // 📱 Right-click for context menu
+      div.addEventListener("contextmenu", e => {
+        e.preventDefault();
+        showMsgOptions(id, msg, isGroup, groupId, div, e.pageX, e.pageY);
+      });
+
+      // 👆 Tap chat title for options
+      document.getElementById("chatWith").onclick = e => {
+        e.stopPropagation();
+        const menu = document.getElementById("chatTitleMenu");
+        menu.style.left = e.pageX + "px";
+        menu.style.top = e.pageY + "px";
+        menu.style.display = "block";
+      };
+
+      // 📲 Swipe to reply (mobile)
+      let swipeTarget = null;
+      document.addEventListener("touchstart", e => {
+        swipeTarget = e.target.closest(".msg");
+        if (swipeTarget) swipeTarget.startX = e.touches[0].clientX;
+      });
+
+      document.addEventListener("touchend", e => {
+        if (!swipeTarget) return;
+        const endX = e.changedTouches[0].clientX;
+        if (endX - swipeTarget.startX > 80) {
+          swipeTarget.style.borderLeft = "4px solid #25D366";
+          replyingTo = {
+            from: swipeTarget.dataset.from,
+            text: swipeTarget.dataset.text,
+            ts: swipeTarget.dataset.ts
+          };
+        }
+        swipeTarget = null;
+      });
+
+      messagesDiv.appendChild(div);
+      messagesDiv.scrollTop = messagesDiv.scrollHeight;
+
+      // ✅ Mark as read
+      if (msg.from !== user && !msg.readBy?.[user]) {
+        const ref = isGroup
+          ? db.ref("groupChats/" + groupId + "/" + id + "/readBy/" + user)
+          : db.ref("chats/" + chatId(user, currentChat) + "/" + id + "/readBy/" + user);
+        ref.set(true);
+      }
+    }
+
+    // ✉️ Send message
+    function sendMsg() {
+      const text = msgBox.value.trim();
+      if (!text || !currentChat) return;
+
+      const msg = {
+        from: user,
+        text,
+        ts: Date.now()
+      };
+
+      if (replyingTo) {
+        msg.replyTo = {
+          from: replyingTo.from,
+          text: replyingTo.text,
+          ts: replyingTo.ts
+        };
+      }
+
+      if (currentChat.startsWith("group_")) {
+        db.ref("groupChats/" + currentChat.slice(6)).push(msg);
+      } else {
+        db.ref("chats/" + chatId(user, currentChat)).push(msg);
+      }
+
+      msgBox.value = "";
+      replyingTo = null;
+    }
+
+    // 📋 Show message options (edit/delete/reply)
+    function showMsgOptions(id, msg, isGroup, groupId, div, x = 100, y = 100) {
+      let m = document.getElementById("msgMenu");
+      m.innerHTML = "";
+      m.style.left = (x + 240 > window.innerWidth ? window.innerWidth - 250 : x) + "px";
+      m.style.top = (y + 180 > window.innerHeight ? window.innerHeight - 200 : y) + "px";
+      m.style.display = "block";
+
+      const closeMenu = () => m.style.display = "none";
+      document.addEventListener("click", closeMenu, { once: true });
+
+      const addBtn = (text, cb) => {
+        const b = document.createElement("button");
+        b.textContent = text;
+        b.onclick = () => {
+          closeMenu();
+          cb();
+        };
+        m.appendChild(b);
+      };
+
+      if (msg.from === user && Date.now() - msg.ts < 60000) {
+        addBtn("Edit", () => {
+          const newText = prompt("Edit your message:", msg.text);
+          if (newText && newText !== msg.text) {
+            const ref = isGroup
+              ? db.ref("groupChats/" + groupId + "/" + id)
+              : db.ref("chats/" + chatId(user, currentChat) + "/" + id);
+            ref.update({ text: newText });
+          }
+        });
+      }
+
+      addBtn("Reply", () => {
+        replyingTo = msg;
+      });
+
+      addBtn("Delete for Me", () => {
+        const ref = isGroup
+          ? db.ref("groupChats/" + groupId + "/" + id + "/deletedFor/" + user)
+          : db.ref("chats/" + chatId(user, currentChat) + "/" + id + "/deletedFor/" + user);
+        ref.set(true);
+        div.remove();
+      });
+
+      if (msg.from === user) {
+        addBtn("Delete for Everyone", () => {
+          const ref = isGroup
+            ? db.ref("groupChats/" + groupId + "/" + id)
+            : db.ref("chats/" + chatId(user, currentChat) + "/" + id);
+          ref.set({ from: user, ts: msg.ts, deleted: true });
+        });
+      }
+    }
+
+    // 🔄 Re-render updated message
+    function updateMessageUI(id, msg, isGroup = false, groupId = "") {
+      const existing = [...messagesDiv.children].find(div => div.dataset.id === id);
+      if (!existing) return;
+      existing.remove();
+      renderMessage(id, msg, isGroup, groupId);
+          }
+    /////////////////////////////
+    // 🔔 UNREAD COUNTERS & TRACKING
+    /////////////////////////////
+
+    function trackUnreadMessages() {
+      const allChatIds = Object.keys(allUsers).map(u => chatId(u, user));
+
+      allChatIds.forEach(id => {
+        db.ref("chats/" + id).on("child_added", snap => {
+          const msg = snap.val();
+          const partner = id.split("_").find(n => n !== user);
+          if (!partner || msg.from === user || msg.deletedFor?.[user]) return;
+
+          if (!msg.readBy || !msg.readBy[user]) {
+            unreadCount[partner] = (unreadCount[partner] || 0) + 1;
+            refreshList();
+            notifyUser();
+          }
+        });
+      });
+
+      Object.keys(allGroups).forEach(id => {
+        db.ref("groupChats/" + id).on("child_added", snap => {
+          const msg = snap.val();
+          if (!msg || msg.from === user || msg.deletedFor?.[user]) return;
+
+          if (!msg.readBy || !msg.readBy[user]) {
+            const gid = "group_" + id;
+            unreadCount[gid] = (unreadCount[gid] || 0) + 1;
+            refreshList();
+            notifyUser();
+          }
+        });
+      });
+    }
+
+    /////////////////////////////
+    // 🔔 NOTIFICATION FEEDBACK (Basic)
+    /////////////////////////////
+    function notifyUser() {
+      // This can be expanded later to play sounds or trigger a toast popup
+      console.log("🔔 New message received.");
+    }
+
+    /////////////////////////////
+    // 🧠 MEMORY HELPER
+    /////////////////////////////
+    function reopenChatIfSame(id) {
+      if (currentChat === id) return false;
+      closeChat();
+      return true;
+    }
+</script>
 </body>
 </html>
