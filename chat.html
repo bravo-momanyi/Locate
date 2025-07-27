@@ -282,7 +282,11 @@
     // 🧠 App State
     let currentChat = "", convoRef = null, typingRef = null;
     let allUsers = {}, allGroups = {}, unreadCount = {}, replyingTo = null;
-    let recentChats = JSON.parse(localStorage.getItem("recentChats") || "{}");
+    let recentChats = {};
+db.ref("recentChats/" + user).once("value", snap => {
+  recentChats = snap.val() || {};
+  refreshList();
+});
     const msgBox = document.getElementById("msgInput");
     const messagesDiv = document.getElementById("messages");
     const msgMenu = document.getElementById("msgMenu");
@@ -414,7 +418,7 @@ Object.keys(allGroups)
       });
 
       recentChats[currentChat] = Date.now();
-      localStorage.setItem("recentChats", JSON.stringify(recentChats));
+      db.ref("recentChats/" + user).set(recentChats);
       unreadCount[toUser] = 0;
 
       db.ref("seen/" + id + "/" + user).set(firebase.database.ServerValue.TIMESTAMP);
@@ -438,7 +442,7 @@ Object.keys(allGroups)
       convoRef.on("child_changed", snap => updateMessageUI(snap.key, snap.val(), true, id));
 
       recentChats[currentChat] = Date.now();
-      localStorage.setItem("recentChats", JSON.stringify(recentChats));
+      db.ref("recentChats/" + user).set(recentChats);
       unreadCount["group_" + id] = 0;
     }
 
