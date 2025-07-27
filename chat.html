@@ -366,21 +366,22 @@
         });
 
       // All groups
-      Object.keys(allGroups)
-        .filter(id => allGroups[id]?.name && allGroups[id].name.toLowerCase().includes(term))
-        .sort((a, b) => allGroups[a].name.localeCompare(allGroups[b].name))
-        .forEach(id => {
-          const g = allGroups[id];
-          const btn = document.createElement("button");
-          btn.className = "group";
-          btn.innerHTML = `${g.public ? "# " : "🔒 "}${g.name}`;
-          btn.onclick = () => {
-  closeChat();
-  setTimeout(() => openChat(u), 310);
-};
-          groups.appendChild(btn);
-        });
-    }
+      // All groups
+Object.keys(allGroups)
+  .filter(id => allGroups[id]?.name && allGroups[id].name.toLowerCase().includes(term))
+  .sort((a, b) => allGroups[a].name.localeCompare(allGroups[b].name))
+  .forEach(id => {
+    const g = allGroups[id];
+    const btn = document.createElement("button");
+    btn.className = "group";
+    btn.innerHTML = `${g.public ? "# " : "🔒 "}${g.name}`;
+    btn.onclick = () => {
+      closeChat();
+      setTimeout(() => attemptJoinGroup(id, g.name), 310); // ✅ FIXED
+    };
+    groups.appendChild(btn);
+  });
+}
 
     // 🚪 Attempt to join a group and open it
     function attemptJoinGroup(id, name) {
