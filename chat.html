@@ -299,6 +299,7 @@
 
     // 🧠 App State
     let currentChat = "", convoRef = null, typingRef = null;
+    let lastRenderedDate = "";
     let allUsers = {}, allGroups = {}, unreadCount = {}, replyingTo = null;
     let recentChats = {};
 db.ref("recentChats/" + user).once("value", snap => {
@@ -318,7 +319,6 @@ db.ref("recentChats/" + user).once("value", snap => {
     function goToDashboard() {
       location.href = "app.html";
     }
-    let lastRenderedDate = "";
 
     // ➕ Create a new group
     function createGroup() {
@@ -443,6 +443,7 @@ Object.keys(allGroups)
       chatWindow.classList.add("active");
       chatWindow.style.display = "flex";
       messagesDiv.innerHTML = "";
+      lastRenderedDate = "";
 
       if (convoRef) convoRef.off();
       if (typingRef) typingRef.off();
@@ -462,7 +463,6 @@ Object.keys(allGroups)
       unreadCount[toUser] = 0;
 
       db.ref("seen/" + id + "/" + user).set(firebase.database.ServerValue.TIMESTAMP);
-      lastRenderedDate = "";
     }
 
     // 📂 Open group chat
@@ -475,6 +475,7 @@ Object.keys(allGroups)
       chatWindow.classList.add("active");
       chatWindow.style.display = "flex";
       messagesDiv.innerHTML = "";
+      lastRenderedDate = "";
 
       if (convoRef) convoRef.off();
 
@@ -497,7 +498,6 @@ Object.keys(allGroups)
     }
   }
   document.getElementById("floatingDate").textContent = floatingText;
-  lastRenderedDate = "";
 });
   
 
@@ -522,15 +522,16 @@ Object.keys(allGroups)
     // 🧾 Render individual message
     function renderMessage(id, msg, isGroup = false, groupId = "") {
       if (!msg || msg.deletedFor?.[user]) return;
+      const msgDate = new Date(msg.ts);
       const msgDateStr = msgDate.toDateString();
 
-if (msgDateStr !== lastRenderedDate) {
-  const label = document.createElement("div");
-  label.className = "date-label";
-  label.textContent = formatDateLabel(msgDate); // Shows 'Today', 'Yesterday', etc.
-  messagesDiv.appendChild(label);
-  lastRenderedDate = msgDateStr;
-}
+      if (msgDateStr !== lastRenderedDate) {
+       const label = document.createElement("div");
+       label.className = "date-label";
+       label.textContent = formatDateLabel(msgDate); // Shows 'Today', 'Yesterday', etc.
+       messagesDiv.appendChild(label);
+       lastRenderedDate = msgDateStr;
+      }
       const div = document.createElement("div");
       div.className = "msg " + (msg.from === user ? "you" : "them");
 
