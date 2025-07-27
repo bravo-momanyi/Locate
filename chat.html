@@ -208,7 +208,6 @@
   opacity: 1;
 }
 
-<!-- Chat title popup -->
 
   </style>
 </head>
@@ -852,7 +851,7 @@ db.ref("calls").on("child_added", snap => {
   const call = snap.val();
   const id = snap.key;
 
-  if (call.to === user && call.status === "ringing") {
+  if (call?.to === user && call.status === "ringing") {
     showCallOverlay(`${call.from} is calling you (${call.type})`);
 
     activeCallRef = db.ref("calls/" + id);
