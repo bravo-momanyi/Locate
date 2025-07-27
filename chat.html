@@ -680,6 +680,13 @@
       closeChat();
       return true;
     }
+    // ✅ Only hide the title menu when clicking outside
+document.addEventListener("click", (e) => {
+  const menu = document.getElementById("chatTitleMenu");
+  if (menu && !menu.contains(e.target) && e.target.id !== "chatWith") {
+    menu.style.display = "none";
+  }
+});
 </script>
 </body>
 </html>
