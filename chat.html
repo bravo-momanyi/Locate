@@ -416,10 +416,12 @@ Object.keys(allGroups)
   return date.toLocaleDateString();
     }
     function formatLastSeen(ts) {
-  if (!ts) return 'Offline';
+  if (!ts || isNaN(ts)) return 'Offline';
+  
   const date = new Date(ts);
-  const now = new Date();
+  if (isNaN(date.getTime())) return 'Unknown';
 
+  const now = new Date();
   const isToday = date.toDateString() === now.toDateString();
   const time = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   const fullDate = date.toLocaleDateString();
@@ -436,7 +438,9 @@ Object.keys(allGroups)
     // 📂 Open private chat
     function openChat(toUser) {
       currentChat = toUser;
-      document.getElementById("chatWith").innerHTML = `${toUser} <small style='font-size:11px;'>(${allUsers[toUser]?.lastSeen || "Offline"})</small>`;
+      const seen = formatLastSeen(allUsers[toUser]?.lastSeen);
+document.getElementById("chatWith").innerHTML =
+  `${toUser} <small style='font-size:11px;'>(${seen})</small>`;
       document.getElementById("chatTitleMenu").style.display = "none";
 
       const chatWindow = document.getElementById("chatWindow");
@@ -779,7 +783,7 @@ messagesDiv.addEventListener("scroll", () => {
     }
   }
 
-  document.getElementById("floatingDate").textContent = current;
+  //document.getElementById("floatingDate").textContent = current;
 });
 </script>
 </body>
