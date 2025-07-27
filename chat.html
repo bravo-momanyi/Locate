@@ -344,7 +344,7 @@ db.ref("recentChats/" + user).once("value", snap => {
         const isGroup = id.startsWith("group_");
         const label = isGroup ? allGroups[id.slice(6)]?.name || "Group" : id;
         const btn = document.createElement("button");
-        const status = isGroup ? "" : `<small style='color:gray'>${allUsers[id]?.lastSeen || 'Offline'}</small>`;
+        const status = isGroup ? "" : `<small style='color:gray'>${formatLastSeen(allUsers[id]?.lastSeen)}</small>`;
         btn.innerHTML = `${label} ${status} ${unreadCount[id] ? '<span class="unread-badge">' + unreadCount[id] + '</span>' : ''}`;
         btn.onclick = () => {
   closeChat();
@@ -357,17 +357,18 @@ db.ref("recentChats/" + user).once("value", snap => {
 
       // All users
       Object.keys(allUsers)
-        .filter(u => u !== user && u.toLowerCase().includes(term))
-        .sort()
-        .forEach(u => {
-          const btn = document.createElement("button");
-          btn.innerHTML = `${u} <small style='color:gray'>${allUsers[u].lastSeen || 'Offline'}</small>`;
-          btn.onclick = () => {
-  closeChat();
-  setTimeout(() => openChat(u), 310);
-};
-          users.appendChild(btn);
-        });
+  .filter(u => u !== user && u.toLowerCase().includes(term))
+  .sort()
+  .forEach(u => {
+    const btn = document.createElement("button");
+    const lastSeen = formatLastSeen(allUsers[u].lastSeen);
+    btn.innerHTML = `${u} <small style='color:gray'>${lastSeen}</small>`;
+    btn.onclick = () => {
+      closeChat();
+      setTimeout(() => openChat(u), 310);
+    };
+    users.appendChild(btn);
+  });
 
       // All groups
       // All groups
@@ -386,6 +387,26 @@ Object.keys(allGroups)
     groups.appendChild(btn);
   });
 }
+    function formatChatDate(ts) {
+  const date = new Date(ts);
+  const today = new Date();
+  const yesterday = new Date(Date.now() - 86400000);
+  
+  if (date.toDateString() === today.toDateString()) return "Today";
+  if (date.toDateString() === yesterday.toDateString()) return "Yesterday";
+  return date.toLocaleDateString();
+    }
+    function formatLastSeen(ts) {
+  if (!ts) return 'Offline';
+  const date = new Date(ts);
+  const now = new Date();
+
+  const isToday = date.toDateString() === now.toDateString();
+  const time = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const fullDate = date.toLocaleDateString();
+
+  return isToday ? `Today at ${time}` : `${fullDate} at ${time}`;
+    }
 
     // 🚪 Attempt to join a group and open it
     function attemptJoinGroup(id, name) {
@@ -467,7 +488,17 @@ Object.keys(allGroups)
     // 🧾 Render individual message
     function renderMessage(id, msg, isGroup = false, groupId = "") {
       if (!msg || msg.deletedFor?.[user]) return;
+      const msgDate = new Date(msg.ts).toDateString();
+const lastMsg = messagesDiv.lastElementChild;
+const lastDateHeader = lastMsg?.classList?.contains("date-header") ? lastMsg : null;
 
+if (!lastDateHeader || lastDateHeader.dataset.date !== msgDate) {
+  const header = document.createElement("div");
+  header.className = "date-header";
+  header.dataset.date = msgDate;
+  header.textContent = formatChatDate(msg.ts);
+  messagesDiv.appendChild(header);
+    }
       const div = document.createElement("div");
       div.className = "msg " + (msg.from === user ? "you" : "them");
 
@@ -488,7 +519,7 @@ Object.keys(allGroups)
         ? (msg.readBy?.[currentChat] ? "✓✓✓" : msg.deliveredTo?.[currentChat] ? "✓✓" : "✓")
         : "";
 
-      const ts = new Date(msg.ts).toLocaleTimeString();
+      const ts = new Date(msg.ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
       inner += `<div class="msg-time">${ts}<span class="msg-status">${status}</span></div>`;
 
       div.innerHTML = inner;
