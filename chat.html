@@ -364,7 +364,7 @@ function refreshList() {
     .sort()
     .forEach(u => {
       const btn = document.createElement("button");
-      btn.innerHTML = `${u} <small style='color:gray'>${allUsers[u].lastSeen || 'Offline'}</small>`;
+      btn.innerHTML = `${u} <small style='color:gray'>${formatLastSeen(allUsers[u].lastSeen)}</small>`;
       btn.onclick = () => {
         if (currentChat !== u) {
           closeChat();
@@ -414,7 +414,7 @@ function joinGroup(groupName) {
 // 📂 Open private chat
 function openChat(to) {
   currentChat = to;
-  document.getElementById("chatWith").textContent = to;
+  document.getElementById("chatWith").innerHTML = `${toUser} <small style='font-size:11px;'>(${formatLastSeen(allUsers[toUser]?.lastSeen)})</small>`;
   document.getElementById("chatWindow").classList.add("active");
   document.getElementById("chatWindow").style.display = "flex";
   messagesDiv.innerHTML = "";
@@ -760,7 +760,20 @@ clearSearch.addEventListener("click", () => {
 
 // Hide "×" initially if empty
 clearSearch.style.display = "none";
+function formatLastSeen(timestamp) {
+  if (!timestamp) return "Offline";
+  const now = new Date();
+  const date = new Date(timestamp);
 
+  const isToday = now.toDateString() === date.toDateString();
+  const isYesterday = new Date(now - 86400000).toDateString() === date.toDateString();
+
+  const time = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+  if (isToday) return `Today at ${time}`;
+  if (isYesterday) return `Yesterday at ${time}`;
+  return `${date.toLocaleDateString()} at ${time}`;
+}
     </script>
 </body>
 </html>
