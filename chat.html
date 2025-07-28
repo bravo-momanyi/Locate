@@ -455,9 +455,16 @@ function openChat(to) {
   if (convoRef) convoRef.off();
   if (typingRef) typingRef.off();
 
-  convoRef = db.ref("chats/" + cid);
-  convoRef.on("child_added", s => renderMsg(s.key, s.val(), false, cid));
-
+  // 💬 Listen for new messages and status changes
+convoRef = db.ref("chats/" + cid);
+convoRef.on("child_added", s => renderMsg(s.key, s.val(), false, cid));
+convoRef.on("child_changed", s => {
+  const el = [...messagesDiv.children].find(c => c.dataset.id === s.key);
+  if (el) {
+    el.remove(); // re-render
+    renderMsg(s.key, s.val(), false, cid);
+  }
+});
   typingRef = db.ref("typing/" + cid + "/" + to);
   typingRef.on("value", s => {
     document.getElementById("typingIndicator").style.display = s.val() ? "block" : "none";
@@ -477,8 +484,14 @@ function openGroup(name, label) {
 
   if (convoRef) convoRef.off();
   convoRef = db.ref("groupChats/" + name);
-  convoRef.on("child_added", s => renderMsg(s.key, s.val(), true, name));
-
+convoRef.on("child_added", s => renderMsg(s.key, s.val(), true, name));
+convoRef.on("child_changed", s => {
+  const el = [...messagesDiv.children].find(c => c.dataset.id === s.key);
+  if (el) {
+    el.remove();
+    renderMsg(s.key, s.val(), true, name);
+  }
+});
   db.ref("recentChats/" + user + "/group_" + name).set(Date.now());
 }
 function closeChat() {
@@ -544,24 +557,22 @@ function renderMsg(id, msg, isGroup = false, groupId = "") {
 
   // ➤ Swipe to reply
   let touchStartX = 0;
-  div.addEventListener("touchstart", e => {
-    touchStartX = e.touches[0].clientX;
-  });
-
-  div.addEventListener("touchend", e => {
-    const dx = e.changedTouches[0].clientX - touchStartX;
-    if (dx > 100) {
+div.addEventListener("touchstart", e => {
+  touchStartX = e.touches[0].clientX;
+});
+div.addEventListener("touchend", e => {
+  const deltaX = e.changedTouches[0].clientX - touchStartX;
+  if (Math.abs(deltaX) > 80) {
+    if (deltaX > 0) {
       // Swipe right to reply
-      replyTo = { from: msg.from, text: msg.text, id };
-      document.getElementById("replyPreview").innerHTML = `<b>${msg.from}</b>: ${msg.text}`;
-      document.getElementById("replyBox").style.display = "block";
-    } else if (dx < -100) {
-      // Swipe left to cancel
-      replyTo = null;
-      document.getElementById("replyPreview").innerHTML = "";
-      document.getElementById("replyBox").style.display = "none";
+      replyTo = { from: msg.from, text: msg.text };
+      document.getElementById("replyBox").innerHTML = `<b>${msg.from}</b>: ${msg.text} <span onclick="cancelReply()" style="cursor:pointer;color:red;margin-left:10px">x</span>`;
+    } else {
+      // Swipe left to cancel reply
+      cancelReply();
     }
-  });
+  }
+});
 
   messagesDiv.appendChild(div);
   messagesDiv.scrollTop = messagesDiv.scrollHeight;
@@ -581,6 +592,10 @@ function renderMsg(id, msg, isGroup = false, groupId = "") {
       : db.ref("chats/" + chatId(user, currentChat) + "/" + id + "/deliveredTo/" + user);
     ref.set(true);
   }
+}
+function cancelReply() {
+  replyTo = null;
+  document.getElementById("replyBox").innerHTML = "";
 }
 
     </script>
@@ -620,103 +635,50 @@ function sendMsg() {
 }
 
 // 📋 Message right-click options
-function showMsgOptions(id, msg, isGroup, groupId, div, x = 100, y = 100) {
-  const m = document.getElementById("msgMenu");
-  m.innerHTML = "";
-  m.style.left = (x + 240 > window.innerWidth ? window.innerWidth - 260 : x) + "px";
-  m.style.top = (y + 180 > window.innerHeight ? window.innerHeight - 200 : y) + "px";
-  m.style.display = "block";
+function showMsgOptions(id, msg, isGroup, groupId, div, x, y) {
+  const menu = document.createElement("div");
+  menu.className = "context-menu";
+  menu.style.top = y + "px";
+  menu.style.left = x + "px";
 
-  const closeMenu = () => m.style.display = "none";
-  document.addEventListener("click", closeMenu, { once: true });
-
-  const addBtn = (text, cb) => {
-    const b = document.createElement("button");
-    b.textContent = text;
-    b.onclick = () => {
-      closeMenu();
-      cb();
-    };
-    m.appendChild(b);
+  // Delete for me — available for all messages
+  const delMe = document.createElement("div");
+  delMe.textContent = "Delete for Me";
+  delMe.onclick = () => {
+    const path = isGroup ? `groupChats/${groupId}/${id}` : `chats/${chatId(user, currentChat)}/${id}`;
+    db.ref(path + `/deletedFor/${user}`).set(true);
+    menu.remove();
   };
+  menu.appendChild(delMe);
 
+  // Delete for everyone — sender only, within 1 min
   if (msg.from === user && Date.now() - msg.ts < 60000) {
-    addBtn("Edit", () => {
-      const newText = prompt("Edit message:", msg.text);
-      if (newText && newText !== msg.text) {
-        const ref = isGroup
-          ? db.ref("groupChats/" + groupId + "/" + id)
-          : db.ref("chats/" + chatId(user, currentChat) + "/" + id);
-        ref.update({ text: newText });
-      }
-    });
-
-    addBtn("Delete for Everyone", () => {
-      const ref = isGroup
-        ? db.ref("groupChats/" + groupId + "/" + id)
-        : db.ref("chats/" + chatId(user, currentChat) + "/" + id);
-      ref.update({ deleted: true });
-    });
-  }
-}
-
-// 🧠 Swipe to reply (mobile)
-let swipeTarget = null;
-document.addEventListener("touchstart", e => {
-  swipeTarget = e.target.closest(".msg");
-  if (swipeTarget) swipeTarget.startX = e.touches[0].clientX;
-});
-document.addEventListener("touchend", e => {
-  if (!swipeTarget) return;
-  const endX = e.changedTouches[0].clientX;
-  if (endX - swipeTarget.startX > 80) {
-    swipeTarget.style.borderLeft = "4px solid #25D366";
-    replyingTo = {
-      from: swipeTarget.dataset.from,
-      text: swipeTarget.dataset.text,
-      ts: swipeTarget.dataset.ts
+    const delAll = document.createElement("div");
+    delAll.textContent = "Delete for Everyone";
+    delAll.onclick = () => {
+      const path = isGroup ? `groupChats/${groupId}/${id}` : `chats/${chatId(user, currentChat)}/${id}`;
+      db.ref(path + `/deleted`).set(true);
+      menu.remove();
     };
-  }
-  swipeTarget = null;
-});
+    menu.appendChild(delAll);
 
-// 📤 Chat title click menu
-document.getElementById("chatWith").addEventListener("click", e => {
-  const menu = document.getElementById("chatTitleMenu");
-  const isGroup = currentChat.startsWith("group_");
-
-  menu.innerHTML = "";
-  if (isGroup) {
-    addTitleBtn("Leave Group", () => {
-      const groupId = currentChat.slice(6);
-      db.ref("groups/" + groupId + "/members/" + user).remove();
-      alert("You left the group.");
-      closeChat();
-    });
-    addTitleBtn("View Members", () => {
-      const groupId = currentChat.slice(6);
-      db.ref("groups/" + groupId + "/members").once("value", snap => {
-        const members = Object.keys(snap.val() || {}).join(", ");
-        alert("Members:\n" + members);
-      });
-    });
-  } else {
-    addTitleBtn("Delete Chat", () => {
-      if (confirm("Delete chat with " + currentChat + "?")) {
-        const path = chatId(user, currentChat);
-        db.ref("chats/" + path).remove();
-        closeChat();
+    // Edit message
+    const edit = document.createElement("div");
+    edit.textContent = "Edit";
+    edit.onclick = () => {
+      const newText = prompt("Edit your message:", msg.text);
+      if (newText && newText.trim()) {
+        const path = isGroup ? `groupChats/${groupId}/${id}` : `chats/${chatId(user, currentChat)}/${id}`;
+        db.ref(path + `/text`).set(newText.trim());
       }
-    });
-    addTitleBtn("Block User", () => {
-      alert("Blocking feature coming soon.");
-    });
+      menu.remove();
+    };
+    menu.appendChild(edit);
   }
 
-  menu.style.left = e.pageX + "px";
-  menu.style.top = e.pageY + "px";
-  menu.style.display = "block";
-});
+  document.body.appendChild(menu);
+  document.addEventListener("click", () => menu.remove(), { once: true });
+}
 
 function addTitleBtn(text, cb) {
   const btn = document.createElement("button");
