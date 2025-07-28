@@ -2,88 +2,188 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Bravo Chat</title>
-  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    html, body { height: 100%; font-family: Arial, sans-serif; background: #fff; overflow: hidden; }
+    body, html {
+      height: 100%;
+      font-family: Arial, sans-serif;
+      background: #fff;
+      overflow: hidden;
+    }
     header {
-      display: flex; justify-content: space-between; align-items: center;
-      background: #075E54; color: white; padding: 10px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: #075E54;
+      color: white;
+      padding: 10px;
     }
     header button {
-      background: #25D366; border: none; padding: 6px 12px;
-      color: white; border-radius: 5px; cursor: pointer;
+      background: #25D366;
+      border: none;
+      padding: 6px 12px;
+      color: white;
+      border-radius: 5px;
+      cursor: pointer;
     }
     #userList {
-      width: 30%; overflow-y: auto; padding: 10px; border-right: 1px solid #ccc;
+      width: 30%;
+      overflow-y: auto;
+      padding: 10px;
+      border-right: 1px solid #ccc;
     }
     #userList input {
-      width: 100%; padding: 8px; margin-bottom: 10px;
-      border-radius: 4px; border: 1px solid #ccc;
+      width: 100%;
+      padding: 8px;
+      margin-bottom: 10px;
+      border-radius: 4px;
+      border: 1px solid #ccc;
     }
     #userList button {
-      width: 100%; margin-bottom: 6px; padding: 8px;
-      border: none; border-radius: 4px; cursor: pointer;
+      width: 100%;
+      margin-bottom: 6px;
+      padding: 8px;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
       background: #e0f7fa;
     }
-    #userList button.group { background: #dcedc8; font-weight: bold; }
+    #userList button.group {
+      background: #dcedc8;
+      font-weight: bold;
+    }
     .unread-badge {
-      background: red; color: white; font-size: 10px; padding: 2px 6px;
-      border-radius: 10px; float: right; margin-top: -15px;
+      background: red;
+      color: white;
+      font-size: 10px;
+      padding: 2px 6px;
+      border-radius: 10px;
+      float: right;
+      margin-top: -15px;
     }
     #chatWindow {
-      display: none; flex-direction: column; flex: 1;
-      height: 100%; transition: opacity 0.3s ease-in-out, transform 0.3s ease;
-      opacity: 0; transform: translateX(100%);
+      display: none;
+      flex-direction: column;
+      flex: 1;
+      height: 100%;
+      transition: opacity 0.3s ease-in-out, transform 0.3s ease;
+      opacity: 0;
+      transform: translateX(100%);
     }
     #chatWindow.active {
-      opacity: 1; transform: translateX(0);
+      opacity: 1;
+      transform: translateX(0);
     }
     #messages {
-      flex: 1; padding: 10px; overflow-y: auto;
-      background: #f5f5f5; display: flex; flex-direction: column;
+      flex: 1;
+      padding: 10px;
+      overflow-y: auto;
+      background: #f5f5f5;
+      display: flex;
+      flex-direction: column;
     }
     .msg {
-      padding: 8px; margin: 6px; border-radius: 7px; max-width: 70%;
-      position: relative; word-wrap: break-word;
+      padding: 8px;
+      margin: 6px;
+      border-radius: 7px;
+      max-width: 70%;
+      position: relative;
+      word-wrap: break-word;
       animation: slideIn 0.3s ease forwards;
     }
-    .you { background: #dcf8c6; align-self: flex-end; text-align: right; }
-    .them { background: white; align-self: flex-start; }
+    .you {
+      background: #dcf8c6;
+      align-self: flex-end;
+      text-align: right;
+    }
+    .them {
+      background: white;
+      align-self: flex-start;
+    }
     .msg-time {
-      font-size: 10px; color: #999; margin-top: 4px;
+      font-size: 10px;
+      color: #999;
+      margin-top: 4px;
     }
     #sendBar {
-      display: flex; padding: 10px; background: white; gap: 5px;
+      display: flex;
+      padding: 10px;
+      background: white;
     }
-    #sendBar input[type="text"] {
-      flex: 1; padding: 8px; border-radius: 20px; border: 1px solid #ccc;
+    #sendBar input {
+      flex: 1;
+      padding: 8px;
+      border-radius: 20px;
+      border: 1px solid #ccc;
     }
     #sendBar button {
-      padding: 8px 14px; background: #25D366; border: none;
-      color: white; border-radius: 20px; cursor: pointer;
-    }
-    #sendBar input[type="file"] {
-      display: none;
+      margin-left: 5px;
+      padding: 8px 14px;
+      background: #25D366;
+      border: none;
+      color: white;
+      border-radius: 20px;
+      cursor: pointer;
     }
     #typingIndicator {
-      padding-left: 12px; font-style: italic; font-size: 12px; color: gray; display: none;
+      padding-left: 12px;
+      font-style: italic;
+      font-size: 12px;
+      color: gray;
+      display: none;
+    }
+    #floatingDate {
+      position: sticky;
+      top: 0;
+      background: #f0f0f0;
+      text-align: center;
+      font-size: 13px;
+      color: gray;
+      z-index: 10;
+      padding: 4px 0;
     }
     .date-label {
-      text-align: center; color: gray; font-size: 12px; margin: 10px 0 5px;
+      text-align: center;
+      color: gray;
+      font-size: 12px;
+      margin: 10px 0 5px;
+    }
+    @media (max-width: 600px) {
+      #userList {
+        width: 100%;
+      }
+      #chatWindow {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        background: white;
+        z-index: 100;
+      }
     }
     @keyframes slideIn {
       from { opacity: 0; transform: translateY(10px); }
       to { opacity: 1; transform: translateY(0); }
     }
-    @media (max-width: 600px) {
-      #userList { width: 100%; }
-      #chatWindow {
-        position: absolute; top: 0; left: 0;
-        width: 100%; background: white; z-index: 100;
-      }
+    #callOverlay {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: #000000cc;
+      color: white;
+      z-index: 99999;
+      justify-content: center;
+      align-items: center;
+      flex-direction: column;
+    }
+    #callOverlay.show {
+      display: flex;
     }
   </style>
 </head>
@@ -94,8 +194,8 @@
   </header>
   <div style="display: flex; height: calc(100% - 50px);">
     <div id="userList">
-      <input id="searchBox" placeholder="Search users/groups..."/>
-      <button onclick="showGroupCreation()">+ Create Group</button>
+      <input id="searchBox" placeholder="Search users/groups..." />
+      <button onclick="createGroup()">Create Group</button>
       <div id="recentChats"><h4>Recent Chats</h4></div>
       <div id="userSection"><h4>All Users</h4></div>
       <div id="groupSection"><h4>All Groups</h4></div>
@@ -110,516 +210,263 @@
         </div>
       </div>
       <div id="typingIndicator">Typing...</div>
-      <div id="messages"></div>
-      <div id="msgMenu" style="position:absolute; display:none; background:white; z-index:9999; border:1px solid #ccc; border-radius:8px;"></div>
+      <div id="messages"><div id="floatingDate"></div></div>
       <div id="sendBar">
-  <input type="file" id="mediaInput" style="margin-right:5px;" />
-  <input id="msgInput" placeholder="Type message..." />
-  <button onclick="sendMsg()">Send</button>
+        <input type="file" id="mediaInput" />
+        <input id="msgInput" placeholder="Type message..." />
+        <button onclick="sendMsg()">Send</button>
       </div>
     </div>
   </div>
 
-  <!-- 🔐 Group Creation Modal -->
-  <div id="groupModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:#0008; justify-content:center; align-items:center; z-index:999;">
-    <div style="background:white; padding:20px; border-radius:8px; max-width:300px;">
-      <h3>Create Group</h3>
-      <input id="groupName" placeholder="Group name" style="width:100%; margin-bottom:10px; padding:5px;"/>
-      <select id="groupPrivacy" style="width:100%; margin-bottom:10px; padding:5px;">
-        <option value="public">Public</option>
-        <option value="private">Private</option>
-      </select>
-      <input id="groupPassword" placeholder="Password (if private)" style="width:100%; margin-bottom:10px; padding:5px; display:none;" type="password"/>
-      <button onclick="createGroup()" style="width:100%; background:#25D366; color:white; padding:8px; border:none; border-radius:5px;">Create</button>
-      <button onclick="document.getElementById('groupModal').style.display='none'" style="width:100%; margin-top:6px; padding:6px;">Cancel</button>
-    </div>
+  <!-- Hidden video elements for WebRTC -->
+  <video id="localVideo" autoplay muted playsinline style="width: 0; height: 0;"></video>
+  <video id="remoteVideo" autoplay playsinline style="width: 0; height: 0;"></video>
+
+  <!-- Call UI -->
+  <div id="callOverlay">
+    <h2 id="callStatus">Calling...</h2>
+    <button onclick="endCall()" style="margin-top: 20px; padding: 10px 20px; background:red; border:none; border-radius:5px; color:white;">End Call</button>
+    <button onclick="minimizeCall()" style="margin-top: 10px; padding: 8px 16px;">Minimize</button>
   </div>
-  <!-- Firebase + Scripts -->
-<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
 
-<script>
-const firebaseConfig = {
-  apiKey: "AIzaSyBfkUJS81minjxj0DFz4pzNnGzCtb5ZJss",
-  authDomain: "locater-42fb4.firebaseapp.com",
-  databaseURL: "https://locater-42fb4-default-rtdb.firebaseio.com",
-  projectId: "locater-42fb4",
-  storageBucket: "locater-42fb4.appspot.com",
-  messagingSenderId: "250348367998",
-  appId: "1:250348367998:web:d734b2b4c735b5684ae82f"
-};
-firebase.initializeApp(firebaseConfig);
-const db = firebase.database();
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
+  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 
-// 🌐 Get current user from session
-let user = sessionStorage.getItem('username');
-if (!user) location.href = "index.html";
-document.getElementById("currentUser").textContent = "Welcome, " + user;
-
-let allUsers = {}, allGroups = {}, currentChat = "", convoRef = null;
-let recentChats = {}, unreadCount = {};
-let typingRef = null;
-
-const msgInput = document.getElementById("msgInput");
-const messagesDiv = document.getElementById("messages");
-
-// 📦 Navigate back
-function goToDashboard() {
-  location.href = "app.html";
-}
-
-// 📂 Show group creation modal
-function showGroupCreation() {
-  document.getElementById("groupModal").style.display = "flex";
-}
-
-// ➕ Create group logic
-function createGroup() {
-  const name = document.getElementById("groupName").value.trim();
-  const privacy = document.getElementById("groupPrivacy").value;
-  const password = document.getElementById("groupPassword").value;
-  if (!name) return alert("Enter group name");
-
-  const id = db.ref("groups").push().key;
-  db.ref("groups/" + id).set({
-    name,
-    public: privacy === "public",
-    password: privacy === "private" ? password : null,
-    members: { [user]: true },
-    createdBy: user
-  });
-
-  document.getElementById("groupModal").style.display = "none";
-  document.getElementById("groupName").value = "";
-  document.getElementById("groupPassword").value = "";
-}
-
-// 🎛 Show/hide password field based on group type
-document.getElementById("groupPrivacy").addEventListener("change", e => {
-  document.getElementById("groupPassword").style.display = e.target.value === "private" ? "block" : "none";
-});
-
-// 📥 Load users
-db.ref("users").on("value", snap => {
-  allUsers = snap.val() || {};
-  refreshList();
-});
-
-// 📥 Load groups
-db.ref("groups").on("value", snap => {
-  allGroups = snap.val() || {};
-  refreshList();
-});
-
-// 🧠 Refresh contact list
-function refreshList() {
-  const userSection = document.getElementById("userSection");
-  const groupSection = document.getElementById("groupSection");
-
-  userSection.innerHTML = "<h4>All Users</h4>";
-  groupSection.innerHTML = "<h4>All Groups</h4>";
-
-  Object.keys(allUsers).forEach(u => {
-    if (u === user) return;
-    const btn = document.createElement("button");
-    btn.textContent = u;
-    btn.onclick = () => openChat(u);
-    userSection.appendChild(btn);
-  });
-
-  Object.entries(allGroups).forEach(([id, g]) => {
-    const btn = document.createElement("button");
-    btn.className = "group";
-    btn.textContent = `${g.public ? "# " : "🔒 "}${g.name}`;
-    btn.onclick = () => {
-      if (g.public) {
-        joinGroup(id);
-      } else {
-        const pass = prompt("Enter group password:");
-        if (pass === g.password) joinGroup(id);
-        else alert("Incorrect password");
-      }
+  <script>
+    // 🔐 Firebase Configuration
+    const firebaseConfig = {
+      apiKey: "AIzaSyBfkUJS81minjxj0DFz4pzNnGzCtb5ZJss",
+      authDomain: "locater-42fb4.firebaseapp.com",
+      databaseURL: "https://locater-42fb4-default-rtdb.firebaseio.com",
+      projectId: "locater-42fb4",
+      storageBucket: "locater-42fb4.appspot.com",
+      messagingSenderId: "250348367998",
+      appId: "1:250348367998:web:d734b2b4c735b5684ae82f"
     };
-    groupSection.appendChild(btn);
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+  </script>
+  <script>
+  // 👤 Current user from session
+  let user = sessionStorage.getItem('username');
+  if (!user) location.href = "index.html";
+  document.getElementById("currentUser").textContent = "Welcome, " + user;
+
+  let currentChat = "", convoRef = null, typingRef = null;
+  let allUsers = {}, allGroups = {}, unreadCount = {}, replyingTo = null;
+  let recentChats = {};
+
+  const msgBox = document.getElementById("msgInput");
+  const messagesDiv = document.getElementById("messages");
+
+  // 🌐 Go to dashboard
+  function goToDashboard() {
+    location.href = "app.html";
+  }
+
+  // ➕ Create Group
+  function createGroup() {
+    const name = prompt("Enter group name:");
+    if (!name) return;
+    const isPrivate = confirm("Make this group private?");
+    let password = "";
+    if (isPrivate) password = prompt("Set group password:");
+    const id = db.ref("groups").push().key;
+    db.ref("groups/" + id).set({
+      name,
+      public: !isPrivate,
+      password: isPrivate ? password : "",
+      createdBy: user,
+      members: { [user]: true }
+    });
+  }
+
+  // 🔄 Load Users
+  db.ref("users").on("value", snap => {
+    allUsers = snap.val() || {};
+    refreshList();
   });
-}
 
-// 🧑‍🤝‍🧑 Join group and open
-function joinGroup(id) {
-  db.ref("groups/" + id + "/members/" + user).set(true);
-  openGroup(id);
-}
+  // 🔄 Load Groups
+  db.ref("groups").on("value", snap => {
+    allGroups = snap.val() || {};
+    refreshList();
+  });
 
-// 🔄 Open private chat
-function openChat(to) {
-  currentChat = to;
-  messagesDiv.innerHTML = "";
-  if (convoRef) convoRef.off();
-  const id = [user, to].sort().join("_");
-  convoRef = db.ref("chats/" + id);
-  convoRef.on("child_added", snap => renderMessage(snap.val()));
-  document.getElementById("chatWith").textContent = to;
-  document.getElementById("chatWindow").classList.add("active");
-  document.getElementById("chatWindow").style.display = "flex";
-}
+  // 🔁 Refresh list
+  function refreshList() {
+    const term = document.getElementById("searchBox").value.toLowerCase();
+    const userSec = document.getElementById("userSection");
+    const groupSec = document.getElementById("groupSection");
 
-// 🔄 Open group chat
-function openGroup(id) {
-  currentChat = "group_" + id;
-  messagesDiv.innerHTML = "";
-  if (convoRef) convoRef.off();
-  convoRef = db.ref("groupChats/" + id);
-  convoRef.on("child_added", snap => renderMessage(snap.val()));
-  document.getElementById("chatWith").textContent = allGroups[id].name;
-  document.getElementById("chatWindow").classList.add("active");
-  document.getElementById("chatWindow").style.display = "flex";
-}
+    userSec.innerHTML = "<h4>All Users</h4>";
+    groupSec.innerHTML = "<h4>All Groups</h4>";
 
-// ❌ Close chat
-function closeChat() {
-  currentChat = "";
-  if (convoRef) convoRef.off();
-  document.getElementById("chatWindow").classList.remove("active");
-  setTimeout(() => document.getElementById("chatWindow").style.display = "none", 300);
-}
-
-// 📦 Send message (text)
-function sendMsg() {
-  const text = msgInput.value.trim();
-  const file = document.getElementById("mediaInput").files[0];
-
-  if (!text && !file) return;
-
-  const msg = {
-    from: user,
-    ts: Date.now()
-  };
-
-  if (text) msg.text = text;
-
-  if (file) {
-    const reader = new FileReader();
-    reader.onload = function(e) {
-      msg.media = {
-        name: file.name,
-        type: file.type,
-        data: e.target.result
+    Object.keys(allUsers).forEach(u => {
+      if (u === user || !u.toLowerCase().includes(term)) return;
+      const btn = document.createElement("button");
+      btn.innerHTML = `${u} <small style='color:gray'>${formatLastSeen(allUsers[u]?.lastSeen)}</small>`;
+      btn.onclick = () => {
+        closeChat();
+        setTimeout(() => openChat(u), 300);
       };
-      sendToDb(msg);
-    };
-    reader.readAsDataURL(file);
-  } else {
-    sendToDb(msg);
-  }
+      userSec.appendChild(btn);
+    });
 
-  msgInput.value = "";
-  document.getElementById("mediaInput").value = "";
-}
-
-function sendToDb(msg) {
-  if (currentChat.startsWith("group_")) {
-    const id = currentChat.split("_")[1];
-    db.ref("groupChats/" + id).push(msg);
-  } else {
-    const id = [user, currentChat].sort().join("_");
-    db.ref("chats/" + id).push(msg);
-  }
-}
-</script>
-<script>
-let lastRenderedDate = "";
-
-function renderMessage(msg, id = "", groupId = "") {
-  if (!msg || msg.deletedFor?.[user]) return;
-
-  const msgDate = new Date(msg.ts);
-  const msgDateStr = msgDate.toDateString();
-
-  if (msgDateStr !== lastRenderedDate) {
-    const label = document.createElement("div");
-    label.className = "date-label";
-    label.textContent = formatDateLabel(msgDate);
-    messagesDiv.appendChild(label);
-    lastRenderedDate = msgDateStr;
-  }
-
-  const div = document.createElement("div");
-  div.className = "msg " + (msg.from === user ? "you" : "them");
-
-  let inner = "";
-
-  if (msg.deleted) {
-    inner = "<i>This message was deleted</i>";
-  } else {
-    if (msg.replyTo) {
-      inner += `<div style="font-size:12px;color:gray;border-left:3px solid #ccc;padding-left:5px">
-        <b>${msg.replyTo.from}</b>: ${msg.replyTo.text}</div>`;
-    }
-
-    if (groupId && msg.from !== user) inner += `<b>${msg.from}:</b> `;
-    inner += msg.text || "";
-
-    if (msg.media) {
-      if (msg.media.type.startsWith("image/")) {
-        inner += `<div><img src="${msg.media.data}" style="max-width:200px; border-radius:10px;"/></div>`;
-      } else {
-        inner += `<div><a href="${msg.media.data}" download="${msg.media.name}">📎 ${msg.media.name}</a></div>`;
-      }
-    }
-  }
-
-  const ts = new Date(msg.ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  const status = msg.from === user
-    ? (msg.readBy?.[currentChat] ? "✓✓✓" : msg.deliveredTo?.[currentChat] ? "✓✓" : "✓")
-    : "";
-
-  inner += `<div class="msg-time">${ts}<span class="msg-status">${status}</span></div>`;
-  div.innerHTML = inner;
-
-  div.dataset.id = id;
-  div.dataset.ts = msg.ts;
-  div.dataset.from = msg.from;
-  div.dataset.text = msg.text;
-
-  // 📋 Right-click for edit/delete
-  div.addEventListener("contextmenu", e => {
-    e.preventDefault();
-    showMsgOptions(id, msg, groupId);
-  });
-
-  // 📱 Swipe to reply (mobile)
-  let swipeTarget = null;
-  div.addEventListener("touchstart", e => {
-    swipeTarget = div;
-    swipeTarget.startX = e.touches[0].clientX;
-  });
-
-  div.addEventListener("touchend", e => {
-    const endX = e.changedTouches[0].clientX;
-    if (endX - swipeTarget.startX > 80) {
-      swipeTarget.style.borderLeft = "4px solid #25D366";
-      replyingTo = {
-        from: swipeTarget.dataset.from,
-        text: swipeTarget.dataset.text,
-        ts: swipeTarget.dataset.ts
+    Object.entries(allGroups).forEach(([id, g]) => {
+      if (!g.name.toLowerCase().includes(term)) return;
+      const btn = document.createElement("button");
+      btn.className = "group";
+      btn.innerHTML = `${g.public ? "# " : "🔒 "}${g.name}`;
+      btn.onclick = () => {
+        if (!g.public && (!g.members || !g.members[user])) {
+          const entered = prompt("Enter password to join:");
+          if (entered !== g.password) return alert("Incorrect password");
+        }
+        db.ref("groups/" + id + "/members/" + user).set(true);
+        closeChat();
+        setTimeout(() => openGroup(id, g.name), 300);
       };
-    }
-    swipeTarget = null;
-  });
-
-  messagesDiv.appendChild(div);
-  messagesDiv.scrollTop = messagesDiv.scrollHeight;
-
-  // ✅ Mark as read
-  if (msg.from !== user && !msg.readBy?.[user]) {
-    const ref = groupId
-      ? db.ref("groupChats/" + groupId + "/" + id + "/readBy/" + user)
-      : db.ref("chats/" + [user, currentChat].sort().join("_") + "/" + id + "/readBy/" + user);
-    ref.set(true);
-  }
-}
-</script>
-<script>
-function formatDateLabel(date) {
-  const today = new Date();
-  const yesterday = new Date(Date.now() - 86400000);
-  if (date.toDateString() === today.toDateString()) return "Today";
-  if (date.toDateString() === yesterday.toDateString()) return "Yesterday";
-  return date.toLocaleDateString();
-}
-</script>
-<script>
-// 🔔 Ask for push notification permission
-if ("Notification" in window && Notification.permission !== "granted") {
-  Notification.requestPermission().then(permission => {
-    if (permission === "granted") {
-      console.log("Push notifications enabled");
-    }
-  });
-}
-</script>
-<script>
-function showMsgOptions(id, msg, groupId = "") {
-  const menu = document.getElementById("msgMenu");
-  menu.innerHTML = "";
-
-  if (msg.from === user && !msg.deleted) {
-    const editBtn = document.createElement("button");
-    editBtn.textContent = "Edit Message";
-    editBtn.onclick = () => {
-      const newText = prompt("Edit your message:", msg.text);
-      if (newText !== null) {
-        const ref = groupId
-          ? db.ref("groupChats/" + groupId + "/" + id)
-          : db.ref("chats/" + [user, currentChat].sort().join("_") + "/" + id);
-        ref.update({ text: newText });
-        menu.style.display = "none";
-      }
-    };
-    menu.appendChild(editBtn);
+      groupSec.appendChild(btn);
+    });
   }
 
-  const deleteBtn = document.createElement("button");
-  deleteBtn.textContent = "Delete";
-  deleteBtn.onclick = () => {
-    const ref = groupId
-      ? db.ref("groupChats/" + groupId + "/" + id + "/deletedFor/" + user)
-      : db.ref("chats/" + [user, currentChat].sort().join("_") + "/" + id + "/deletedFor/" + user);
-    ref.set(true);
-    menu.style.display = "none";
-  };
-  menu.appendChild(deleteBtn);
+  function formatLastSeen(ts) {
+    if (!ts) return "Offline";
+    const date = new Date(ts);
+    const today = new Date();
+    const isToday = date.toDateString() === today.toDateString();
+    return isToday
+      ? "Today at " + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      : date.toLocaleDateString() + " at " + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  }
 
-  // Show context menu near pointer
-  menu.style.left = event.pageX + "px";
-  menu.style.top = event.pageY + "px";
-  menu.style.display = "block";
-}
-</script>
-<script>
-// ✍️ Typing indicator (1-to-1 only)
-msgInput.addEventListener("input", () => {
-  if (!currentChat || currentChat.startsWith("group_")) return;
-  const id = [user, currentChat].sort().join("_");
-  db.ref("typing/" + id + "/" + user).set(true);
-  setTimeout(() => db.ref("typing/" + id + "/" + user).set(false), 1500);
-});
+  function chatId(a, b) {
+    return [a, b].sort().join("_");
+  }
 
-// Show typing if other user is typing
-function watchTyping(toUser) {
-  if (typingRef) typingRef.off();
-  const id = [user, toUser].sort().join("_");
-  typingRef = db.ref("typing/" + id + "/" + toUser);
-  typingRef.on("value", snap => {
-    document.getElementById("typingIndicator").style.display = snap.val() ? "block" : "none";
+  // 📂 Open 1-on-1 Chat
+  function openChat(toUser) {
+    currentChat = toUser;
+    document.getElementById("chatWith").textContent = toUser;
+
+    const id = chatId(user, toUser);
+    const ref = db.ref("chats/" + id);
+    convoRef?.off();
+    convoRef = ref;
+    messagesDiv.innerHTML = "";
+
+    ref.on("child_added", snap => renderMessage(snap.val(), snap.key));
+    db.ref("seen/" + id + "/" + user).set(firebase.database.ServerValue.TIMESTAMP);
+
+    document.getElementById("chatWindow").classList.add("active");
+    document.getElementById("chatWindow").style.display = "flex";
+  }
+
+  // 📂 Open Group Chat
+  function openGroup(id, name) {
+    currentChat = "group_" + id;
+    document.getElementById("chatWith").textContent = name;
+
+    const ref = db.ref("groupChats/" + id);
+    convoRef?.off();
+    convoRef = ref;
+    messagesDiv.innerHTML = "";
+
+    ref.on("child_added", snap => renderMessage(snap.val(), snap.key, true));
+    document.getElementById("chatWindow").classList.add("active");
+    document.getElementById("chatWindow").style.display = "flex";
+  }
+
+  // 🧠 Render message (group or private)
+  function renderMessage(msg, id, isGroup = false) {
+    if (!msg) return;
+    const div = document.createElement("div");
+    div.className = "msg " + (msg.from === user ? "you" : "them");
+    div.innerHTML = (isGroup ? `<b>${msg.from}</b>: ` : "") + msg.text +
+      `<div class="msg-time">${new Date(msg.ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>`;
+    messagesDiv.appendChild(div);
+    messagesDiv.scrollTop = messagesDiv.scrollHeight;
+  }
+
+  // ⌨️ Typing indicator
+  msgBox.addEventListener("input", () => {
+    if (!currentChat.startsWith("group_")) {
+      const id = chatId(user, currentChat);
+      db.ref("typing/" + id + "/" + user).set(true);
+      setTimeout(() => db.ref("typing/" + id + "/" + user).set(false), 1500);
+    }
   });
-}
-function formatLastSeen(ts) {
-  if (!ts || isNaN(ts)) return "Offline";
-  const date = new Date(ts);
-  if (isNaN(date.getTime())) return "Unknown";
-  const now = new Date();
-  const isToday = date.toDateString() === now.toDateString();
-  const time = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  const fullDate = date.toLocaleDateString();
-  return isToday ? `Today at ${time}` : `${fullDate} at ${time}`;
-}
-</script>
-<script>
-let localStream, remoteStream, peerConnection;
-const servers = { iceServers: [{ urls: "stun:stun.l.google.com:19302" }] };
 
-// 🔊 Start a voice or video call
-function startCall(type = "voice") {
-  if (currentChat.startsWith("group_")) return alert("Calls only allowed in private chats");
+  // ❌ Close Chat
+  function closeChat() {
+    currentChat = "";
+    convoRef?.off();
+    document.getElementById("chatWindow").classList.remove("active");
+    setTimeout(() => {
+      document.getElementById("chatWindow").style.display = "none";
+      messagesDiv.innerHTML = "";
+    }, 300);
+  }
 
-  navigator.mediaDevices.getUserMedia({ audio: true, video: type === "video" }).then(stream => {
-    localStream = stream;
-    document.getElementById("localVideo").srcObject = stream;
+  // ✉️ Send message
+  function sendMsg() {
+    const text = msgBox.value.trim();
+    if (!text || !currentChat) return;
+    const ts = Date.now();
+    const msg = { from: user, text, ts };
+    const ref = currentChat.startsWith("group_")
+      ? db.ref("groupChats/" + currentChat.slice(6)).push()
+      : db.ref("chats/" + chatId(user, currentChat)).push();
+    ref.set(msg);
+    msgBox.value = "";
+  }
 
-    peerConnection = new RTCPeerConnection(servers);
-    stream.getTracks().forEach(track => peerConnection.addTrack(track, stream));
+  // 📞 CALLING SYSTEM (WebRTC via Firebase)
+  let peerConn, localStream;
 
-    peerConnection.onicecandidate = e => {
-      if (e.candidate) {
-        db.ref("calls/" + currentChat + "/candidates/" + user).push(e.candidate.toJSON());
-      }
-    };
+  async function startCall(type = "voice") {
+    const isVideo = type === "video";
+    localStream = await navigator.mediaDevices.getUserMedia({ video: isVideo, audio: true });
+    document.getElementById("localVideo").srcObject = localStream;
 
-    peerConnection.ontrack = e => {
+    peerConn = new RTCPeerConnection();
+    localStream.getTracks().forEach(track => peerConn.addTrack(track, localStream));
+
+    peerConn.ontrack = e => {
       document.getElementById("remoteVideo").srcObject = e.streams[0];
     };
 
-    peerConnection.createOffer().then(offer => {
-      peerConnection.setLocalDescription(offer);
-      db.ref("calls/" + currentChat).set({
-        from: user,
-        type,
-        offer
-      });
-    });
+    const offer = await peerConn.createOffer();
+    await peerConn.setLocalDescription(offer);
 
-    showCallOverlay("Calling...");
-  });
-}
+    const callId = chatId(user, currentChat);
+    db.ref("calls/" + callId).set({ from: user, type, offer: offer.sdp });
 
-// 🔔 Accept incoming call
-function acceptCall() {
-  navigator.mediaDevices.getUserMedia({ audio: true, video: true }).then(stream => {
-    localStream = stream;
-    document.getElementById("localVideo").srcObject = stream;
-
-    peerConnection = new RTCPeerConnection(servers);
-    stream.getTracks().forEach(track => peerConnection.addTrack(track, stream));
-
-    peerConnection.ontrack = e => {
-      document.getElementById("remoteVideo").srcObject = e.streams[0];
-    };
-
-    peerConnection.onicecandidate = e => {
-      if (e.candidate) {
-        db.ref("calls/" + user + "/candidates/" + user).push(e.candidate.toJSON());
-      }
-    };
-
-    db.ref("calls/" + user).once("value", snap => {
-      const call = snap.val();
-      currentChat = call.from;
-      peerConnection.setRemoteDescription(new RTCSessionDescription(call.offer)).then(() => {
-        peerConnection.createAnswer().then(answer => {
-          peerConnection.setLocalDescription(answer);
-          db.ref("calls/" + user + "/answer").set(answer);
-        });
-      });
-    });
-
-    showCallOverlay("In Call");
-  });
-}
-
-// 🎧 Listen for incoming calls
-db.ref("calls/" + user).on("value", snap => {
-  const call = snap.val();
-  if (!call) return;
-
-  if (call.from && !call.answer) {
-    showIncomingCall(call.from, call.type);
+    document.getElementById("callOverlay").classList.add("show");
+    listenForAnswer(callId);
   }
 
-  if (call.answer && peerConnection) {
-    peerConnection.setRemoteDescription(new RTCSessionDescription(call.answer));
+  function listenForAnswer(callId) {
+    db.ref("calls/" + callId + "/answer").on("value", async snap => {
+      if (!snap.exists()) return;
+      const answer = new RTCSessionDescription({ type: "answer", sdp: snap.val() });
+      await peerConn.setRemoteDescription(answer);
+    });
   }
 
-  const candRef = db.ref("calls/" + user + "/candidates/" + call.from);
-  candRef.on("child_added", c => {
-    peerConnection.addIceCandidate(new RTCIceCandidate(c.val()));
-  });
-});
+  function endCall() {
+    document.getElementById("callOverlay").classList.remove("show");
+    peerConn?.close();
+    if (localStream) localStream.getTracks().forEach(track => track.stop());
+  }
 
-// ❌ End call
-function endCall(hangup = false) {
-  if (peerConnection) peerConnection.close();
-  if (localStream) localStream.getTracks().forEach(track => track.stop());
-  document.getElementById("callOverlay").style.display = "none";
-  db.ref("calls/" + user).remove();
-  if (hangup && currentChat) db.ref("calls/" + currentChat).remove();
-}
-
-// 🔽 Minimize call overlay
-function minimizeCall() {
-  document.getElementById("callOverlay").style.display = "none";
-}
-
-// Show call overlay
-function showCallOverlay(text) {
-  document.getElementById("callOverlay").style.display = "flex";
-  document.getElementById("callStatus").textContent = text;
-}
-
-// Show incoming call UI
-function showIncomingCall(from, type) {
-  showCallOverlay(`${from} is calling...`);
-  document.getElementById("incomingControls").style.display = "block";
-  document.getElementById("ongoingControls").style.display = "none";
-}
+  function minimizeCall() {
+    document.getElementById("callOverlay").classList.remove("show");
+  }
 </script>
+</body>
+</html>
