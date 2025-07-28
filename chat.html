@@ -414,7 +414,7 @@ function joinGroup(groupName) {
 // 📂 Open private chat
 function openChat(to) {
   currentChat = to;
-  document.getElementById("chatWith").innerHTML = `${toUser} <small style='font-size:11px;'>(${formatLastSeen(allUsers[toUser]?.lastSeen)})</small>`;
+  document.getElementById("chatWith").textContent = toUser;
   document.getElementById("chatWindow").classList.add("active");
   document.getElementById("chatWindow").style.display = "flex";
   messagesDiv.innerHTML = "";
