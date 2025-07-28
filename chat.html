@@ -358,8 +358,11 @@ function refreshList() {
       const btn = document.createElement("button");
       btn.innerHTML = `${u} <small style='color:gray'>${allUsers[u].lastSeen || 'Offline'}</small>`;
       btn.onclick = () => {
-        if (reopenChatIfSame(u)) openChat(u);
-      };
+  if (currentChat !== u) {
+    closeChat();
+    setTimeout(() => openChat(u), 310);
+  }
+};
       users.appendChild(btn);
     });
 
@@ -376,8 +379,11 @@ function refreshList() {
       btn.className = "group";
       btn.innerHTML = `${g.public ? "# " : "🔒 "}${g.name}`;
       btn.onclick = () => {
-        if (reopenChatIfSame("group_" + id)) attemptJoinGroup(id, g.name);
-      };
+  if (currentChat !== "group_" + id) {
+    closeChat();
+    setTimeout(() => attemptJoinGroup(id, g.name), 310);
+  }
+};
       groups.appendChild(btn);
     });
 }
