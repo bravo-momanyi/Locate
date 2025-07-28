@@ -303,48 +303,80 @@ function refreshList() {
   const users = document.getElementById("userSection");
   const groups = document.getElementById("groupSection");
 
-  recent.innerHTML = "<h4>Recent Chats</h4>";
+  recent.innerHTML = "<h4>Recent Chats & Groups</h4>";
   users.innerHTML = "<h4>All Users</h4>";
   groups.innerHTML = "<h4>All Groups</h4>";
 
-  // Recent Chats
-  db.ref("users/" + user + "/recentChats").once("value", snap => {
-    const data = snap.val() || {};
-    const sorted = Object.entries(data).sort((a, b) => b[1] - a[1]);
-    sorted.forEach(([id]) => {
-      const isGroup = id.startsWith("group_");
-      const label = isGroup ? allGroups[id.slice(6)]?.name || id : id;
-      const btn = document.createElement("button");
-      btn.innerHTML = label;
-      btn.onclick = () => {
-        isGroup ? openGroup(id.slice(6), label) : openChat(id);
-      };
-      recent.appendChild(btn);
-    });
-  });
+  // 🔍 Recent
+  const sortedRecent = Object.entries(recentChats).sort((a, b) => b[1] - a[1]);
+  sortedRecent.forEach(([id]) => {
+    const isGroup = id.startsWith("group_");
+    const label = isGroup
+      ? allGroups[id.slice(6)]?.name || "Group"
+      : id;
 
-  // All Users
-  Object.keys(allUsers).forEach(u => {
-    const { email = "", mobile = "" } = allUsers[u];
-    if (u === user) return;
-    if ([u, email, mobile].some(v => v?.toLowerCase().includes(term))) {
-      const btn = document.createElement("button");
-      btn.innerHTML = `${u} <small style="color:gray">${allUsers[u].lastSeen || 'Offline'}</small>`;
-      btn.onclick = () => openChat(u);
-      users.appendChild(btn);
-    }
-  });
+    const matchesSearch = !term || (
+      isGroup
+        ? label.toLowerCase().includes(term)
+        : id.toLowerCase().includes(term) ||
+          (allUsers[id]?.email || "").toLowerCase().includes(term) ||
+          (allUsers[id]?.mobile || "").toLowerCase().includes(term)
+    );
 
-  // All Groups
-  Object.keys(allGroups).forEach(g => {
-    const group = allGroups[g];
-    if (!group?.name?.toLowerCase().includes(term)) return;
+    if (!matchesSearch) return;
+
     const btn = document.createElement("button");
-    btn.className = "group";
-    btn.innerHTML = `${group.public ? "# " : "🔒 "}${group.name}`;
-    btn.onclick = () => joinGroup(g);
-    groups.appendChild(btn);
+    const status = isGroup ? "" : `<small style='color:gray'>${allUsers[id]?.lastSeen || 'Offline'}</small>`;
+    btn.innerHTML = `${label} ${status} ${unreadCount[id] ? '<span class="unread-badge">' + unreadCount[id] + '</span>' : ''}`;
+    btn.onclick = () => {
+      if (currentChat !== id) {
+        closeChat();
+        setTimeout(() => {
+          isGroup ? openGroup(id.slice(6), label) : openChat(id);
+        }, 310);
+      }
+    };
+    recent.appendChild(btn);
   });
+
+  // 👥 All Users
+  Object.keys(allUsers)
+    .filter(u => {
+      if (u === user) return false;
+      const info = allUsers[u];
+      return (
+        u.toLowerCase().includes(term) ||
+        (info.email || "").toLowerCase().includes(term) ||
+        (info.mobile || "").toLowerCase().includes(term)
+      );
+    })
+    .sort()
+    .forEach(u => {
+      const btn = document.createElement("button");
+      btn.innerHTML = `${u} <small style='color:gray'>${allUsers[u].lastSeen || 'Offline'}</small>`;
+      btn.onclick = () => {
+        if (reopenChatIfSame(u)) openChat(u);
+      };
+      users.appendChild(btn);
+    });
+
+  // 👥 All Groups
+  Object.keys(allGroups)
+    .filter(id => {
+      const g = allGroups[id];
+      return g?.name?.toLowerCase().includes(term);
+    })
+    .sort((a, b) => allGroups[a].name.localeCompare(allGroups[b].name))
+    .forEach(id => {
+      const g = allGroups[id];
+      const btn = document.createElement("button");
+      btn.className = "group";
+      btn.innerHTML = `${g.public ? "# " : "🔒 "}${g.name}`;
+      btn.onclick = () => {
+        if (reopenChatIfSame("group_" + id)) attemptJoinGroup(id, g.name);
+      };
+      groups.appendChild(btn);
+    });
 }
 
 // 🔓 Join or open group
@@ -691,6 +723,7 @@ function updateRecent(chatId) {
   localStorage.setItem("recentChats", JSON.stringify(recentChats));
   updateRecentInDB();
 }
+document.getElementById("searchBox").addEventListener("input", refreshList);
     </script>
 </body>
 </html>
