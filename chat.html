@@ -595,8 +595,7 @@ function renderMsg(id, msg, isGroup = false, groupId = "") {
       if (deltaX > 0) {
         // Swipe right to reply
         replyingTo = { from: msg.from, text: msg.text };
-        document.getElementById("replyBox").innerHTML =
-          `<b>${msg.from}</b>: ${msg.text} <span onclick="cancelReply()" style="cursor:pointer;color:red;margin-left:10px">x</span>`;
+        document.getElementById("replyBox").style.display = "block"; // on reply
       } else {
         // Swipe left to cancel reply
         cancelReply();
@@ -627,7 +626,7 @@ function renderMsg(id, msg, isGroup = false, groupId = "") {
 // ❌ Cancel reply
 function cancelReply() {
   replyingTo = null;
-  document.getElementById("replyBox").innerHTML = "";
+document.getElementById("replyBox").style.display = "none";  // on cancel
 }
 
 // 📋 Right-click message options
