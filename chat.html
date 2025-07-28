@@ -170,6 +170,10 @@
     #msgMenu button:hover {
       background: #f2f2f2;
     }
+    #backBtn {
+  padding: 6px 12px;
+  font-size: 24px;
+    }
     @media (max-width: 600px) {
       #userList { width: 100%; }
       #chatWindow {
@@ -203,7 +207,11 @@
       <div style="padding: 10px; background: #128C7E; color: white; display: flex; justify-content: space-between;">
         <span id="chatWith">---</span>
         <div>
-          <button onclick="closeChat()">✖</button>
+          <div style="padding: 10px; background: #128C7E; color: white; display: flex; justify-content: space-between; align-items: center;">
+            <button id="backBtn" onclick="closeChat()" style="font-size: 20px; background: none; border: none; color: white; cursor: pointer;">←</button>
+            <span id="chatWith" style="flex: 1; text-align: center; font-weight: bold;"></span>
+            <div style="width: 40px;"></div>
+          </div>
         </div>
       </div>
       <div id="typingIndicator">Typing...</div>
@@ -388,6 +396,17 @@ function openGroup(name, label) {
   convoRef.on("child_added", s => renderMsg(s.key, s.val(), true, name));
 
   db.ref("users/" + user + "/recentChats/group_" + name).set(Date.now());
+}
+function closeChat() {
+  const chatWindow = document.getElementById("chatWindow");
+  chatWindow.classList.remove("active");
+
+  setTimeout(() => {
+    chatWindow.style.display = "none";
+    messagesDiv.innerHTML = "";
+    currentChat = "";
+    lastMsgDate = ""; // reset floating date header
+  }, 300);
 }
 
 // 🧾 Render a message
