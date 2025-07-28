@@ -307,15 +307,13 @@ function refreshList() {
   const users = document.getElementById("userSection");
   const groups = document.getElementById("groupSection");
 
-  // Clear all sections
   recent.innerHTML = "<h4>Recent Chats & Groups</h4>";
   users.innerHTML = "<h4>All Users</h4>";
   groups.innerHTML = "<h4>All Groups</h4>";
 
-  // ✅ Load recent chats from Firebase
   db.ref("recentChats/" + user).once("value", snap => {
     const rc = snap.val() || {};
-    const seen = new Set(); // prevent duplication
+    const seen = new Set();
 
     const sortedRecent = Object.entries(rc).sort((a, b) => b[1] - a[1]);
     sortedRecent.forEach(([id]) => {
@@ -336,7 +334,11 @@ function refreshList() {
 
       if (match) {
         const btn = document.createElement("button");
-        const status = isGroup ? "" : `<small style='color:gray'>${allUsers[id]?.lastSeen || 'Offline'}</small>`;
+        let status = "";
+        if (!isGroup && allUsers[id]) {
+          const uData = allUsers[id];
+          status = `<small style='color:gray'>${formatLastSeen(uData.lastSeen, uData.online)}</small>`;
+        }
         btn.innerHTML = `${label} ${status} ${unreadCount[id] ? '<span class="unread-badge">' + unreadCount[id] + '</span>' : ''}`;
         btn.onclick = () => {
           if (currentChat !== id) {
@@ -351,7 +353,7 @@ function refreshList() {
     });
   });
 
-  // ✅ All users section
+  // All Users
   Object.keys(allUsers)
     .filter(u =>
       u !== user &&
@@ -363,8 +365,9 @@ function refreshList() {
     )
     .sort()
     .forEach(u => {
+      const uData = allUsers[u];
       const btn = document.createElement("button");
-      btn.innerHTML = `${u} <small style='color:gray'>${allUsers[u].lastSeen || 'Offline'}</small>`;
+      btn.innerHTML = `${u} <small style='color:gray'>${formatLastSeen(uData.lastSeen, uData.online)}</small>`;
       btn.onclick = () => {
         if (currentChat !== u) {
           closeChat();
@@ -374,7 +377,7 @@ function refreshList() {
       users.appendChild(btn);
     });
 
-  // ✅ All groups section
+  // All Groups
   Object.keys(allGroups)
     .filter(id => {
       const g = allGroups[id];
@@ -414,10 +417,17 @@ function joinGroup(groupName) {
 // 📂 Open private chat
 function openChat(to) {
   currentChat = to;
-  document.getElementById("chatWith").textContent = toUser;
+  const uData = allUsers[to] || {};
+  const displayStatus = formatLastSeen(uData.lastSeen, uData.online);
+
+  document.getElementById("chatWith").innerHTML = `
+    ${to}
+    <div style="font-size: 12px; color: gray">${displayStatus}</div>
+  `;
   document.getElementById("chatWindow").classList.add("active");
   document.getElementById("chatWindow").style.display = "flex";
   messagesDiv.innerHTML = "";
+
   const cid = chatId(user, to);
 
   if (convoRef) convoRef.off();
@@ -432,13 +442,13 @@ function openChat(to) {
   });
 
   db.ref(`seen/${cid}/${user}`).set(Date.now());
-  db.ref("recentChats/" + user + "/" + toUser).set(Date.now());
+  db.ref("recentChats/" + user + "/" + to).set(Date.now());
 }
 
 // 📂 Open group chat
 function openGroup(name, label) {
   currentChat = "group_" + name;
-  document.getElementById("chatWith").textContent = label;
+  document.getElementById("chatWith").innerHTML = label;
   document.getElementById("chatWindow").classList.add("active");
   document.getElementById("chatWindow").style.display = "flex";
   messagesDiv.innerHTML = "";
@@ -447,7 +457,7 @@ function openGroup(name, label) {
   convoRef = db.ref("groupChats/" + name);
   convoRef.on("child_added", s => renderMsg(s.key, s.val(), true, name));
 
-db.ref("recentChats/" + user + "/group_" + id).set(Date.now());
+  db.ref("recentChats/" + user + "/group_" + name).set(Date.now());
 }
 function closeChat() {
   const chatWindow = document.getElementById("chatWindow");
@@ -760,19 +770,19 @@ clearSearch.addEventListener("click", () => {
 
 // Hide "×" initially if empty
 clearSearch.style.display = "none";
-function formatLastSeen(timestamp) {
-  if (!timestamp) return "Offline";
-  const now = new Date();
-  const date = new Date(timestamp);
+function formatLastSeen(ts, online) {
+  if (online) return "Online";
+  if (!ts) return "Offline";
 
-  const isToday = now.toDateString() === date.toDateString();
-  const isYesterday = new Date(now - 86400000).toDateString() === date.toDateString();
+  const now = Date.now();
+  const diff = now - ts;
 
-  const time = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  if (diff < 60000) return "Last seen just now";
+  if (diff < 3600000) return `Last seen ${Math.floor(diff / 60000)} mins ago`;
+  if (diff < 86400000) return `Last seen at ${new Date(ts).toLocaleTimeString()}`;
 
-  if (isToday) return `Today at ${time}`;
-  if (isYesterday) return `Yesterday at ${time}`;
-  return `${date.toLocaleDateString()} at ${time}`;
+  const date = new Date(ts);
+  return `Last seen on ${date.toLocaleDateString()} at ${date.toLocaleTimeString()}`;
 }
     </script>
 </body>
