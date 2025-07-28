@@ -525,6 +525,8 @@ function closeChat() {
 }
 
 // 🧾 Render a message
+
+// 🧾 Render a message
 function renderMsg(id, msg, isGroup = false, groupId = "") {
   if (!msg || msg.deletedFor?.[user]) return;
 
@@ -575,22 +577,23 @@ function renderMsg(id, msg, isGroup = false, groupId = "") {
 
   // ➤ Swipe to reply
   let touchStartX = 0;
-div.addEventListener("touchstart", e => {
-  touchStartX = e.touches[0].clientX;
-});
-div.addEventListener("touchend", e => {
-  const deltaX = e.changedTouches[0].clientX - touchStartX;
-  if (Math.abs(deltaX) > 80) {
-    if (deltaX > 0) {
-      // Swipe right to reply
-      replyTo = { from: msg.from, text: msg.text };
-      document.getElementById("replyBox").innerHTML = `<b>${msg.from}</b>: ${msg.text} <span onclick="cancelReply()" style="cursor:pointer;color:red;margin-left:10px">x</span>`;
-    } else {
-      // Swipe left to cancel reply
-      cancelReply();
+  div.addEventListener("touchstart", e => {
+    touchStartX = e.touches[0].clientX;
+  });
+  div.addEventListener("touchend", e => {
+    const deltaX = e.changedTouches[0].clientX - touchStartX;
+    if (Math.abs(deltaX) > 80) {
+      if (deltaX > 0) {
+        // Swipe right to reply
+        replyingTo = { from: msg.from, text: msg.text };
+        document.getElementById("replyBox").innerHTML =
+          `<b>${msg.from}</b>: ${msg.text} <span onclick="cancelReply()" style="cursor:pointer;color:red;margin-left:10px">x</span>`;
+      } else {
+        // Swipe left to cancel reply
+        cancelReply();
+      }
     }
-  }
-});
+  });
 
   messagesDiv.appendChild(div);
   messagesDiv.scrollTop = messagesDiv.scrollHeight;
@@ -611,11 +614,58 @@ div.addEventListener("touchend", e => {
     ref.set(true);
   }
 }
+
+// ❌ Cancel reply
 function cancelReply() {
-  replyTo = null;
+  replyingTo = null;
   document.getElementById("replyBox").innerHTML = "";
 }
 
+// 📋 Right-click message options
+function showMsgOptions(id, msg, isGroup, groupId, div, x, y) {
+  const menu = document.createElement("div");
+  menu.className = "context-menu";
+  menu.style.top = y + "px";
+  menu.style.left = x + "px";
+
+  // Delete for Me
+  const delMe = document.createElement("div");
+  delMe.textContent = "Delete for Me";
+  delMe.onclick = () => {
+    const path = isGroup ? `groupChats/${groupId}/${id}` : `chats/${chatId(user, currentChat)}/${id}`;
+    db.ref(path + `/deletedFor/${user}`).set(true);
+    menu.remove();
+  };
+  menu.appendChild(delMe);
+
+  // Delete for Everyone — only sender and within 1 minute
+  if (msg.from === user && Date.now() - msg.ts < 60000) {
+    const delAll = document.createElement("div");
+    delAll.textContent = "Delete for Everyone";
+    delAll.onclick = () => {
+      const path = isGroup ? `groupChats/${groupId}/${id}` : `chats/${chatId(user, currentChat)}/${id}`;
+      db.ref(path + `/deleted`).set(true);
+      menu.remove();
+    };
+    menu.appendChild(delAll);
+
+    // Edit message
+    const edit = document.createElement("div");
+    edit.textContent = "Edit";
+    edit.onclick = () => {
+      const newText = prompt("Edit your message:", msg.text);
+      if (newText && newText.trim()) {
+        const path = isGroup ? `groupChats/${groupId}/${id}` : `chats/${chatId(user, currentChat)}/${id}`;
+        db.ref(path + `/text`).set(newText.trim());
+      }
+      menu.remove();
+    };
+    menu.appendChild(edit);
+  }
+
+  document.body.appendChild(menu);
+  document.addEventListener("click", () => menu.remove(), { once: true });
+}
     </script>
     <script>
 // ✍️ Typing indicator (only in 1-on-1)
