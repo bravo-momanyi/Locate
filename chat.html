@@ -307,71 +307,81 @@
   });
 
   // 🔍 Refresh user/group list
-  function refreshList() {
-    const term = document.getElementById("searchBox").value.toLowerCase();
-    const recent = document.getElementById("recentChats");
-    const users = document.getElementById("userSection");
-    const groups = document.getElementById("groupSection");
 
-    recent.innerHTML = "<h4>Recent Chats</h4>";
-    users.innerHTML = "<h4>All Users</h4>";
-    groups.innerHTML = "<h4>All Groups</h4>";
+  <script>
+function refreshList() {
+  const term = document.getElementById("searchBox").value.toLowerCase().trim();
+  const recent = document.getElementById("recentChats");
+  const users = document.getElementById("userSection");
+  const groups = document.getElementById("groupSection");
 
-    const sortedRecent = Object.entries(recentChats).sort((a, b) => b[1] - a[1]);
-    sortedRecent.forEach(([id]) => {
-      const isGroup = id.startsWith("group_");
-      const label = isGroup ? allGroups[id.slice(6)]?.name || "Group" : id;
-      if (label.toLowerCase().includes(term)) {
-        const btn = document.createElement("button");
-        const status = isGroup ? "" : `<small style='color:gray'>${formatLastSeen(allUsers[id]?.lastSeen)}</small>`;
-        btn.innerHTML = `${label} ${status} ${unreadCount[id] ? '<span class="unread-badge">' + unreadCount[id] + '</span>' : ''}`;
-        btn.onclick = () => {
-          closeChat();
-          setTimeout(() => {
-            isGroup ? openGroup(id.slice(6), label) : openChat(id);
-          }, 310);
-        };
-        recent.appendChild(btn);
-      }
+  recent.innerHTML = "<h4>Recent Chats</h4>";
+  users.innerHTML = "<h4>All Users</h4>";
+  groups.innerHTML = "<h4>All Groups</h4>";
+
+  // ✅ Recent
+  sortByTime(recentChats).forEach(([id]) => {
+    const isGroup = id.startsWith("group_");
+    const label = isGroup ? allGroups[id.slice(6)]?.name || "Group" : id;
+    const show = label.toLowerCase().includes(term) || id.toLowerCase().includes(term);
+
+    if (show) {
+      const btn = document.createElement("button");
+      const status = isGroup ? "" : `<small style='color:gray'>${formatLastSeen(allUsers[id]?.lastSeen)}</small>`;
+      const badge = unreadCount[id] ? `<span class="unread-badge">${unreadCount[id]}</span>` : "";
+      btn.innerHTML = `${label} ${status} ${badge}`;
+      btn.onclick = () => {
+        closeChat();
+        setTimeout(() => {
+          if (isGroup) {
+            openGroup(id.slice(6), label);
+          } else {
+            openChat(id);
+          }
+        }, 100); // reduced delay
+      };
+      recent.appendChild(btn);
+    }
+  });
+
+  // ✅ All users
+  Object.entries(allUsers)
+    .filter(([uid, info]) =>
+      uid !== user &&
+      (
+        uid.toLowerCase().includes(term) ||
+        (info.email || "").toLowerCase().includes(term) ||
+        (info.phone || "").toLowerCase().includes(term)
+      )
+    )
+    .sort()
+    .forEach(([uid, info]) => {
+      const btn = document.createElement("button");
+      const lastSeen = formatLastSeen(info.lastSeen);
+      btn.innerHTML = `${uid} <small style='color:gray'>${lastSeen}</small>`;
+      btn.onclick = () => {
+        closeChat();
+        setTimeout(() => openChat(uid), 100);
+      };
+      users.appendChild(btn);
     });
 
-    Object.keys(allUsers)
-      .filter(u =>
-        u !== user &&
-        (u.toLowerCase().includes(term) ||
-         allUsers[u].email?.toLowerCase().includes(term) ||
-         allUsers[u].phone?.toLowerCase().includes(term))
-      )
-      .sort()
-      .forEach(u => {
-        const btn = document.createElement("button");
-        const lastSeen = formatLastSeen(allUsers[u]?.lastSeen);
-        btn.innerHTML = `${u} <small style='color:gray'>${lastSeen}</small>`;
-        btn.onclick = () => {
-          closeChat();
-          setTimeout(() => openChat(u), 310);
-        };
-        users.appendChild(btn);
-      });
-
-    Object.keys(allGroups)
-      .filter(id =>
-        allGroups[id]?.name &&
-        allGroups[id].name.toLowerCase().includes(term)
-      )
-      .sort((a, b) => allGroups[a].name.localeCompare(allGroups[b].name))
-      .forEach(id => {
-        const g = allGroups[id];
-        const btn = document.createElement("button");
-        btn.className = "group";
-        btn.innerHTML = `${g.public ? "# " : "🔒 "}${g.name}`;
-        btn.onclick = () => {
-          closeChat();
-          setTimeout(() => attemptJoinGroup(id, g.name, g.public, g.password), 310);
-        };
-        groups.appendChild(btn);
-      });
-  }
+  // ✅ All groups
+  Object.entries(allGroups)
+    .filter(([id, g]) => g?.name?.toLowerCase().includes(term))
+    .sort((a, b) => a[1].name.localeCompare(b[1].name))
+    .forEach(([id, g]) => {
+      const btn = document.createElement("button");
+      btn.className = "group";
+      btn.innerHTML = `${g.public ? "# " : "🔒 "}${g.name}`;
+      btn.onclick = () => {
+        closeChat();
+        setTimeout(() => attemptJoinGroup(id, g.name), 100);
+      };
+      groups.appendChild(btn);
+    });
+}
+</script>
 
   // 📅 Format helper
   function formatLastSeen(ts) {
