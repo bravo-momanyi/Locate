@@ -777,7 +777,7 @@ function formatDateLabel(ts) {
 
 // 🧾 Enhanced renderMessage with floating date headers
 let lastMsgDate = "";
-function renderMessage(id, msg, isGroup = false, groupId = "") {
+function renderMsg(id, msg, isGroup = false, groupId = "") {
   if (!msg || msg.deletedFor?.[user]) return;
 
   const dateLabel = formatDateLabel(msg.ts);
