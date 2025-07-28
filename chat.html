@@ -527,8 +527,17 @@ function closeChat() {
 // 🧾 Render a message
 
 // 🧾 Render a message
-function renderMsga(id, msg, isGroup = false, groupId = "") {
+function renderMsg(id, msg, isGroup = false, groupId = "") {
   if (!msg || msg.deletedFor?.[user]) return;
+
+  const dateLabel = formatDateLabel(msg.ts);
+  if (dateLabel !== lastMsgDate) {
+    const dateDiv = document.createElement("div");
+    dateDiv.textContent = dateLabel;
+    dateDiv.style.cssText = "text-align:center;color:gray;font-size:12px;margin:6px 0;";
+    messagesDiv.appendChild(dateDiv);
+    lastMsgDate = dateLabel;
+  }
 
   const existing = document.querySelector(`.msg[data-id='${id}']`);
   if (existing) existing.remove(); // prevent duplication
@@ -777,7 +786,7 @@ function formatDateLabel(ts) {
 
 // 🧾 Enhanced renderMessage with floating date headers
 let lastMsgDate = "";
-function renderMsg(id, msg, isGroup = false, groupId = "") {
+function renderMsg1(id, msg, isGroup = false, groupId = "") {
   if (!msg || msg.deletedFor?.[user]) return;
 
   const dateLabel = formatDateLabel(msg.ts);
