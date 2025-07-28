@@ -197,7 +197,10 @@
   </header>
   <div style="display: flex; height: calc(100% - 50px);">
     <div id="userList">
-      <input id="searchBox" placeholder="Search users/groups..."/>
+      <div style="position: relative;">
+  <input id="searchBox" placeholder="Search users/groups..." style="padding-right: 30px;" />
+  <span id="clearSearch" style="position: absolute; right: 10px; top: 8px; cursor: pointer; font-weight: bold; font-size: 16px; color: #999;">×</span>
+      </div>
       <button onclick="createGroup()">Create Group</button>
       <div id="recentChats"><h4>Recent Chats</h4></div>
       <div id="userSection"><h4>All Users</h4></div>
@@ -724,6 +727,23 @@ function updateRecent(chatId) {
   updateRecentInDB();
 }
 document.getElementById("searchBox").addEventListener("input", refreshList);
+const searchBox = document.getElementById("searchBox");
+const clearSearch = document.getElementById("clearSearch");
+
+searchBox.addEventListener("input", () => {
+  refreshList();
+  clearSearch.style.display = searchBox.value ? "block" : "none";
+});
+
+clearSearch.addEventListener("click", () => {
+  searchBox.value = "";
+  refreshList();
+  clearSearch.style.display = "none";
+});
+
+// Hide "×" initially if empty
+clearSearch.style.display = "none";
+
     </script>
 </body>
 </html>
