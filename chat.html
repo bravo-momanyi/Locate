@@ -816,6 +816,14 @@ clearSearch.addEventListener("click", () => {
   refreshList();
   clearSearch.style.display = "none";
 });
+const typingPath = currentChat.startsWith("group_")
+  ? "typing/" + currentChat + "/" + user
+  : "typing/" + chatId(user, currentChat) + "/" + user;
+
+document.getElementById("msgInput").addEventListener("input", () => {
+  const input = document.getElementById("msgInput").value.trim();
+  db.ref(typingPath).set(!!input);
+});
 
 // Hide "×" initially if empty
 clearSearch.style.display = "none";
