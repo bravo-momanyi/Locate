@@ -390,59 +390,49 @@
       openGroup(id, name);
     }
     function openChat(toUser) {
-      currentChat = toUser;
-      const seen = formatLastSeen(allUsers[toUser]?.lastSeen);
-      document.getElementById("chatWith").innerHTML =
-        `${toUser} <small style='font-size:11px;'>(${seen})</small>`;
-      document.getElementById("chatTitleMenu").style.display = "none";
+  currentChat = toUser;
+  const seen = formatLastSeen(allUsers[toUser]?.lastSeen || 0);
+  document.getElementById("chatWith").innerHTML = `${toUser} <small style='font-size:11px;'>(${seen})</small>`;
+  document.getElementById("chatWindow").classList.add("active");
+  document.getElementById("chatWindow").style.display = "flex";
+  messagesDiv.innerHTML = "";
+  lastRenderedDate = "";
 
-      const chatWindow = document.getElementById("chatWindow");
-      chatWindow.classList.add("active");
-      chatWindow.style.display = "flex";
-      messagesDiv.innerHTML = "";
-      lastRenderedDate = "";
+  if (convoRef) convoRef.off();
+  if (typingRef) typingRef.off();
 
-      if (convoRef) convoRef.off();
-      if (typingRef) typingRef.off();
+  const id = chatId(user, toUser); // eg. userA_userB
+  convoRef = db.ref("chats/" + id);
+  convoRef.on("child_added", snap => {
+    renderMessage(snap.key, snap.val(), false, id);
+  });
 
-      const id = chatId(user, toUser);
-      convoRef = db.ref("chats/" + id);
-      convoRef.on("child_added", snap => renderMessage(snap.key, snap.val(), false, id));
-      convoRef.on("child_changed", snap => updateMessageUI(snap.key, snap.val(), false, id));
+  recentChats[currentChat] = Date.now();
+  db.ref("recentChats/" + user).set(recentChats);
+  unreadCount[toUser] = 0;
 
-      typingRef = db.ref(`typing/${id}/${toUser}`);
-      typingRef.on("value", snap => {
-        document.getElementById("typingIndicator").style.display = snap.val() ? "block" : "none";
-      });
+  // Mark as seen
+  db.ref("seen/" + id + "/" + user).set(firebase.database.ServerValue.TIMESTAMP);
+}
 
-      recentChats[currentChat] = Date.now();
-      db.ref("recentChats/" + user).set(recentChats);
-      unreadCount[toUser] = 0;
+function openGroup(name, label) {
+  currentChat = "group_" + name;
+  document.getElementById("chatWith").textContent = label;
+  document.getElementById("chatWindow").classList.add("active");
+  document.getElementById("chatWindow").style.display = "flex";
+  messagesDiv.innerHTML = "";
+  lastRenderedDate = "";
 
-      db.ref("seen/" + id + "/" + user).set(firebase.database.ServerValue.TIMESTAMP);
-    }
+  if (convoRef) convoRef.off();
+  convoRef = db.ref("groupChats/" + name);
+  convoRef.on("child_added", snap => {
+    renderMessage(snap.key, snap.val(), true, name);
+  });
 
-    function openGroup(name, label) {
-      currentChat = "group_" + name;
-      document.getElementById("chatWith").textContent = label;
-      document.getElementById("chatTitleMenu").style.display = "none";
-
-      const chatWindow = document.getElementById("chatWindow");
-      chatWindow.classList.add("active");
-      chatWindow.style.display = "flex";
-      messagesDiv.innerHTML = "";
-      lastRenderedDate = "";
-
-      if (convoRef) convoRef.off();
-
-      convoRef = db.ref("groupChats/" + name);
-      convoRef.on("child_added", snap => renderMessage(snap.key, snap.val(), true, name));
-      convoRef.on("child_changed", snap => updateMessageUI(snap.key, snap.val(), true, name));
-
-      recentChats[currentChat] = Date.now();
-      db.ref("recentChats/" + user).set(recentChats);
-      unreadCount["group_" + name] = 0;
-    }
+  recentChats[currentChat] = Date.now();
+  db.ref("recentChats/" + user).set(recentChats);
+  unreadCount[currentChat] = 0;
+}
 
     function closeChat() {
       const chatWindow = document.getElementById("chatWindow");
@@ -560,30 +550,31 @@
       setTimeout(() => db.ref("typing/" + id + "/" + user).set(false), 1500);
     });
     function sendMsg() {
-      const text = msgBox.value.trim();
-      if (!text || !currentChat) return;
+  const text = msgBox.value.trim();
+  if (!text || !currentChat) return;
 
-      const ts = Date.now();
-      const msgId = db.ref().push().key;
-      const msgData = {
-        from: user,
-        text,
-        ts
-      };
+  const now = Date.now();
+  const data = {
+    from: user,
+    text,
+    ts: now
+  };
 
-      if (replyingTo) {
-        msgData.replyTo = replyingTo;
-        replyingTo = null;
-      }
+  if (replyingTo) data.replyTo = replyingTo;
 
-      if (currentChat.startsWith("group_")) {
-        db.ref("groupChats/" + currentChat.slice(6) + "/" + msgId).set(msgData);
-      } else {
-        const id = chatId(user, currentChat);
-        db.ref("chats/" + id + "/" + msgId).set(msgData);
-      }
+  if (currentChat.startsWith("group_")) {
+    const groupName = currentChat.slice(6);
+    const msgId = db.ref().push().key;
+    db.ref("groupChats/" + groupName + "/" + msgId).set(data);
+  } else {
+    const id = chatId(user, currentChat);
+    const msgId = db.ref().push().key;
+    db.ref("chats/" + id + "/" + msgId).set(data);
+    // Optionally update delivery state, etc.
+  }
 
-      msgBox.value = "";
+  msgBox.value = "";
+  replyingTo = null;
     }
 
     function showMsgOptions(id, msg, isGroup, refName, div, x, y) {
