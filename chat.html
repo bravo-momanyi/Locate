@@ -451,104 +451,43 @@ function openGroup(name, label) {
       if (date.toDateString() === yesterday.toDateString()) return "Yesterday";
       return date.toLocaleDateString();
     }
+    function renderMessage(id, msg, isGroup, groupName) {
+  if (!msg || msg.deletedFor?.[user]) return;
 
-    function renderMessage(id, msg, isGroup = false, groupName = "") {
-      if (!msg || msg.deletedFor?.[user]) return;
-      const msgDate = new Date(msg.ts);
-      const msgDateStr = msgDate.toDateString();
+  const msgDate = new Date(msg.ts);
+  const msgDateStr = msgDate.toDateString();
+  if (msgDateStr !== lastRenderedDate) {
+    const label = document.createElement("div");
+    label.className = "date-label";
+    label.textContent = formatDateLabel(msgDate);
+    messagesDiv.appendChild(label);
+    lastRenderedDate = msgDateStr;
+  }
 
-      if (msgDateStr !== lastRenderedDate) {
-        const label = document.createElement("div");
-        label.className = "date-label";
-        label.textContent = formatDateLabel(msgDate);
-        messagesDiv.appendChild(label);
-        lastRenderedDate = msgDateStr;
-      }
+  const div = document.createElement("div");
+  div.className = "msg " + (msg.from === user ? "you" : "them");
 
-      const div = document.createElement("div");
-      div.className = "msg " + (msg.from === user ? "you" : "them");
+  let inner = "";
 
-      let inner = "";
+  if (msg.deleted) {
+    inner = "<i>This message was deleted</i>";
+  } else {
+    if (msg.replyTo) {
+      inner += `<div style="font-size:12px;color:gray;border-left:3px solid #ccc;padding-left:5px">
+        <b>${msg.replyTo.from}</b>: ${msg.replyTo.text}</div>`;
+    }
+    if (isGroup && msg.from !== user) inner += `<b>${msg.from}:</b> `;
+    inner += msg.text;
+  }
 
-      if (msg.deleted) {
-        inner = "<i>This message was deleted</i>";
-      } else {
-        if (msg.replyTo) {
-          inner += `<div style="font-size:12px;color:gray;border-left:3px solid #ccc;padding-left:5px">
-            <b>${msg.replyTo.from}</b>: ${msg.replyTo.text}</div>`;
-        }
-        if (isGroup && msg.from !== user) inner += `<b>${msg.from}:</b> `;
-        inner += msg.text;
-      }
+  const ts = new Date(msg.ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  inner += `<div class="msg-time">${ts}</div>`;
 
-      const status = msg.from === user
-        ? (msg.readBy?.[currentChat] ? "✓✓✓" : msg.deliveredTo?.[currentChat] ? "✓✓" : "✓")
-        : "";
-
-      const ts = new Date(msg.ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-      inner += `<div class="msg-time">${ts}<span class="msg-status">${status}</span></div>`;
-
-      div.innerHTML = inner;
-      div.dataset.id = id;
-      div.dataset.ts = msg.ts;
-      div.dataset.from = msg.from;
-      div.dataset.text = msg.text;
-
-      div.addEventListener("contextmenu", e => {
-        e.preventDefault();
-        showMsgOptions(id, msg, isGroup, groupName, div, e.pageX, e.pageY);
-      });
-
-      document.getElementById("chatWith").onclick = e => {
-        e.stopPropagation();
-        const menu = document.getElementById("chatTitleMenu");
-        menu.innerHTML = currentChat.startsWith("group_")
-          ? `<button onclick="leaveGroup()">Leave Group</button><br><button onclick="alert('Coming soon: View members')">View Members</button>`
-          : `<button onclick="deleteChat()">Delete Chat</button><br><button onclick="blockUser()">Block User</button>`;
-        menu.style.left = e.pageX + "px";
-        menu.style.top = e.pageY + "px";
-        menu.style.display = "block";
-      };
-
-      // Swipe to reply
-      let swipeTarget = null;
-      document.addEventListener("touchstart", e => {
-        swipeTarget = e.target.closest(".msg");
-        if (swipeTarget) swipeTarget.startX = e.touches[0].clientX;
-      });
-
-      document.addEventListener("touchend", e => {
-        if (!swipeTarget) return;
-        const endX = e.changedTouches[0].clientX;
-        if (endX - swipeTarget.startX > 80) {
-          swipeTarget.style.borderLeft = "4px solid #25D366";
-          replyingTo = {
-            from: swipeTarget.dataset.from,
-            text: swipeTarget.dataset.text,
-            ts: swipeTarget.dataset.ts
-          };
-        }
-        swipeTarget = null;
-      });
-
-      messagesDiv.appendChild(div);
-      messagesDiv.scrollTop = messagesDiv.scrollHeight;
-
-      // Mark as read
-      if (msg.from !== user && !msg.readBy?.[user]) {
-        const ref = isGroup
-          ? db.ref("groupChats/" + groupName + "/" + id + "/readBy/" + user)
-          : db.ref("chats/" + chatId(user, currentChat) + "/" + id + "/readBy/" + user);
-        ref.set(true);
-      }
+  div.innerHTML = inner;
+  messagesDiv.appendChild(div);
+  messagesDiv.scrollTop = messagesDiv.scrollHeight;
     }
 
-    msgBox.addEventListener("input", () => {
-      if (!currentChat || currentChat.startsWith("group_")) return;
-      const id = chatId(user, currentChat);
-      db.ref("typing/" + id + "/" + user).set(true);
-      setTimeout(() => db.ref("typing/" + id + "/" + user).set(false), 1500);
-    });
     function sendMsg() {
   const text = msgBox.value.trim();
   if (!text || !currentChat) return;
