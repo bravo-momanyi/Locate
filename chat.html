@@ -286,120 +286,42 @@ function createGroup() {
     members: { [user]: true }
   });
 }
+let usersLoaded = false, groupsLoaded = false;
 
 // 🔁 Load users
 db.ref("users").on("value", snap => {
   allUsers = snap.val() || {};
-  refreshList();
+  usersLoaded = true;
+  if (groupsLoaded) refreshList(); // only call if both loaded
 });
 
-// 🔁 Load groups
 db.ref("groups").on("value", snap => {
   allGroups = snap.val() || {};
-  refreshList();
+  groupsLoaded = true;
+  if (usersLoaded) refreshList(); // only call if both loaded
 });
-
 // 🔍 Search and refresh chat list
 function refreshList() {
-  loadRecentChats();
-  
   const term = document.getElementById("searchBox").value.toLowerCase();
   const recent = document.getElementById("recentChats");
   const users = document.getElementById("userSection");
   const groups = document.getElementById("groupSection");
 
+  // Clear all sections
   recent.innerHTML = "<h4>Recent Chats & Groups</h4>";
   users.innerHTML = "<h4>All Users</h4>";
   groups.innerHTML = "<h4>All Groups</h4>";
 
-  
-
-    const sortedRecent = Object.entries(rc).sort((a, b) => b[1] - a[1]);
-    sortedRecent.forEach(([id]) => {
-      const isGroup = id.startsWith("group_");
-      const groupId = id.slice(6);
-      const label = isGroup ? allGroups[groupId]?.name || "Group" : id;
-
-      if (
-        (isGroup && label.toLowerCase().includes(term)) ||
-        (!isGroup &&
-          (id.toLowerCase().includes(term) ||
-           allUsers[id]?.email?.toLowerCase().includes(term) ||
-           allUsers[id]?.mobile?.toLowerCase().includes(term)))
-      ) {
-        const btn = document.createElement("button");
-        const status = isGroup ? "" : `<small style='color:gray'>${allUsers[id]?.lastSeen || 'Offline'}</small>`;
-        btn.innerHTML = `${label} ${status} ${unreadCount[id] ? '<span class="unread-badge">' + unreadCount[id] + '</span>' : ''}`;
-        btn.onclick = () => {
-          if (currentChat !== id) {
-            closeChat();
-            setTimeout(() => {
-              isGroup ? openGroup(groupId, label) : openChat(id);
-            }, 310);
-          }
-        };
-        recent.appendChild(btn);
-      }
-    });
-  });
-
-  // 👤 Filter all users
-  Object.keys(allUsers)
-    .filter(u =>
-      u !== user &&
-      (
-        u.toLowerCase().includes(term) ||
-        allUsers[u]?.email?.toLowerCase().includes(term) ||
-        allUsers[u]?.mobile?.toLowerCase().includes(term)
-      )
-    )
-    .sort()
-    .forEach(u => {
-      const btn = document.createElement("button");
-      btn.innerHTML = `${u} <small style='color:gray'>${allUsers[u].lastSeen || 'Offline'}</small>`;
-      btn.onclick = () => {
-  if (currentChat !== u) {
-    closeChat();
-    setTimeout(() => openChat(u), 310);
-  }
-};
-      users.appendChild(btn);
-    });
-
-  // 👥 Filter groups
-  Object.keys(allGroups)
-    .filter(id => {
-      const g = allGroups[id];
-      return g?.name && g.name.toLowerCase().includes(term);
-    })
-    .sort((a, b) => allGroups[a].name.localeCompare(allGroups[b].name))
-    .forEach(id => {
-      const g = allGroups[id];
-      const btn = document.createElement("button");
-      btn.className = "group";
-      btn.innerHTML = `${g.public ? "# " : "🔒 "}${g.name}`;
-      btn.onclick = () => {
-  if (currentChat !== "group_" + id) {
-    closeChat();
-    setTimeout(() => {
-      db.ref("groups/" + id + "/members/" + user).set(true);
-      openGroup(id, g.name);
-    }, 310);
-  }
-};
-      groups.appendChild(btn);
-    });
-}
-function loadRecentChats() {
-  const recent = document.getElementById("recentChats");
-  recent.innerHTML = "<h4>Recent Chats & Groups</h4>";
-  
+  // ✅ Load recent chats from Firebase
   db.ref("recentChats/" + user).once("value", snap => {
     const rc = snap.val() || {};
-    const term = document.getElementById("searchBox").value.toLowerCase();
+    const seen = new Set(); // prevent duplication
 
     const sortedRecent = Object.entries(rc).sort((a, b) => b[1] - a[1]);
     sortedRecent.forEach(([id]) => {
+      if (seen.has(id)) return;
+      seen.add(id);
+
       const isGroup = id.startsWith("group_");
       const groupId = id.slice(6);
       const label = isGroup ? allGroups[groupId]?.name || "Group" : id;
@@ -428,7 +350,55 @@ function loadRecentChats() {
       }
     });
   });
+
+  // ✅ All users section
+  Object.keys(allUsers)
+    .filter(u =>
+      u !== user &&
+      (
+        u.toLowerCase().includes(term) ||
+        allUsers[u]?.email?.toLowerCase().includes(term) ||
+        allUsers[u]?.mobile?.toLowerCase().includes(term)
+      )
+    )
+    .sort()
+    .forEach(u => {
+      const btn = document.createElement("button");
+      btn.innerHTML = `${u} <small style='color:gray'>${allUsers[u].lastSeen || 'Offline'}</small>`;
+      btn.onclick = () => {
+        if (currentChat !== u) {
+          closeChat();
+          setTimeout(() => openChat(u), 310);
+        }
+      };
+      users.appendChild(btn);
+    });
+
+  // ✅ All groups section
+  Object.keys(allGroups)
+    .filter(id => {
+      const g = allGroups[id];
+      return g?.name && g.name.toLowerCase().includes(term);
+    })
+    .sort((a, b) => allGroups[a].name.localeCompare(allGroups[b].name))
+    .forEach(id => {
+      const g = allGroups[id];
+      const btn = document.createElement("button");
+      btn.className = "group";
+      btn.innerHTML = `${g.public ? "# " : "🔒 "}${g.name}`;
+      btn.onclick = () => {
+        if (currentChat !== "group_" + id) {
+          closeChat();
+          setTimeout(() => {
+            db.ref("groups/" + id + "/members/" + user).set(true);
+            openGroup(id, g.name);
+          }, 310);
+        }
+      };
+      groups.appendChild(btn);
+    });
 }
+
 // 🔓 Join or open group
 function joinGroup(groupName) {
   const group = allGroups[groupName];
