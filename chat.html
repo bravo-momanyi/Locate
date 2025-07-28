@@ -249,7 +249,59 @@
     });
   }
 
-  function refreshList() {
+ 
+
+  // Continue in Part 3...
+</script>
+<script>
+  function openChat(toUser) {
+    currentChat = toUser;
+    const seen = formatLastSeen(allUsers[toUser]?.lastSeen);
+    document.getElementById("chatWith").innerHTML = `${toUser} <small style='font-size:11px;'>(${seen})</small>`;
+    document.getElementById("chatTitleMenu").innerHTML = `
+      <button onclick="deleteChat('${toUser}')">Delete Chat</button><br>
+      <button onclick="blockUser('${toUser}')">Block User</button>
+    `;
+
+    const chatWindow = document.getElementById("chatWindow");
+    chatWindow.classList.add("active");
+    chatWindow.style.display = "flex";
+    messagesDiv.innerHTML = "";
+    lastRenderedDate = "";
+
+    if (convoRef) convoRef.off();
+    convoRef = db.ref("chats/" + chatId(user, toUser));
+    convoRef.on("child_added", snap => renderMessage(snap.key, snap.val(), false));
+    convoRef.on("child_changed", snap => updateMessageUI(snap.key, snap.val()));
+
+    db.ref("seen/" + chatId(user, toUser) + "/" + user).set(firebase.database.ServerValue.TIMESTAMP);
+    recentChats[toUser] = Date.now();
+    db.ref("recentChats/" + user).set(recentChats);
+  }
+
+  function openGroup(id, name) {
+    currentChat = "group_" + id;
+    document.getElementById("chatWith").textContent = name;
+    document.getElementById("chatTitleMenu").innerHTML = `
+      <button onclick="leaveGroup('${id}')">Leave Group</button><br>
+      <button onclick="viewMembers('${id}')">View Members</button>
+    `;
+
+    const chatWindow = document.getElementById("chatWindow");
+    chatWindow.classList.add("active");
+    chatWindow.style.display = "flex";
+    messagesDiv.innerHTML = "";
+    lastRenderedDate = "";
+
+    if (convoRef) convoRef.off();
+    convoRef = db.ref("groupChats/" + id);
+    convoRef.on("child_added", snap => renderMessage(snap.key, snap.val(), true, id));
+    convoRef.on("child_changed", snap => updateMessageUI(snap.key, snap.val(), true, id));
+
+    recentChats["group_" + id] = Date.now();
+    db.ref("recentChats/" + user).set(recentChats);
+  }
+   function refreshList() {
   const term = document.getElementById("searchBox").value.toLowerCase();
   const recent = document.getElementById("recentChats");
   const users = document.getElementById("userSection");
@@ -313,9 +365,15 @@
       btn.className = "group";
       btn.innerHTML = `${g.public ? "# " : "🔒 "}${g.name}`;
       btn.onclick = () => {
-        closeChat();
-        setTimeout(() => attemptJoinGroup(id, g.name), 310);
-      };
+  closeChat();
+  setTimeout(() => {
+    if (isGroup) {
+      openGroup(id.slice(6), label);
+    } else {
+      openChat(id);
+    }
+  }, 310);
+};
       groups.appendChild(btn);
     });
   }
@@ -328,57 +386,6 @@
       messagesDiv.innerHTML = "";
       currentChat = "";
     }, 300);
-  }
-
-  // Continue in Part 3...
-</script>
-<script>
-  function openChat(toUser) {
-    currentChat = toUser;
-    const seen = formatLastSeen(allUsers[toUser]?.lastSeen);
-    document.getElementById("chatWith").innerHTML = `${toUser} <small style='font-size:11px;'>(${seen})</small>`;
-    document.getElementById("chatTitleMenu").innerHTML = `
-      <button onclick="deleteChat('${toUser}')">Delete Chat</button><br>
-      <button onclick="blockUser('${toUser}')">Block User</button>
-    `;
-
-    const chatWindow = document.getElementById("chatWindow");
-    chatWindow.classList.add("active");
-    chatWindow.style.display = "flex";
-    messagesDiv.innerHTML = "";
-    lastRenderedDate = "";
-
-    if (convoRef) convoRef.off();
-    convoRef = db.ref("chats/" + chatId(user, toUser));
-    convoRef.on("child_added", snap => renderMessage(snap.key, snap.val(), false));
-    convoRef.on("child_changed", snap => updateMessageUI(snap.key, snap.val()));
-
-    db.ref("seen/" + chatId(user, toUser) + "/" + user).set(firebase.database.ServerValue.TIMESTAMP);
-    recentChats[toUser] = Date.now();
-    db.ref("recentChats/" + user).set(recentChats);
-  }
-
-  function openGroup(id, name) {
-    currentChat = "group_" + id;
-    document.getElementById("chatWith").textContent = name;
-    document.getElementById("chatTitleMenu").innerHTML = `
-      <button onclick="leaveGroup('${id}')">Leave Group</button><br>
-      <button onclick="viewMembers('${id}')">View Members</button>
-    `;
-
-    const chatWindow = document.getElementById("chatWindow");
-    chatWindow.classList.add("active");
-    chatWindow.style.display = "flex";
-    messagesDiv.innerHTML = "";
-    lastRenderedDate = "";
-
-    if (convoRef) convoRef.off();
-    convoRef = db.ref("groupChats/" + id);
-    convoRef.on("child_added", snap => renderMessage(snap.key, snap.val(), true, id));
-    convoRef.on("child_changed", snap => updateMessageUI(snap.key, snap.val(), true, id));
-
-    recentChats["group_" + id] = Date.now();
-    db.ref("recentChats/" + user).set(recentChats);
   }
 
   function renderMessage(id, msg, isGroup = false, groupId = "") {
