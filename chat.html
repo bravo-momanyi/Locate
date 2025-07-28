@@ -301,21 +301,28 @@ db.ref("groups").on("value", snap => {
   if (usersLoaded) refreshList(); // only call if both loaded
 });
 // 🔍 Search and refresh chat list
+let recentChatsRef = null;
+
 function refreshList() {
   const term = document.getElementById("searchBox").value.toLowerCase();
   const recent = document.getElementById("recentChats");
   const users = document.getElementById("userSection");
   const groups = document.getElementById("groupSection");
 
-  recent.innerHTML = "<h4>Recent Chats & Groups</h4>";
+  // Clear user and group sections only (recent handled in listener)
   users.innerHTML = "<h4>All Users</h4>";
   groups.innerHTML = "<h4>All Groups</h4>";
 
-  db.ref("recentChats/" + user).once("value", snap => {
+  // 🔁 Realtime recent chats & groups
+  if (recentChatsRef) recentChatsRef.off();
+  recentChatsRef = db.ref("recentChats/" + user);
+  recentChatsRef.on("value", snap => {
     const rc = snap.val() || {};
     const seen = new Set();
 
+    recent.innerHTML = "<h4>Recent Chats & Groups</h4>";
     const sortedRecent = Object.entries(rc).sort((a, b) => b[1] - a[1]);
+
     sortedRecent.forEach(([id]) => {
       if (seen.has(id)) return;
       seen.add(id);
@@ -353,7 +360,7 @@ function refreshList() {
     });
   });
 
-  // All Users
+  // 👤 All users section
   Object.keys(allUsers)
     .filter(u =>
       u !== user &&
@@ -365,9 +372,10 @@ function refreshList() {
     )
     .sort()
     .forEach(u => {
-      const uData = allUsers[u];
       const btn = document.createElement("button");
-      btn.innerHTML = `${u} <small style='color:gray'>${formatLastSeen(uData.lastSeen, uData.online)}</small>`;
+      const uData = allUsers[u];
+      const status = formatLastSeen(uData.lastSeen, uData.online);
+      btn.innerHTML = `${u} <small style='color:gray'>${status}</small>`;
       btn.onclick = () => {
         if (currentChat !== u) {
           closeChat();
@@ -377,7 +385,7 @@ function refreshList() {
       users.appendChild(btn);
     });
 
-  // All Groups
+  // 👥 All groups section
   Object.keys(allGroups)
     .filter(id => {
       const g = allGroups[id];
@@ -400,8 +408,7 @@ function refreshList() {
       };
       groups.appendChild(btn);
     });
-}
-
+          }
 // 🔓 Join or open group
 function joinGroup(groupName) {
   const group = allGroups[groupName];
