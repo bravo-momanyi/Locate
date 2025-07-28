@@ -301,6 +301,8 @@ db.ref("groups").on("value", snap => {
 
 // 🔍 Search and refresh chat list
 function refreshList() {
+  loadRecentChats();
+  
   const term = document.getElementById("searchBox").value.toLowerCase();
   const recent = document.getElementById("recentChats");
   const users = document.getElementById("userSection");
@@ -310,9 +312,7 @@ function refreshList() {
   users.innerHTML = "<h4>All Users</h4>";
   groups.innerHTML = "<h4>All Groups</h4>";
 
-  // ⏱️ Load recent chats from Firebase
-  db.ref("recentChats/" + user).once("value", snap => {
-    const rc = snap.val() || {};
+  
 
     const sortedRecent = Object.entries(rc).sort((a, b) => b[1] - a[1]);
     sortedRecent.forEach(([id]) => {
@@ -390,7 +390,45 @@ function refreshList() {
       groups.appendChild(btn);
     });
 }
+function loadRecentChats() {
+  const recent = document.getElementById("recentChats");
+  recent.innerHTML = "<h4>Recent Chats & Groups</h4>";
+  
+  db.ref("recentChats/" + user).once("value", snap => {
+    const rc = snap.val() || {};
+    const term = document.getElementById("searchBox").value.toLowerCase();
 
+    const sortedRecent = Object.entries(rc).sort((a, b) => b[1] - a[1]);
+    sortedRecent.forEach(([id]) => {
+      const isGroup = id.startsWith("group_");
+      const groupId = id.slice(6);
+      const label = isGroup ? allGroups[groupId]?.name || "Group" : id;
+
+      const match = isGroup
+        ? label.toLowerCase().includes(term)
+        : (
+          id.toLowerCase().includes(term) ||
+          allUsers[id]?.email?.toLowerCase().includes(term) ||
+          allUsers[id]?.mobile?.toLowerCase().includes(term)
+        );
+
+      if (match) {
+        const btn = document.createElement("button");
+        const status = isGroup ? "" : `<small style='color:gray'>${allUsers[id]?.lastSeen || 'Offline'}</small>`;
+        btn.innerHTML = `${label} ${status} ${unreadCount[id] ? '<span class="unread-badge">' + unreadCount[id] + '</span>' : ''}`;
+        btn.onclick = () => {
+          if (currentChat !== id) {
+            closeChat();
+            setTimeout(() => {
+              isGroup ? openGroup(groupId, label) : openChat(id);
+            }, 310);
+          }
+        };
+        recent.appendChild(btn);
+      }
+    });
+  });
+}
 // 🔓 Join or open group
 function joinGroup(groupName) {
   const group = allGroups[groupName];
