@@ -300,6 +300,21 @@ db.ref("groups").on("value", snap => {
   groupsLoaded = true;
   if (usersLoaded) refreshList(); // only call if both loaded
 });
+const userRef = db.ref("users/" + user);
+
+// Mark user online
+userRef.update({ online: true, lastSeen: Date.now() });
+
+// Update last seen every 15 seconds while online
+setInterval(() => {
+  userRef.update({ online: true, lastSeen: Date.now() });
+}, 15000); // You can lower to 1000ms (1 second), but 15s is enough for most UIs
+
+// When user leaves or closes tab
+window.addEventListener("beforeunload", () => {
+  userRef.update({ online: false, lastSeen: Date.now() });
+});
+userRef.onDisconnect().update({ online: false, lastSeen: Date.now() });
 // 🔍 Search and refresh chat list
 let recentChatsRef = null;
 
