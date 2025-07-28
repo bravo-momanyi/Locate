@@ -111,6 +111,7 @@
       </div>
       <div id="typingIndicator">Typing...</div>
       <div id="messages"></div>
+      <div id="msgMenu" style="position:absolute; display:none; background:white; z-index:9999; border:1px solid #ccc; border-radius:8px;"></div>
       <div id="sendBar">
   <input type="file" id="mediaInput" style="margin-right:5px;" />
   <input id="msgInput" placeholder="Type message..." />
@@ -492,6 +493,16 @@ function watchTyping(toUser) {
   typingRef.on("value", snap => {
     document.getElementById("typingIndicator").style.display = snap.val() ? "block" : "none";
   });
+}
+function formatLastSeen(ts) {
+  if (!ts || isNaN(ts)) return "Offline";
+  const date = new Date(ts);
+  if (isNaN(date.getTime())) return "Unknown";
+  const now = new Date();
+  const isToday = date.toDateString() === now.toDateString();
+  const time = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const fullDate = date.toLocaleDateString();
+  return isToday ? `Today at ${time}` : `${fullDate} at ${time}`;
 }
 </script>
 <script>
