@@ -381,7 +381,10 @@ function refreshList() {
       btn.onclick = () => {
   if (currentChat !== "group_" + id) {
     closeChat();
-    setTimeout(() => attemptJoinGroup(id, g.name), 310);
+    setTimeout(() => {
+      db.ref("groups/" + id + "/members/" + user).set(true);
+      openGroup(id, g.name);
+    }, 310);
   }
 };
       groups.appendChild(btn);
