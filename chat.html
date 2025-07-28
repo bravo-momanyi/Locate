@@ -496,6 +496,10 @@ function closeChat() {
 // 🧾 Render a message
 function renderMsg(id, msg, isGroup = false, groupId = "") {
   if (!msg || msg.deletedFor?.[user]) return;
+
+  const existing = document.querySelector(`.msg[data-id='${id}']`);
+  if (existing) existing.remove(); // prevent duplication
+
   const div = document.createElement("div");
   div.className = "msg " + (msg.from === user ? "you" : "them");
 
@@ -504,14 +508,25 @@ function renderMsg(id, msg, isGroup = false, groupId = "") {
     inner += `<div style="font-size:12px;color:gray;border-left:3px solid #ccc;padding-left:5px">
       <b>${msg.replyTo.from}</b>: ${msg.replyTo.text}</div>`;
   }
+
   if (isGroup && msg.from !== user) inner += `<b>${msg.from}:</b> `;
   inner += msg.deleted ? "<i>Message deleted</i>" : msg.text;
 
   const ts = new Date(msg.ts);
   const time = ts.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  const status = msg.from === user
-    ? (msg.readBy?.[currentChat] ? "✓✓✓" : msg.deliveredTo?.[currentChat] ? "✓✓" : "✓")
-    : "";
+
+  let status = "";
+  if (msg.from === user) {
+    const delivered = isGroup
+      ? msg.deliveredTo && Object.keys(msg.deliveredTo).length >= 1
+      : msg.deliveredTo?.[currentChat];
+
+    const read = isGroup
+      ? msg.readBy && Object.keys(msg.readBy).length >= 2 // excluding sender
+      : msg.readBy?.[currentChat];
+
+    status = read ? "✓✓✓" : delivered ? "✓✓" : "✓";
+  }
 
   inner += `<div class="msg-time">${time} <span class="msg-status">${status}</span></div>`;
 
@@ -520,9 +535,32 @@ function renderMsg(id, msg, isGroup = false, groupId = "") {
   div.dataset.ts = msg.ts;
   div.dataset.from = msg.from;
   div.dataset.text = msg.text;
+
+  // ➤ Right click: message options
   div.addEventListener("contextmenu", e => {
     e.preventDefault();
     showMsgOptions(id, msg, isGroup, groupId, div, e.pageX, e.pageY);
+  });
+
+  // ➤ Swipe to reply
+  let touchStartX = 0;
+  div.addEventListener("touchstart", e => {
+    touchStartX = e.touches[0].clientX;
+  });
+
+  div.addEventListener("touchend", e => {
+    const dx = e.changedTouches[0].clientX - touchStartX;
+    if (dx > 100) {
+      // Swipe right to reply
+      replyTo = { from: msg.from, text: msg.text, id };
+      document.getElementById("replyPreview").innerHTML = `<b>${msg.from}</b>: ${msg.text}`;
+      document.getElementById("replyBox").style.display = "block";
+    } else if (dx < -100) {
+      // Swipe left to cancel
+      replyTo = null;
+      document.getElementById("replyPreview").innerHTML = "";
+      document.getElementById("replyBox").style.display = "none";
+    }
   });
 
   messagesDiv.appendChild(div);
@@ -535,7 +573,16 @@ function renderMsg(id, msg, isGroup = false, groupId = "") {
       : db.ref("chats/" + chatId(user, currentChat) + "/" + id + "/readBy/" + user);
     ref.set(true);
   }
+
+  // ✅ Mark as delivered
+  if (msg.from !== user && !msg.deliveredTo?.[user]) {
+    const ref = isGroup
+      ? db.ref("groupChats/" + groupId + "/" + id + "/deliveredTo/" + user)
+      : db.ref("chats/" + chatId(user, currentChat) + "/" + id + "/deliveredTo/" + user);
+    ref.set(true);
+  }
 }
+
     </script>
     <script>
 // ✍️ Typing indicator (only in 1-on-1)
