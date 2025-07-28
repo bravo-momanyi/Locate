@@ -250,19 +250,23 @@
   }
 
   function refreshList() {
-    const term = document.getElementById("searchBox").value.toLowerCase();
-    const recent = document.getElementById("recentChats");
-    const users = document.getElementById("userSection");
-    const groups = document.getElementById("groupSection");
+  const term = document.getElementById("searchBox").value.toLowerCase();
+  const recent = document.getElementById("recentChats");
+  const users = document.getElementById("userSection");
+  const groups = document.getElementById("groupSection");
 
-    recent.innerHTML = "<h4>Recent Chats & Groups</h4>";
-    users.innerHTML = "<h4>All Users</h4>";
-    groups.innerHTML = "<h4>All Groups</h4>";
+  recent.innerHTML = "<h4>Recent Chats & Groups</h4>";
+  users.innerHTML = "<h4>All Users</h4>";
+  groups.innerHTML = "<h4>All Groups</h4>";
 
-    // 🔁 Recent
-    Object.entries(recentChats).sort((a, b) => b[1] - a[1]).forEach(([id]) => {
-      const isGroup = id.startsWith("group_");
-      const label = isGroup ? allGroups[id.slice(6)]?.name || "Group" : id;
+  // 🟢 Recent
+  const sortedRecent = Object.entries(recentChats).sort((a, b) => b[1] - a[1]);
+  sortedRecent.forEach(([id]) => {
+    const isGroup = id.startsWith("group_");
+    const label = isGroup ? allGroups[id.slice(6)]?.name || "Group" : id;
+    const meta = isGroup ? label.toLowerCase() : `${id} ${allUsers[id]?.email || ""} ${allUsers[id]?.phone || ""}`.toLowerCase();
+
+    if (!term || meta.includes(term)) {
       const btn = document.createElement("button");
       const status = isGroup ? "" : `<small style='color:gray'>${formatLastSeen(allUsers[id]?.lastSeen)}</small>`;
       btn.innerHTML = `${label} ${status} ${unreadCount[id] ? '<span class="unread-badge">' + unreadCount[id] + '</span>' : ''}`;
@@ -270,43 +274,47 @@
         closeChat();
         setTimeout(() => {
           isGroup ? openGroup(id.slice(6), label) : openChat(id);
-        }, 300);
+        }, 310);
       };
       recent.appendChild(btn);
-    });
+    }
+  });
 
-    // 👤 Users
-    Object.keys(allUsers).filter(u => u !== user && u.toLowerCase().includes(term)).forEach(u => {
+  // 🟢 All Users
+  Object.keys(allUsers)
+    .filter(u => {
+      if (u === user) return false;
+      const { email = "", phone = "" } = allUsers[u];
+      const meta = `${u} ${email} ${phone}`.toLowerCase();
+      return meta.includes(term);
+    })
+    .sort()
+    .forEach(u => {
       const btn = document.createElement("button");
-      btn.innerHTML = `${u} <small style='color:gray'>${formatLastSeen(allUsers[u]?.lastSeen)}</small>`;
+      const lastSeen = formatLastSeen(allUsers[u].lastSeen);
+      btn.innerHTML = `${u} <small style='color:gray'>${lastSeen}</small>`;
       btn.onclick = () => {
         closeChat();
-        setTimeout(() => openChat(u), 300);
+        setTimeout(() => openChat(u), 310);
       };
       users.appendChild(btn);
     });
 
-    // 👥 Groups
-    Object.keys(allGroups).filter(id => allGroups[id]?.name?.toLowerCase().includes(term)).forEach(id => {
+  // 🟢 All Groups
+  Object.keys(allGroups)
+    .filter(id => {
+      const g = allGroups[id];
+      return g?.name && g.name.toLowerCase().includes(term);
+    })
+    .sort((a, b) => allGroups[a].name.localeCompare(allGroups[b].name))
+    .forEach(id => {
       const g = allGroups[id];
       const btn = document.createElement("button");
       btn.className = "group";
       btn.innerHTML = `${g.public ? "# " : "🔒 "}${g.name}`;
       btn.onclick = () => {
         closeChat();
-        setTimeout(() => {
-          if (g.members?.[user]) openGroup(id, g.name);
-          else if (!g.public) {
-            const pwd = prompt("Group password:");
-            if (pwd === g.password) {
-              db.ref("groups/" + id + "/members/" + user).set(true);
-              openGroup(id, g.name);
-            } else alert("Wrong password");
-          } else {
-            db.ref("groups/" + id + "/members/" + user).set(true);
-            openGroup(id, g.name);
-          }
-        }, 300);
+        setTimeout(() => attemptJoinGroup(id, g.name), 310);
       };
       groups.appendChild(btn);
     });
@@ -675,6 +683,7 @@
   Object.keys(allUsers).forEach(u => {
     if (u !== user) watchDelivery(chatId(user, u), false);
   });
+document.getElementById("searchBox").addEventListener("input", refreshList);
 </script>
 </body>
 </html>
