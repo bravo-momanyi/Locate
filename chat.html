@@ -364,7 +364,7 @@ function refreshList() {
     .sort()
     .forEach(u => {
       const btn = document.createElement("button");
-      btn.innerHTML = `${u} <small style='color:gray'>${formatLastSeen(allUsers[u].lastSeen)}</small>`;
+      btn.innerHTML = `${u} <small style='color:gray'>${allUsers[u].lastSeen || 'Offline'}</small>`;
       btn.onclick = () => {
         if (currentChat !== u) {
           closeChat();
