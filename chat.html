@@ -136,10 +136,11 @@
       cursor: pointer;
     }
     #typingIndicator {
-  font-size: 16px;
-  font-weight: bold;
-  padding: 5px;
-  color: #0a9c3c;
+      font-size: 16px;
+      font-weight: bold;
+      padding: 5px;
+      color: #0a9c3c;
+      display: none;
     }
     #msgMenu {
       display: none;
@@ -489,6 +490,24 @@ convoRef.on("child_changed", s => {
   if (el) {
     el.remove();
     renderMsg(s.key, s.val(), true, name);
+  }
+});
+  // 👥 Group typing
+typingRef = db.ref("typing/group_" + name);
+typingRef.on("value", snap => {
+  const typingUsers = snap.val() || {};
+  const othersTyping = Object.keys(typingUsers)
+    .filter(u => typingUsers[u] && u !== user);
+
+  const typingBox = document.getElementById("typingIndicator");
+
+  if (othersTyping.length === 0) {
+    typingBox.style.display = "none";
+  } else {
+    typingBox.style.display = "block";
+    typingBox.textContent = othersTyping.length === 1
+      ? `${othersTyping[0]} is typing...`
+      : `${othersTyping.join(", ")} are typing...`;
   }
 });
   db.ref("recentChats/" + user + "/group_" + name).set(Date.now());
