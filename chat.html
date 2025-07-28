@@ -527,7 +527,7 @@ function closeChat() {
 // 🧾 Render a message
 
 // 🧾 Render a message
-function renderMsg(id, msg, isGroup = false, groupId = "") {
+function renderMsga(id, msg, isGroup = false, groupId = "") {
   if (!msg || msg.deletedFor?.[user]) return;
 
   const existing = document.querySelector(`.msg[data-id='${id}']`);
@@ -622,7 +622,7 @@ function cancelReply() {
 }
 
 // 📋 Right-click message options
-function showMsgOptions(id, msg, isGroup, groupId, div, x, y) {
+function showMsgOptions1(id, msg, isGroup, groupId, div, x, y) {
   const menu = document.createElement("div");
   menu.className = "context-menu";
   menu.style.top = y + "px";
