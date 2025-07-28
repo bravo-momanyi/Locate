@@ -307,9 +307,7 @@
   });
 
   // 🔍 Refresh user/group list
-
-  <script>
-function refreshList() {
+    function refreshList() {
   const term = document.getElementById("searchBox").value.toLowerCase().trim();
   const recent = document.getElementById("recentChats");
   const users = document.getElementById("userSection");
@@ -381,7 +379,6 @@ function refreshList() {
       groups.appendChild(btn);
     });
 }
-</script>
 
   // 📅 Format helper
   function formatLastSeen(ts) {
