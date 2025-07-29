@@ -666,21 +666,7 @@ function addSwipeSupport(elem, msgId, msgText, fromGroup) {
 
     if (diffX > 80) {
       // Swipe detected
-      swiped = true;
-      document.getElementById("replyBox").innerHTML = msgText;
-      document.getElementById("replyBox").style.display = "block";
-      replyTo = msgId;
 
-      // Snap message back
-      elem.style.transition = "transform 0.3s ease";
-      elem.style.transform = "translateX(0px)";
-    } else {
-      // No swipe, snap back
-      elem.style.transition = "transform 0.3s ease";
-      elem.style.transform = "translateX(0px)";
-    }
-  });
-  }
 // ❌ Cancel reply
 function cancelReply() {
   replyingTo = null;
