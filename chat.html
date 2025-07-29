@@ -681,7 +681,6 @@ function sendMsg() {
     ts: ts
   };
 
-  // Add reply data if replying
   if (replyingTo) {
     msg.replyTo = {
       from: replyingTo.from,
