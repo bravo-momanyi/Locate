@@ -623,8 +623,8 @@ function renderMsg(id, msg, isGroup = false, groupId = "") {
       : db.ref("chats/" + chatId(user, currentChat) + "/" + id + "/deliveredTo/" + user);
     ref.set(true);
   }
-      }
-  function addSwipeSupport(elem, msgId, msgText, fromGroup) {
+}
+function addSwipeSupport(elem, msgId, msgText, isGroup) {
   let startX = 0;
 
   elem.addEventListener("touchstart", (e) => {
@@ -636,7 +636,7 @@ function renderMsg(id, msg, isGroup = false, groupId = "") {
     const currentX = e.touches[0].clientX;
     const diffX = currentX - startX;
     if (diffX > 0) {
-      elem.style.transform = `translateX(${Math.min(diffX, 100)}px)`;
+      elem.style.transform = `translateX(${Math.min(diffX, 120)}px)`;
     }
   });
 
@@ -644,65 +644,22 @@ function renderMsg(id, msg, isGroup = false, groupId = "") {
     const endX = e.changedTouches[0].clientX;
     const diffX = endX - startX;
 
-    if (diffX > 80) {
-      // Trigger reply
-      document.getElementById("replyBox").innerHTML = msgText;
-      document.getElementById("replyBox").style.display = "block";
-      replyTo = msgId;
-    }
-
-    // Reset position
     elem.style.transition = "transform 0.3s ease";
     elem.style.transform = "translateX(0px)";
+
+    if (diffX > 80) {
+      replyingTo = { id: msgId, text: msgText };
+      document.getElementById("replyTag").style.display = "block";
+      document.getElementById("replyUser").textContent = isGroup ? msg.from : (msg.from === user ? "You" : msg.from);
+      document.getElementById("replyText").textContent = msgText;
+    }
   });
-  }
-// 📋 Right-click message options
-function showMsgOptions1(id, msg, isGroup, groupId, div, x, y) {
-  const menu = document.createElement("div");
-  menu.className = "context-menu";
-  menu.style.top = y + "px";
-  menu.style.left = x + "px";
-
-  // Delete for Me
-  const delMe = document.createElement("div");
-  delMe.textContent = "Delete for Me";
-  delMe.onclick = () => {
-    const path = isGroup ? `groupChats/${groupId}/${id}` : `chats/${chatId(user, currentChat)}/${id}`;
-    db.ref(path + `/deletedFor/${user}`).set(true);
-    menu.remove();
-  };
-  menu.appendChild(delMe);
-
-  // Delete for Everyone — only sender and within 1 minute
-  if (msg.from === user && Date.now() - msg.ts < 60000) {
-    const delAll = document.createElement("div");
-    delAll.textContent = "Delete for Everyone";
-    delAll.onclick = () => {
-      const path = isGroup ? `groupChats/${groupId}/${id}` : `chats/${chatId(user, currentChat)}/${id}`;
-      db.ref(path + `/deleted`).set(true);
-      menu.remove();
-    };
-    menu.appendChild(delAll);
-
-    // Edit message
-    const edit = document.createElement("div");
-    edit.textContent = "Edit";
-    edit.onclick = () => {
-      const newText = prompt("Edit your message:", msg.text);
-      if (newText && newText.trim()) {
-        const path = isGroup ? `groupChats/${groupId}/${id}` : `chats/${chatId(user, currentChat)}/${id}`;
-        db.ref(path + `/text`).set(newText.trim());
-      }
-      menu.remove();
-    };
-    menu.appendChild(edit);
-  }
-
-  document.body.appendChild(menu);
-  document.addEventListener("click", () => menu.remove(), { once: true });
 }
-    </script>
-    <script>
+function cancelReply() {
+  replyingTo = null;
+  document.getElementById("replyTag").style.display = "none";
+}
+
 // ✍️ Typing indicator (only in 1-on-1)
 msgBox.addEventListener("input", () => {
   if (!currentChat || currentChat.startsWith("group_")) return;
@@ -714,29 +671,54 @@ msgBox.addEventListener("input", () => {
 // ✉️ Send message
 function sendMsg() {
   const text = msgBox.value.trim();
-  if (!text || !currentChat) return;
+  if (!text || !chat) return;
 
-  const msg = {
+  const now = Date.now();
+  const code = generateCode();
+  const isGroup = currentGroup !== "";
+  const path = isGroup
+    ? `groupChats/${currentGroup}/${code}`
+    : `chats/${[user, chat].sort().join("_")}/${code}`;
+
+  const msgData = {
     from: user,
     text,
-    ts: Date.now()
+    ts: now,
   };
 
   if (replyingTo) {
-    msg.replyTo = { ...replyingTo };
+    msgData.replyTo = {
+      text: replyingTo.text,
+      from: replyingTo.from || "", // Optional: include sender if available
+    };
+    cancelReply(); // hide reply UI and reset global
   }
 
-  if (currentChat.startsWith("group_")) {
-    db.ref("groupChats/" + currentChat.slice(6)).push(msg);
-  } else {
-    const id = chatId(user, currentChat);
-    db.ref("chats/" + id).push(msg);
+  db.ref(path).set(msgData);
+
+  // Update last message in recentChats
+  const recent = {
+    user: isGroup ? currentGroup : chat,
+    lastMsg: text,
+    ts: now,
+    isGroup,
+  };
+  db.ref(`recentChats/${user}/${isGroup ? currentGroup : chat}`).set(recent);
+
+  if (!isGroup) {
+    // Update other user's recent chat list too
+    db.ref(`recentChats/${chat}/${user}`).set({
+      user,
+      lastMsg: text,
+      ts: now,
+      isGroup: false,
+    });
   }
 
+  // Clear input and typing status
   msgBox.value = "";
-  replyingTo = null;
+  if (!isGroup) db.ref(`typing/${[user, chat].sort().join("_")}/${user}`).set(false);
 }
-
 // 📋 Message right-click options
 function showMsgOptions(id, msg, isGroup, groupId, div, x, y) {
   const menu = document.createElement("div");
