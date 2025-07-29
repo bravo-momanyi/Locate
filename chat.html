@@ -527,10 +527,10 @@ function closeChat() {
 
 // 🧾 Render a message
 
-// 🧾 Render a message
 function renderMsg(id, msg, isGroup = false, groupId = "") {
   if (!msg || msg.deletedFor?.[user]) return;
 
+  // ➤ Floating Date Header
   const dateLabel = formatDateLabel(msg.ts);
   if (dateLabel !== lastMsgDate) {
     const dateDiv = document.createElement("div");
@@ -540,32 +540,42 @@ function renderMsg(id, msg, isGroup = false, groupId = "") {
     lastMsgDate = dateLabel;
   }
 
+  // ➤ Remove duplicate message with same ID if it already exists
   const existing = document.querySelector(`.msg[data-id='${id}']`);
-  if (existing) existing.remove(); // prevent duplication
+  if (existing) existing.remove();
 
+  // ➤ Create Message Element
   const div = document.createElement("div");
   div.className = "msg " + (msg.from === user ? "you" : "them");
 
   let inner = "";
+
+  // ➤ Reply Preview
   if (msg.replyTo) {
-    inner += `<div style="font-size:12px;color:gray;border-left:3px solid #ccc;padding-left:5px">
-      <b>${msg.replyTo.from}</b>: ${msg.replyTo.text}</div>`;
+    const replyText = msg.replyTo.text || "<i>(deleted)</i>";
+    inner += `<div style="font-size:12px;color:gray;border-left:3px solid #ccc;padding-left:5px;margin-bottom:3px">
+      <b>${msg.replyTo.from}</b>: ${replyText}</div>`;
   }
 
-  if (isGroup && msg.from !== user) inner += `<b>${msg.from}:</b> `;
-  inner += msg.deleted ? "<i>Message deleted</i>" : msg.text;
+  // ➤ Message Text
+  if (isGroup && msg.from !== user) {
+    inner += `<b>${msg.from}:</b> `;
+  }
 
+  inner += msg.deleted ? "<i>Message deleted</i>" : (msg.text || "");
+
+  // ➤ Timestamp and Tick Status
   const ts = new Date(msg.ts);
   const time = ts.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
   let status = "";
   if (msg.from === user) {
     const delivered = isGroup
-      ? msg.deliveredTo && Object.keys(msg.deliveredTo).length >= 1
+      ? msg.deliveredTo && Object.keys(msg.deliveredTo).length > 0
       : msg.deliveredTo?.[currentChat];
 
     const read = isGroup
-      ? msg.readBy && Object.keys(msg.readBy).length >= 2 // excluding sender
+      ? msg.readBy && Object.keys(msg.readBy).length > 1
       : msg.readBy?.[currentChat];
 
     status = read ? "✓✓✓" : delivered ? "✓✓" : "✓";
@@ -574,21 +584,27 @@ function renderMsg(id, msg, isGroup = false, groupId = "") {
   inner += `<div class="msg-time">${time} <span class="msg-status">${status}</span></div>`;
 
   div.innerHTML = inner;
+
+  // ➤ Attach metadata for later use
   div.dataset.id = id;
   div.dataset.ts = msg.ts;
   div.dataset.from = msg.from;
   div.dataset.text = msg.text;
 
-  // ➤ Right click: message options
-  div.addEventListener("contextmenu", e => {
+  // ➤ Right-click support
+  div.addEventListener("contextmenu", (e) => {
     e.preventDefault();
     showMsgOptions(id, msg, isGroup, groupId, div, e.pageX, e.pageY);
   });
-  // 
+
+  // ➤ Swipe support
+  addSwipeSupport(div, id, msg.text || "", isGroup);
+
+  // ➤ Append to messages
   messagesDiv.appendChild(div);
   messagesDiv.scrollTop = messagesDiv.scrollHeight;
 
-  // ✅ Mark as read
+  // ➤ Real-time: Mark as read
   if (msg.from !== user && !msg.readBy?.[user]) {
     const ref = isGroup
       ? db.ref("groupChats/" + groupId + "/" + id + "/readBy/" + user)
@@ -596,27 +612,25 @@ function renderMsg(id, msg, isGroup = false, groupId = "") {
     ref.set(true);
   }
 
-  // ✅ Mark as delivered
+  // ➤ Real-time: Mark as delivered
   if (msg.from !== user && !msg.deliveredTo?.[user]) {
     const ref = isGroup
       ? db.ref("groupChats/" + groupId + "/" + id + "/deliveredTo/" + user)
       : db.ref("chats/" + chatId(user, currentChat) + "/" + id + "/deliveredTo/" + user);
     ref.set(true);
   }
-}
-function addSwipeSupport(elem, msgId, msgText, fromGroup) {
+      }
+  function addSwipeSupport(elem, msgId, msgText, fromGroup) {
   let startX = 0;
-  let swiped = false;
 
   elem.addEventListener("touchstart", (e) => {
     startX = e.touches[0].clientX;
-    elem.style.transition = ""; // remove transition
+    elem.style.transition = "none";
   });
 
   elem.addEventListener("touchmove", (e) => {
     const currentX = e.touches[0].clientX;
     const diffX = currentX - startX;
-
     if (diffX > 0) {
       elem.style.transform = `translateX(${Math.min(diffX, 100)}px)`;
     }
@@ -627,14 +641,17 @@ function addSwipeSupport(elem, msgId, msgText, fromGroup) {
     const diffX = endX - startX;
 
     if (diffX > 80) {
-      // Swipe detected
+      // Trigger reply
+      document.getElementById("replyBox").innerHTML = msgText;
+      document.getElementById("replyBox").style.display = "block";
+      replyTo = msgId;
+    }
 
-// ❌ Cancel reply
-function cancelReply() {
-  replyingTo = null;
-document.getElementById("replyBox").style.display = "none";  // on cancel
-}
-
+    // Reset position
+    elem.style.transition = "transform 0.3s ease";
+    elem.style.transform = "translateX(0px)";
+  });
+  }
 // 📋 Right-click message options
 function showMsgOptions1(id, msg, isGroup, groupId, div, x, y) {
   const menu = document.createElement("div");
