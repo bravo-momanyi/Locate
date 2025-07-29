@@ -584,6 +584,11 @@ function renderMsg(id, msg, isGroup = false, groupId = "") {
     e.preventDefault();
     showMsgOptions(id, msg, isGroup, groupId, div, e.pageX, e.pageY);
   });
+  msgElem.className = "msg";
+msgElem.oncontextmenu = (e) => {
+  e.preventDefault();
+  showMsgOptions(e, msg, msgId, fromGroup);
+};
 
   // ➤ Swipe to reply
   let touchStartX = 0;
