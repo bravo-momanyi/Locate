@@ -219,6 +219,10 @@
       </div>
       <div id="typingIndicator">Typing...</div>
       <div id="messages"></div>
+      <div id="replyTag" style="display:none; background:#eee; padding:5px 10px; font-size:13px; color:#555; border-left:4px solid #128C7E;">
+  Replying to <b id="replyUser"></b>: <span id="replyText"></span>
+  <span style="float:right; cursor:pointer; color:red;" onclick="cancelReply()">×</span>
+      </div>
       <div id="sendBar">
         <input id="msgInput" placeholder="Type message..."/>
         <button onclick="sendMsg()">Send</button>
