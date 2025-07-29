@@ -585,7 +585,43 @@ function renderMsg(id, msg, isGroup = false, groupId = "") {
     showMsgOptions(id, msg, isGroup, groupId, div, e.pageX, e.pageY);
   });
   // ➤ Swipe to reply
-  addSwipeSupport(elem, msgId, msgText, fromGroup)
+  let startX = 0;
+  let swiped = false;
+
+  elem.addEventListener("touchstart", (e) => {
+    startX = e.touches[0].clientX;
+    elem.style.transition = ""; // remove transition
+  });
+
+  elem.addEventListener("touchmove", (e) => {
+    const currentX = e.touches[0].clientX;
+    const diffX = currentX - startX;
+
+    if (diffX > 0) {
+      elem.style.transform = `translateX(${Math.min(diffX, 100)}px)`;
+    }
+  });
+
+  elem.addEventListener("touchend", (e) => {
+    const endX = e.changedTouches[0].clientX;
+    const diffX = endX - startX;
+
+    if (diffX > 80) {
+      // Swipe detected
+      swiped = true;
+      document.getElementById("replyBox").innerHTML = msgText;
+      document.getElementById("replyBox").style.display = "block";
+      replyTo = msgId;
+
+      // Snap message back
+      elem.style.transition = "transform 0.3s ease";
+      elem.style.transform = "translateX(0px)";
+    } else {
+      // No swipe, snap back
+      elem.style.transition = "transform 0.3s ease";
+      elem.style.transform = "translateX(0px)";
+    }
+  });
 
   messagesDiv.appendChild(div);
   messagesDiv.scrollTop = messagesDiv.scrollHeight;
