@@ -670,54 +670,41 @@ msgBox.addEventListener("input", () => {
 
 // ✉️ Send message
 function sendMsg() {
-  const text = msgBox.value.trim();
-  if (!text || !chat) return;
+  const input = document.getElementById("msgInput");
+  const text = input.value.trim();
+  if (!text) return;
 
-  const now = Date.now();
-  const code = generateCode();
-  const isGroup = currentGroup !== "";
-  const path = isGroup
-    ? `groupChats/${currentGroup}/${code}`
-    : `chats/${[user, chat].sort().join("_")}/${code}`;
-
-  const msgData = {
+  const ts = Date.now();
+  const msg = {
     from: user,
-    text,
-    ts: now,
+    text: text,
+    ts: ts
   };
 
+  // Add reply data if replying
   if (replyingTo) {
-    msgData.replyTo = {
-      text: replyingTo.text,
-      from: replyingTo.from || "", // Optional: include sender if available
+    msg.replyTo = {
+      from: replyingTo.from,
+      text: replyingTo.text || "(deleted)"
     };
-    cancelReply(); // hide reply UI and reset global
   }
 
-  db.ref(path).set(msgData);
-
-  // Update last message in recentChats
-  const recent = {
-    user: isGroup ? currentGroup : chat,
-    lastMsg: text,
-    ts: now,
-    isGroup,
-  };
-  db.ref(`recentChats/${user}/${isGroup ? currentGroup : chat}`).set(recent);
-
-  if (!isGroup) {
-    // Update other user's recent chat list too
-    db.ref(`recentChats/${chat}/${user}`).set({
-      user,
-      lastMsg: text,
-      ts: now,
-      isGroup: false,
-    });
+  if (currentChat && !currentChat.startsWith("group_")) {
+    const chatKey = chatId(user, currentChat);
+    db.ref("chats/" + chatKey).push(msg);
+    db.ref("recentChats/" + user + "/" + currentChat).set(ts);
+    db.ref("recentChats/" + currentChat + "/" + user).set(ts);
+  } else if (currentChat && currentChat.startsWith("group_")) {
+    const groupName = currentChat.slice(6);
+    db.ref("groupChats/" + groupName).push(msg);
+    db.ref("recentChats/" + user + "/group_" + groupName).set(ts);
+  } else {
+    alert("No chat selected.");
+    return;
   }
 
-  // Clear input and typing status
-  msgBox.value = "";
-  if (!isGroup) db.ref(`typing/${[user, chat].sort().join("_")}/${user}`).set(false);
+  input.value = "";
+  cancelReply();
 }
 // 📋 Message right-click options
 function showMsgOptions(id, msg, isGroup, groupId, div, x, y) {
