@@ -251,8 +251,8 @@
     };
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
-    let currentUser = localStorage.getItem('user');
-    if (!currentUser) location.href = 'app.html';
+    let currentUser = sessionStorage.getItem('username');
+    if (!currentUser) location.href = 'index.html';
     document.getElementById('currentUser').innerText = "Logged in as " + currentUser;
 
     function goToDashboard() {
