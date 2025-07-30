@@ -6,782 +6,848 @@
   <title>Bravo Chat</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    html, body {
+    body, html {
       height: 100%;
       font-family: Arial, sans-serif;
-      background: #fff;
-      overflow: hidden;
+      background: #ece5dd;
     }
-    header {
+    #chat-container {
       display: flex;
-      justify-content: space-between;
-      align-items: center;
-      background: #075E54;
-      color: white;
-      padding: 10px;
-    }
-    header button {
-      background: #25D366;
-      border: none;
-      padding: 6px 12px;
-      color: white;
-      border-radius: 5px;
-      cursor: pointer;
-    }
-    #userList {
-      width: 30%;
-      overflow-y: auto;
-      padding: 10px;
-      border-right: 1px solid #ccc;
-    }
-    #userList input {
-      width: 100%;
-      padding: 8px;
-      margin-bottom: 10px;
-      border-radius: 4px;
-      border: 1px solid #ccc;
-    }
-    #userList button {
-      width: 100%;
-      margin-bottom: 6px;
-      padding: 8px;
-      border: none;
-      border-radius: 4px;
-      cursor: pointer;
-      background: #e0f7fa;
-    }
-    #userList button.group {
-      background: #dcedc8;
-      font-weight: bold;
-    }
-    .unread-badge {
-      background: red;
-      color: white;
-      font-size: 10px;
-      padding: 2px 6px;
-      border-radius: 10px;
-      float: right;
-      margin-top: -15px;
-    }
-    #chatWindow {
-      display: none;
-      flex-direction: column;
-      flex: 1;
       height: 100%;
-      transition: opacity 0.3s ease-in-out, transform 0.3s ease;
-      opacity: 0;
-      transform: translateX(100%);
     }
-    #chatWindow.active {
-      opacity: 1;
-      transform: translateX(0);
-    }
-    #messages {
-      flex: 1;
-      padding: 10px;
+    #sidebar {
+      width: 30%;
+      background: #ffffff;
+      border-right: 1px solid #ccc;
       overflow-y: auto;
-      background: #f5f5f5;
+    }
+    #chat-main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      background: #f0f0f0;
+    }
+    #chat-header {
+      background: #075e54;
+      color: white;
+      padding: 10px;
+      font-weight: bold;
+      position: relative;
+    }
+    #chat-title-options {
+      position: absolute;
+      right: 10px;
+      top: 10px;
+      display: flex;
+      gap: 10px;
+    }
+    #message-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 10px;
+    }
+    #message-input-container {
+      padding: 10px;
+      background: #fff;
       display: flex;
       flex-direction: column;
     }
-    .msg {
-      padding: 8px;
-      margin: 6px;
-      border-radius: 7px;
+    #reply-tag {
+      background: #f1f1f1;
+      padding: 5px 10px;
+      margin-bottom: 5px;
+      border-left: 3px solid #34b7f1;
+      display: none;
+    }
+    #msg-input-row {
+      display: flex;
+      gap: 10px;
+    }
+    #msg-input {
+      flex: 1;
+      padding: 10px;
+      border: 1px solid #ccc;
+      border-radius: 20px;
+      outline: none;
+    }
+    #send-btn {
+      background: #128c7e;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 20px;
+      cursor: pointer;
+    }
+    .message {
+      padding: 8px 10px;
+      margin: 5px 0;
+      border-radius: 8px;
       max-width: 70%;
       position: relative;
-      word-wrap: break-word;
-      animation: slideIn 0.3s ease forwards;
     }
-    .you {
+    .sent {
       background: #dcf8c6;
       align-self: flex-end;
-      text-align: right;
     }
-    .them {
+    .received {
       background: white;
       align-self: flex-start;
     }
     .msg-time {
       font-size: 10px;
-      color: #888;
-      margin-top: 4px;
-      display: flex;
-      justify-content: flex-end;
-      align-items: center;
-    }
-    .msg-status {
-      margin-left: 6px;
-      font-weight: bold;
-      color: #999;
-    }
-    #sendBar {
-      display: flex;
-      padding: 10px;
-      background: white;
-      align-items: center;
-      gap: 8px;
-    }
-    #sendBar input {
-      flex: 1;
-      padding: 8px;
-      border-radius: 20px;
-      border: 1px solid #ccc;
-    }
-    #sendBar button {
-      padding: 8px 14px;
-      background: #25D366;
-      border: none;
-      color: white;
-      border-radius: 20px;
-      cursor: pointer;
-    }
-    #typingIndicator {
-      font-size: 16px;
-      font-weight: bold;
-      padding: 5px;
-      color: #0a9c3c;
-      display: none;
-    }
-    #replyTag {
-      display: none;
-      padding: 6px 10px;
-      font-size: 13px;
-      border-left: 3px solid #0a9c3c;
-      background: #e1f5e0;
-      color: #333;
-      margin: 6px 10px -4px 10px;
-    }
-    #msgMenu {
-      display: none;
+      color: gray;
       position: absolute;
-      background: white;
-      border: 2px solid #888;
-      border-radius: 10px;
-      z-index: 9999;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.25);
-      min-width: 240px;
-      font-size: 17px;
-      padding: 10px;
+      bottom: 4px;
+      right: 10px;
     }
-    #msgMenu button {
-      width: 100%;
-      border: none;
-      padding: 16px 20px;
-      background: white;
-      text-align: left;
-      font-size: 16px;
-      cursor: pointer;
-      border-bottom: 1px solid #eee;
+    .tick {
+      font-size: 12px;
+      margin-left: 4px;
     }
-    #msgMenu button:last-child {
-      border-bottom: none;
+    .selected {
+      outline: 2px solid #128c7e;
     }
-    #msgMenu button:hover {
-      background: #f2f2f2;
+    #multi-action-bar {
+      display: none;
+      background: #eee;
+      padding: 5px 10px;
+      justify-content: space-between;
+      align-items: center;
     }
-    #backBtn {
-      padding: 6px 12px;
-      font-size: 24px;
-    }
-    @media (max-width: 600px) {
-      #userList { width: 100%; }
-      #chatWindow {
-        position: absolute;
-        top: 0; left: 0;
-        width: 100%;
-        background: white;
-        z-index: 100;
-      }
-    }
-    @keyframes slideIn {
-      from { opacity: 0; transform: translateY(10px); }
-      to { opacity: 1; transform: translateY(0); }
+    #typing-indicator {
+      font-size: 13px;
+      color: #333;
+      margin-left: 10px;
+      display: none;
     }
   </style>
 </head>
 <body>
-  <header>
-    <div id="currentUser">Welcome</div>
-    <button onclick="goToDashboard()">Dashboard</button>
-  </header>
-  <div style="display: flex; height: calc(100% - 50px);">
-    <div id="userList">
-      <div style="position: relative;">
-        <input id="searchBox" placeholder="Search users/groups..." style="padding-right: 30px;" />
-        <span id="clearSearch" style="position: absolute; right: 10px; top: 8px; cursor: pointer; font-weight: bold; font-size: 16px; color: #999;">×</span>
+<div id="chat-container">
+  <div id="sidebar">
+    <div style="padding: 10px; font-weight: bold;">Chats & Groups</div>
+    <div id="chat-list"></div>
+  </div>
+
+  <div id="chat-main">
+    <div id="chat-header">
+      <span id="chat-title">Bravo Chat</span>
+      <span id="typing-indicator"></span>
+      <div id="chat-title-options">
+        <button onclick="deleteChat()">Delete Chat</button>
+        <button onclick="blockUser()">Block User</button>
       </div>
-      <button onclick="createGroup()">Create Group</button>
-      <div id="recentChats"><h4>Recent Chats</h4></div>
-      <div id="userSection"><h4>All Users</h4></div>
-      <div id="groupSection"><h4>All Groups</h4></div>
     </div>
-    <div id="chatWindow">
-      <div style="padding: 10px; background: #128C7E; color: white; display: flex; justify-content: space-between;">
-        <button id="backBtn" onclick="closeChat()">BACK</button>
-        <span id="chatWith" style="flex: 1; text-align: center; font-weight: bold;"></span>
-        <div style="width: 40px;"></div>
+
+    <div id="multi-action-bar">
+      <button onclick="copySelected()">Copy</button>
+      <button onclick="editSelected()">Edit</button>
+      <button onclick="deleteSelected()">Delete</button>
+      <button onclick="cancelSelection()">Cancel</button>
+    </div>
+
+    <div id="message-list"></div>
+
+    <div id="message-input-container">
+      <div id="reply-tag">
+        Replying to: <span id="reply-preview"></span>
       </div>
-      <div id="typingIndicator">Typing...</div>
-      <div id="messages"></div>
-      <div id="replyTag"></div>
-      <div id="sendBar">
-        <input id="msgInput" placeholder="Type message..."/>
-        <button onclick="sendMsg()">Send</button>
+      <div id="msg-input-row">
+        <input id="msg-input" type="text" placeholder="Type a message..." oninput="updateTyping()" />
+        <button id="send-btn" onclick="sendMsg()">Send</button>
       </div>
     </div>
   </div>
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+</div>
+
+<!-- Firebase & App Logic -->
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 <script>
   const firebaseConfig = {
-  apiKey: "AIzaSyBfkUJS81minjxj0DFz4pzNnGzCtb5ZJss",
-  authDomain: "locater-42fb4.firebaseapp.com",
-  databaseURL: "https://locater-42fb4-default-rtdb.firebaseio.com",
-  projectId: "locater-42fb4",
-  storageBucket: "locater-42fb4.appspot.com",
-  messagingSenderId: "250348367998",
-  appId: "1:250348367998:web:d734b2b4c735b5684ae82f"
-};
+    apiKey: "AIzaSyBfkUJS81minjxj0DFz4pzNnGzCtb5ZJss",
+    authDomain: "locater-42fb4.firebaseapp.com",
+    databaseURL: "https://locater-42fb4-default-rtdb.firebaseio.com",
+    projectId: "locater-42fb4",
+    storageBucket: "locater-42fb4.appspot.com",
+    messagingSenderId: "250348367998",
+    appId: "1:250348367998:web:d734b2b4c735b5684ae82f"
+  };
+
   firebase.initializeApp(firebaseConfig);
   const db = firebase.database();
 
-  let user = sessionStorage.getItem("username");
-  if (!user) location.href = "index.html";
-  document.getElementById("currentUser").innerText = `Welcome ${user}`;
+  let currentUser = localStorage.getItem("user"); // stored username
   let currentChat = null;
-  let isGroup = false;
-  let replyTo = null;
-  let blockedUsers = {};
-  let replyTag = document.getElementById("replyTag");
+  let selectedMessages = [];
+  let replyToMsg = null;
+  const chatListEl = document.getElementById("chat-list");
+  const msgListEl = document.getElementById("message-list");
+  const chatTitleEl = document.getElementById("chat-title");
+  const typingIndicatorEl = document.getElementById("typing-indicator");
+  const replyTagEl = document.getElementById("reply-tag");
+  const replyPreviewEl = document.getElementById("reply-preview");
 
-  function goToDashboard() {
-    location.href = "dashboard.html";
+  function loadChatList() {
+    db.ref("recentChats/" + currentUser).on("value", snap => {
+      chatListEl.innerHTML = "";
+      const data = snap.val();
+      if (data) {
+        Object.keys(data).forEach(key => {
+          const btn = document.createElement("button");
+          btn.innerText = key;
+          btn.style.display = "block";
+          btn.style.width = "100%";
+          btn.style.padding = "10px";
+          btn.style.border = "none";
+          btn.style.background = "#f9f9f9";
+          btn.onclick = () => openChat(key);
+          chatListEl.appendChild(btn);
+        });
+      }
+    });
   }
 
-  function closeChat() {
-    document.getElementById("chatWindow").classList.remove("active");
-    currentChat = null;
-    isGroup = false;
-    replyTo = null;
-    replyTag.style.display = "none";
+  function openChat(usernameOrGroup) {
+    currentChat = usernameOrGroup;
+    chatTitleEl.innerText = usernameOrGroup;
+    msgListEl.innerHTML = "";
+
+    const isGroup = usernameOrGroup.includes("group:");
+
+    const path = isGroup ? `groupChats/${usernameOrGroup}` : `chats/${chatKey(currentUser, usernameOrGroup)}`;
+
+    db.ref(path).on("value", snap => {
+      msgListEl.innerHTML = "";
+      const data = snap.val();
+      if (data) {
+        Object.keys(data).sort().forEach(key => {
+          renderMsg(key, data[key]);
+        });
+      }
+      scrollToBottom();
+    });
+
+    // Typing listener
+    const typingPath = `typing/${chatKey(currentUser, usernameOrGroup)}`;
+    db.ref(typingPath).on("value", snap => {
+      const data = snap.val();
+      if (data && data[usernameOrGroup]) {
+        typingIndicatorEl.style.display = data[usernameOrGroup] ? "inline" : "none";
+        typingIndicatorEl.innerText = data[usernameOrGroup] ? `${usernameOrGroup} is typing...` : "";
+      }
+    });
   }
 
-  function showReplyTag(msgId, text) {
-    replyTo = msgId;
-    replyTag.innerText = text.length > 60 ? text.substring(0, 60) + "..." : text;
-    replyTag.style.display = "block";
+  function chatKey(a, b) {
+    return [a, b].sort().join("_");
   }
 
-  replyTag.addEventListener("click", () => {
-    replyTo = null;
-    replyTag.style.display = "none";
-  });
+  function renderMsg(key, msg) {
+    const div = document.createElement("div");
+    div.className = "message " + (msg.from === currentUser ? "sent" : "received");
+    div.innerText = msg.text;
+    div.dataset.key = key;
+    div.onclick = (e) => onMsgClick(e, key);
+    div.oncontextmenu = (e) => onMsgRightClick(e, key);
+    
+    const time = document.createElement("div");
+    time.className = "msg-time";
+    const d = new Date(msg.ts);
+    time.innerText = d.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
 
+    if (msg.from === currentUser) {
+      const tick = document.createElement("span");
+      tick.className = "tick";
+      tick.innerText = msg.readBy ? "✓✓✓" : "✓";
+      time.appendChild(tick);
+    }
+
+    div.appendChild(time);
+    msgListEl.appendChild(div);
+  }
+
+  function scrollToBottom() {
+    msgListEl.scrollTop = msgListEl.scrollHeight;
+  }
   function sendMsg() {
-    const input = document.getElementById("msgInput");
-    let text = input.value.trim();
+    const input = document.getElementById("msg-input");
+    const text = input.value.trim();
     if (!text || !currentChat) return;
 
-    const ts = Date.now();
+    const isGroup = currentChat.includes("group:");
+    const path = isGroup ? `groupChats/${currentChat}` : `chats/${chatKey(currentUser, currentChat)}`;
+    const msgKey = db.ref().push().key;
+    const now = Date.now();
+
     const msgObj = {
-      from: user,
-      text,
-      ts,
-      replyTo: replyTo || null
+      from: currentUser,
+      text: text,
+      ts: now
     };
 
-    let ref;
-    if (isGroup) {
-      ref = db.ref(`groupChats/${currentChat}`).push();
-    } else {
-      const path = [user, currentChat].sort().join("_");
-      ref = db.ref(`chats/${path}`).push();
+    if (replyToMsg) {
+      msgObj.replyTo = replyToMsg.text;
+      replyToMsg = null;
+      replyTagEl.style.display = "none";
+      replyPreviewEl.innerText = "";
     }
 
-    ref.set(msgObj).then(() => {
-      db.ref(`recentChats/${user}/${currentChat}`).set(ts);
-      db.ref(`recentChats/${currentChat}/${user}`).set(ts);
-    });
+    db.ref(`${path}/${msgKey}`).set(msgObj);
+    db.ref(`recentChats/${currentUser}/${currentChat}`).set(now);
+    if (!isGroup) db.ref(`recentChats/${currentChat}/${currentUser}`).set(now);
 
     input.value = "";
-    replyTo = null;
-    replyTag.style.display = "none";
+    stopTyping();
   }
 
-  document.getElementById("msgInput").addEventListener("keydown", e => {
+  function updateTyping() {
+    const input = document.getElementById("msg-input").value.trim();
+    const typingPath = `typing/${chatKey(currentUser, currentChat)}`;
+    db.ref(`${typingPath}/${currentUser}`).set(!!input);
+  }
+
+  function stopTyping() {
+    const typingPath = `typing/${chatKey(currentUser, currentChat)}`;
+    db.ref(`${typingPath}/${currentUser}`).set(false);
+  }
+
+  function replyTo(messageText) {
+    replyToMsg = { text: messageText };
+    replyTagEl.style.display = "block";
+    replyPreviewEl.innerText = messageText;
+  }
+
+  function cancelReply() {
+    replyToMsg = null;
+    replyTagEl.style.display = "none";
+    replyPreviewEl.innerText = "";
+  }
+
+  document.getElementById("msg-input").addEventListener("keydown", e => {
     if (e.key === "Enter") sendMsg();
-    else updateTyping(true);
   });
 
-  function updateTyping(status) {
-    if (!currentChat || isGroup) return;
-    const key = [user, currentChat].sort().join("_");
-    db.ref(`typing/${key}/${user}`).set(status);
-    if (status) {
-      setTimeout(() => db.ref(`typing/${key}/${user}`).set(false), 2000);
+  function onMsgClick(e, key) {
+    if (selectedMessages.length > 0) {
+      toggleSelectMessage(key, e.currentTarget);
+    } else if (e.detail === 2) {
+      replyTo(e.currentTarget.innerText);
     }
   }
 
-  function setupTypingListener(chatUser) {
-    if (isGroup) return;
-    const key = [user, chatUser].sort().join("_");
-    db.ref(`typing/${key}/${chatUser}`).on("value", snap => {
-      document.getElementById("typingIndicator").style.display = snap.val() ? "block" : "none";
+  function onMsgRightClick(e, key) {
+    e.preventDefault();
+    toggleSelectMessage(key, e.currentTarget);
+  }
+
+  function toggleSelectMessage(key, el) {
+    if (selectedMessages.includes(key)) {
+      selectedMessages = selectedMessages.filter(k => k !== key);
+      el.style.border = "none";
+    } else {
+      selectedMessages.push(key);
+      el.style.border = "2px solid #007bff";
+    }
+    document.getElementById("multi-action-bar").style.display = selectedMessages.length ? "flex" : "none";
+  }
+
+  function cancelSelection() {
+    selectedMessages = [];
+    document.getElementById("multi-action-bar").style.display = "none";
+    Array.from(document.getElementsByClassName("message")).forEach(el => el.style.border = "none");
+      }
+  function copySelectedMessages() {
+    const path = currentChat.includes("group:")
+      ? `groupChats/${currentChat}`
+      : `chats/${chatKey(currentUser, currentChat)}`;
+
+    db.ref(path).once("value", snap => {
+      const msgs = snap.val() || {};
+      const selected = selectedMessages.map(k => msgs[k]?.text).filter(Boolean).join("\n");
+      navigator.clipboard.writeText(selected);
+      cancelSelection();
     });
   }
-</script>
-<script>
-  function renderMsg(id, msg) {
-    const msgDiv = document.createElement("div");
-    msgDiv.className = msg.from === user ? "msg you" : "msg them";
-    msgDiv.dataset.id = id;
 
-    if (msg.replyTo) {
-      const replyDiv = document.createElement("div");
-      replyDiv.style.fontSize = "12px";
-      replyDiv.style.paddingBottom = "4px";
-      replyDiv.style.borderLeft = "3px solid #aaa";
-      replyDiv.style.marginBottom = "4px";
-      replyDiv.style.color = "#444";
-      replyDiv.innerText = "Replying to: " + (msg.text || "(deleted)");
-      msgDiv.appendChild(replyDiv);
-    }
+  function editSelectedMessage() {
+    if (selectedMessages.length !== 1) return;
+    const key = selectedMessages[0];
+    const path = currentChat.includes("group:")
+      ? `groupChats/${currentChat}/${key}`
+      : `chats/${chatKey(currentUser, currentChat)}/${key}`;
 
-    msgDiv.innerHTML += `
-      <div>${msg.text || "(deleted)"}</div>
-      <div class="msg-time">${formatTime(msg.ts)} <span class="msg-status">✓</span></div>
-    `;
-
-    msgDiv.oncontextmenu = (e) => {
-      e.preventDefault();
-      enterSelectionMode(id);
-    };
-
-    msgDiv.onclick = (e) => {
-      if (selectionMode) toggleSelection(id, msgDiv);
-    };
-
-    document.getElementById("messages").appendChild(msgDiv);
-    document.getElementById("messages").scrollTop = 99999;
-  }
-
-  function formatTime(ts) {
-    const d = new Date(ts);
-    return d.getHours().toString().padStart(2, "0") + ":" +
-           d.getMinutes().toString().padStart(2, "0");
-  }
-
-  let selectedMessages = [];
-  let selectionMode = false;
-
-  function enterSelectionMode(msgId) {
-    selectionMode = true;
-    selectedMessages = [msgId];
-    document.querySelector(`[data-id="${msgId}"]`).style.border = "2px solid blue";
-    showMsgMenu();
-  }
-
-  function toggleSelection(msgId, div) {
-    const i = selectedMessages.indexOf(msgId);
-    if (i >= 0) {
-      selectedMessages.splice(i, 1);
-      div.style.border = "";
-    } else {
-      selectedMessages.push(msgId);
-      div.style.border = "2px solid blue";
-    }
-
-    if (selectedMessages.length === 0) exitSelectionMode();
-  }
-
-  function exitSelectionMode() {
-    selectionMode = false;
-    selectedMessages = [];
-    document.querySelectorAll(".msg").forEach(m => m.style.border = "");
-    document.getElementById("msgMenu").style.display = "none";
-  }
-
-  function showMsgMenu() {
-    const menu = document.getElementById("msgMenu");
-    menu.innerHTML = "";
-
-    if (selectedMessages.length === 1) {
-      const msgId = selectedMessages[0];
-      const msgEl = document.querySelector(`[data-id="${msgId}"]`);
-      const text = msgEl?.innerText;
-
-      const copyBtn = document.createElement("button");
-      copyBtn.innerText = "Copy";
-      copyBtn.onclick = () => {
-        navigator.clipboard.writeText(text);
-        exitSelectionMode();
-      };
-      menu.appendChild(copyBtn);
-
-      const replyBtn = document.createElement("button");
-      replyBtn.innerText = "Reply";
-      replyBtn.onclick = () => {
-        showReplyTag(msgId, text);
-        exitSelectionMode();
-      };
-      menu.appendChild(replyBtn);
-
-      const msgData = msgEl?.dataset;
-      const ts = +msgData?.ts || 0;
-      const editable = Date.now() - ts < 60000 && msg.from === user;
-
-      if (editable) {
-        const editBtn = document.createElement("button");
-        editBtn.innerText = "Edit";
-        editBtn.onclick = () => {
-          document.getElementById("msgInput").value = text;
-          deleteMsg(msgId);
-          exitSelectionMode();
-        };
-        menu.appendChild(editBtn);
+    db.ref(path).once("value", snap => {
+      const msg = snap.val();
+      if (msg && msg.from === currentUser && Date.now() - msg.ts < 60000) {
+        document.getElementById("msg-input").value = msg.text;
+        editingMessage = key;
+        cancelSelection();
       }
+    });
+  }
+
+  function deleteSelectedMessages(forEveryone = false) {
+    const isGroup = currentChat.includes("group:");
+    const basePath = isGroup ? `groupChats/${currentChat}` : `chats/${chatKey(currentUser, currentChat)}`;
+
+    selectedMessages.forEach(k => {
+      if (forEveryone) {
+        db.ref(`${basePath}/${k}`).remove();
+      } else {
+        db.ref(`${basePath}/${k}/deletedFor`).update({ [currentUser]: true });
+      }
+    });
+    cancelSelection();
+  }
+
+  function updateReadReceipts(path, key) {
+    const ref = db.ref(`${path}/${key}/readBy`);
+    ref.once("value", snap => {
+      const val = snap.val() || {};
+      if (!val[currentUser]) {
+        val[currentUser] = Date.now();
+        ref.set(val);
+      }
+    });
+  }
+
+  function chatKey(userA, userB) {
+    return [userA, userB].sort().join("_");
+  }
+
+  function getUserName(uid) {
+    return uid === currentUser ? "You" : uid;
+  }
+
+  function showTypingIndicator(partner) {
+    const path = `typing/${chatKey(currentUser, partner)}`;
+    db.ref(path).on("value", snap => {
+      const typingData = snap.val();
+      if (typingData && typingData[partner]) {
+        typingEl.innerText = `${partner} is typing...`;
+        typingEl.style.display = "block";
+      } else {
+        typingEl.style.display = "none";
+      }
+    });
+  }
+
+  function showReadStatus(msg) {
+    if (msg.readBy) {
+      const readers = Object.keys(msg.readBy);
+      if (readers.includes(currentUser)) return "✓✓✓";
+      return readers.length > 0 ? "✓✓" : "✓";
+    }
+    return "✓";
+  }
+
+  function formatTimestamp(ts) {
+    const date = new Date(ts);
+    return isNaN(date.getTime()) ? "" : `${date.getHours()}:${date.getMinutes().toString().padStart(2, "0")}`;
+  }
+  function showGroupMembers(groupId) {
+    const modal = document.getElementById("modal");
+    modal.innerHTML = "<h3>Group Members</h3>";
+    db.ref(`groups/${groupId}`).once("value", snap => {
+      const group = snap.val();
+      if (!group) return;
+
+      const members = group.members || {};
+      Object.keys(members).forEach(user => {
+        const div = document.createElement("div");
+        div.innerText = user;
+        if (currentUser === group.admin && user !== currentUser) {
+          const makeAdminBtn = document.createElement("button");
+          makeAdminBtn.innerText = "Make Admin";
+          makeAdminBtn.onclick = () => db.ref(`groups/${groupId}/admin`).set(user);
+
+          const removeBtn = document.createElement("button");
+          removeBtn.innerText = "Remove";
+          removeBtn.onclick = () => db.ref(`groups/${groupId}/members/${user}`).remove();
+
+          div.append(makeAdminBtn, removeBtn);
+        }
+        modal.appendChild(div);
+      });
+    });
+    modal.style.display = "block";
+  }
+
+  function leaveGroup(groupId) {
+    db.ref(`groups/${groupId}/leaveRequests/${currentUser}`).set(true);
+    alert("Leave request sent to admin.");
+  }
+
+  function handleLeaveRequests(groupId) {
+    const modal = document.getElementById("modal");
+    modal.innerHTML = "<h3>Leave Requests</h3>";
+    db.ref(`groups/${groupId}/leaveRequests`).once("value", snap => {
+      const reqs = snap.val() || {};
+      Object.keys(reqs).forEach(user => {
+        const div = document.createElement("div");
+        div.innerText = user;
+
+        const approve = document.createElement("button");
+        approve.innerText = "Approve";
+        approve.onclick = () => {
+          db.ref(`groups/${groupId}/members/${user}`).remove();
+          db.ref(`groups/${groupId}/leaveRequests/${user}`).remove();
+        };
+
+        const reject = document.createElement("button");
+        reject.innerText = "Reject";
+        reject.onclick = () => db.ref(`groups/${groupId}/leaveRequests/${user}`).remove();
+
+        div.append(approve, reject);
+        modal.appendChild(div);
+      });
+    });
+    modal.style.display = "block";
+  }
+
+  function deleteGroup(groupId) {
+    if (confirm("Are you sure you want to delete this group?")) {
+      db.ref(`groups/${groupId}`).remove();
+      db.ref(`groupChats/${groupId}`).remove();
+    }
+  }
+
+  function blockUser(userId) {
+    if (confirm(`Block ${userId}?`)) {
+      db.ref(`blocks/${currentUser}/${userId}`).set(true);
+      alert(`${userId} blocked.`);
+    }
+  }
+
+  function isBlocked(userId, callback) {
+    db.ref(`blocks/${userId}/${currentUser}`).once("value", snap => {
+      callback(!!snap.val());
+    });
+  }
+
+  function handleChatHeaderClick() {
+    const modal = document.getElementById("modal");
+    modal.innerHTML = "";
+
+    if (currentChat.startsWith("group:")) {
+      const groupId = currentChat.replace("group:", "");
+      const viewMembers = document.createElement("button");
+      viewMembers.innerText = "View Members";
+      viewMembers.onclick = () => showGroupMembers(groupId);
+
+      const leave = document.createElement("button");
+      leave.innerText = "Leave Group";
+      leave.onclick = () => leaveGroup(groupId);
+
+      const handleReq = document.createElement("button");
+      handleReq.innerText = "Handle Leave Requests";
+      handleReq.onclick = () => handleLeaveRequests(groupId);
+
+      const delGroup = document.createElement("button");
+      delGroup.innerText = "Delete Group";
+      delGroup.onclick = () => deleteGroup(groupId);
+
+      modal.append(viewMembers, leave, handleReq, delGroup);
+    } else {
+      const block = document.createElement("button");
+      block.innerText = "Block User";
+      block.onclick = () => blockUser(currentChat);
+
+      const delChat = document.createElement("button");
+      delChat.innerText = "Delete Chat";
+      delChat.onclick = () => {
+        if (confirm("Delete all messages with this user?")) {
+          db.ref(`chats/${chatKey(currentUser, currentChat)}`).remove();
+        }
+      };
+
+      modal.append(block, delChat);
+    }
+    modal.style.display = "block";
+  }
+
+  document.getElementById("chat-title").addEventListener("click", handleChatHeaderClick);
+  let selectedMsgs = [];
+
+  function renderActionBar() {
+    const actionBar = document.getElementById("action-bar");
+    actionBar.innerHTML = "";
+
+    const copyBtn = document.createElement("button");
+    copyBtn.innerText = "Copy";
+    copyBtn.onclick = () => {
+      const texts = selectedMsgs.map(id => messages[id]?.text).join("\n");
+      navigator.clipboard.writeText(texts);
+      selectedMsgs = [];
+      renderMsgs(Object.values(messages));
+    };
+
+    if (selectedMsgs.length === 1 && messages[selectedMsgs[0]]?.from === currentUser && Date.now() - messages[selectedMsgs[0]].ts < 60000) {
+      const editBtn = document.createElement("button");
+      editBtn.innerText = "Edit";
+      editBtn.onclick = () => {
+        const msg = messages[selectedMsgs[0]];
+        input.value = msg.text;
+        input.dataset.editing = selectedMsgs[0];
+        selectedMsgs = [];
+        renderMsgs(Object.values(messages));
+      };
+      actionBar.appendChild(editBtn);
     }
 
-    const delBtn = document.createElement("button");
-    delBtn.innerText = "Delete";
-    delBtn.onclick = () => {
-      selectedMessages.forEach(deleteMsg);
-      exitSelectionMode();
+    const deleteBtn = document.createElement("button");
+    deleteBtn.innerText = "Delete";
+    deleteBtn.onclick = () => {
+      const forEveryone = confirm("Delete for everyone?");
+      selectedMsgs.forEach(msgId => {
+        if (forEveryone && messages[msgId]?.from === currentUser && Date.now() - messages[msgId].ts < 60000) {
+          db.ref(`${msgRefPath}/${msgId}`).update({ deleted: true });
+        } else {
+          db.ref(`deleted/${currentUser}/${msgRefPath.replace(/\//g, "_")}/${msgId}`).set(true);
+        }
+      });
+      selectedMsgs = [];
+      renderMsgs(Object.values(messages));
     };
-    menu.appendChild(delBtn);
 
     const cancelBtn = document.createElement("button");
     cancelBtn.innerText = "Cancel";
-    cancelBtn.onclick = exitSelectionMode;
-    menu.appendChild(cancelBtn);
+    cancelBtn.onclick = () => {
+      selectedMsgs = [];
+      renderMsgs(Object.values(messages));
+    };
 
-    menu.style.display = "block";
-    menu.style.top = "60px";
-    menu.style.left = "50%";
-    menu.style.transform = "translateX(-50%)";
+    actionBar.append(copyBtn, deleteBtn, cancelBtn);
   }
 
-  function deleteMsg(id) {
-    if (!currentChat) return;
-    const path = isGroup
-      ? `groupChats/${currentChat}/${id}`
-      : `chats/${[user, currentChat].sort().join("_")}/${id}`;
-    db.ref(path).remove();
+  function handleRightClick(msgId, e) {
+    e.preventDefault();
+    if (!selectedMsgs.includes(msgId)) {
+      selectedMsgs.push(msgId);
+    } else {
+      selectedMsgs = selectedMsgs.filter(id => id !== msgId);
+    }
+    renderMsgs(Object.values(messages));
   }
 
-  function setupChatListener(chatId, group) {
-    const path = group ? `groupChats/${chatId}` : `chats/${[user, chatId].sort().join("_")}`;
-    const ref = db.ref(path);
-    document.getElementById("messages").innerHTML = "";
+  function renderModal() {
+    const modal = document.createElement("div");
+    modal.id = "modal";
+    modal.style = `
+      display: none;
+      position: fixed;
+      top: 10%;
+      left: 10%;
+      width: 80%;
+      max-height: 80%;
+      overflow-y: auto;
+      background: #fff;
+      border: 1px solid #aaa;
+      padding: 1em;
+      z-index: 1000;
+    `;
+    document.body.appendChild(modal);
 
-    ref.on("child_added", snap => {
-      renderMsg(snap.key, snap.val());
+    modal.addEventListener("click", (e) => {
+      if (e.target.id === "modal") modal.style.display = "none";
+    });
+  }
+
+  renderModal();
+  function requestNotificationPermission() {
+    if ("Notification" in window && Notification.permission !== "granted") {
+      Notification.requestPermission();
+    }
+  }
+
+  function showNotification(title, body) {
+    if (document.hidden && Notification.permission === "granted") {
+      new Notification(title, { body });
+    }
+  }
+
+  function renderMsgs(msgList) {
+    const area = document.getElementById("chat-area");
+    area.innerHTML = "";
+    let lastDate = "";
+    msgList.sort((a, b) => a.ts - b.ts).forEach(msg => {
+      const msgDate = new Date(msg.ts).toDateString();
+      if (msgDate !== lastDate) {
+        const dateLabel = document.createElement("div");
+        dateLabel.className = "date-label";
+        dateLabel.innerText = msgDate;
+        area.appendChild(dateLabel);
+        lastDate = msgDate;
+      }
+
+      if (deleted[currentUser]?.[msg.code]) return;
+      const div = document.createElement("div");
+      div.className = "message";
+      div.innerHTML = `
+        ${msg.replyTo ? `<div class="reply-tag small">Replying to: ${messages[msg.replyTo]?.text || "(message deleted)"}</div>` : ""}
+        <div class="msg-bubble ${msg.from === currentUser ? "me" : "other"}"
+             oncontextmenu="handleRightClick('${msg.code}', event)">
+          ${msg.deleted ? "<i>Message deleted</i>" : msg.text}
+          <span class="meta">${msg.from}${formatTicks(msg)} ${formatTime(msg.ts)}</span>
+        </div>`;
+      if (selectedMsgs.includes(msg.code)) div.classList.add("selected");
+      area.appendChild(div);
     });
 
-    ref.on("child_removed", snap => {
-      const el = document.querySelector(`[data-id="${snap.key}"]`);
-      if (el) el.remove();
-    });
-  }
-    </script>
-    <script>
-  function openChat(name, group = false) {
-    currentChat = name;
-    isGroup = group;
-    document.getElementById("chatWindow").classList.add("active");
-    document.getElementById("chatTitle").innerText = name;
-    document.getElementById("messages").innerHTML = "";
-    setupChatListener(name, group);
-    if (!group) setupTypingListener(name);
+    area.scrollTop = area.scrollHeight;
+    if (selectedMsgs.length) renderActionBar();
   }
 
-  function fetchUsersAndGroups() {
-    const usersRef = db.ref("users");
-    const groupsRef = db.ref("groups");
+  function loadUsersAndGroups() {
+    const list = document.getElementById("user-list");
+    list.innerHTML = "";
 
-    usersRef.once("value", snap => {
-      const list = document.getElementById("chatList");
-      snap.forEach(child => {
-        const uname = child.key;
-        if (uname !== user) {
+    db.ref("users").once("value", snap => {
+      const users = snap.val() || {};
+      Object.keys(users).forEach(user => {
+        if (user !== currentUser) {
           const div = document.createElement("div");
-          div.className = "chatItem";
-          div.innerText = uname;
-          div.onclick = () => openChat(uname, false);
+          div.innerText = user;
+          div.onclick = () => openChat(user, false);
           list.appendChild(div);
         }
       });
     });
 
-    groupsRef.once("value", snap => {
-      const list = document.getElementById("chatList");
-      snap.forEach(child => {
-        const gname = child.val().name;
-        const members = child.val().members || {};
-        const isMember = members[user];
-
+    db.ref("groups").once("value", snap => {
+      const groups = snap.val() || {};
+      Object.entries(groups).forEach(([id, group]) => {
         const div = document.createElement("div");
-        div.className = "chatItem";
-        div.innerText = "#" + gname;
+        div.innerText = group.name;
         div.onclick = () => {
-          if (isMember) {
-            openChat(gname, true);
-          } else {
-            const join = confirm("Join this group?");
-            if (join) {
-              if (!child.val().public) {
-                const pwd = prompt("Enter group password:");
-                if (pwd !== child.val().password) return alert("Wrong password.");
-              }
-              db.ref(`groups/${gname}/members/${user}`).set(true);
-              openChat(gname, true);
+          if (!group.members || !group.members[currentUser]) {
+            if (!group.public) {
+              const pass = prompt("This is a private group. Enter password:");
+              if (pass !== group.password) return alert("Incorrect password.");
             }
+            if (!group.members) group.members = {};
+            group.members[currentUser] = true;
+            db.ref(`groups/${id}/members/${currentUser}`).set(true);
           }
+          openChat(group.name, true);
         };
         list.appendChild(div);
       });
     });
   }
 
-  function createGroup() {
-    const gname = prompt("Group name:");
-    if (!gname) return;
+  requestNotificationPermission();
+  loadUsersAndGroups();
+  function showGroupOptions(groupName) {
+    const groupId = groupName;
+    db.ref(`groups/${groupId}`).once("value", snap => {
+      const group = snap.val();
+      if (!group) return alert("Group not found");
 
-    const pub = confirm("Make group public?");
-    const password = pub ? null : prompt("Enter group password:");
+      const isAdmin = group.admin === currentUser;
+      const members = group.members ? Object.keys(group.members) : [];
 
-    const newGroup = {
-      name: gname,
-      admin: user,
-      members: { [user]: true },
-      public: pub,
-      password: pub ? "" : password
-    };
+      let html = `<h3>Members of ${group.name}</h3>`;
+      members.forEach(member => {
+        html += `<div>${member}`;
+        if (isAdmin && member !== currentUser) {
+          html += `
+            <button onclick="makeAdmin('${groupId}', '${member}')">Make Admin</button>
+            <button onclick="removeMember('${groupId}', '${member}')">Remove</button>`;
+        }
+        html += `</div>`;
+      });
 
-    db.ref(`groups/${gname}`).set(newGroup);
-    openChat(gname, true);
-  }
-
-  function setupChatTitleOptions() {
-    const title = document.getElementById("chatTitle");
-    title.onclick = () => {
-      const menu = document.createElement("div");
-      menu.className = "menu";
-      menu.style.position = "absolute";
-      menu.style.top = "40px";
-      menu.style.right = "10px";
-      menu.style.background = "#fff";
-      menu.style.padding = "10px";
-      menu.style.border = "1px solid #ccc";
-      menu.style.boxShadow = "0 2px 5px rgba(0,0,0,0.2)";
-      menu.innerHTML = "";
-
-      if (!isGroup) {
-        const blockBtn = document.createElement("button");
-        blockBtn.innerText = "Block User";
-        blockBtn.onclick = () => {
-          db.ref(`blocked/${user}/${currentChat}`).set(true);
-          alert("User blocked.");
-          menu.remove();
-        };
-        menu.appendChild(blockBtn);
-
-        const delChat = document.createElement("button");
-        delChat.innerText = "Delete Chat";
-        delChat.onclick = () => {
-          const path = [user, currentChat].sort().join("_");
-          db.ref(`chats/${path}`).remove();
-          menu.remove();
-        };
-        menu.appendChild(delChat);
-      } else {
-        const leaveBtn = document.createElement("button");
-        leaveBtn.innerText = "Leave Group";
-        leaveBtn.onclick = () => {
-          db.ref(`groups/${currentChat}/leaveRequests/${user}`).set(true);
-          alert("Leave request sent.");
-          menu.remove();
-        };
-        menu.appendChild(leaveBtn);
-
-        const viewMembers = document.createElement("button");
-        viewMembers.innerText = "View Members";
-        viewMembers.onclick = () => {
-          db.ref(`groups/${currentChat}/members`).once("value", snap => {
-            let out = "";
-            snap.forEach(c => {
-              out += c.key + "\n";
-            });
-            alert(out);
-            menu.remove();
-          });
-        };
-        menu.appendChild(viewMembers);
+      if (isAdmin && group.leaveRequests) {
+        html += `<h4>Leave Requests</h4>`;
+        Object.keys(group.leaveRequests).forEach(user => {
+          html += `<div>${user}
+            <button onclick="confirmLeave('${groupId}', '${user}')">Confirm</button>
+            <button onclick="cancelLeave('${groupId}', '${user}')">Cancel</button>
+          </div>`;
+        });
       }
 
-      document.body.appendChild(menu);
-      setTimeout(() => {
-        document.addEventListener("click", () => menu.remove(), { once: true });
-      }, 10);
-    };
+      html += isAdmin
+        ? `<button onclick="deleteGroup('${groupId}')">Delete Group</button>`
+        : `<button onclick="requestLeave('${groupId}')">Leave Group</button>`;
+
+      showPopup(html);
+    });
   }
 
-  window.onload = () => {
-    fetchUsersAndGroups();
-    setupChatTitleOptions();
-  };
-    </script>
-    <script>
-  function formatDateHeader(timestamp) {
-    const date = new Date(timestamp);
-    return date.toDateString();
+  function showPopup(content) {
+    const popup = document.createElement("div");
+    popup.className = "popup";
+    popup.innerHTML = `<div class="popup-inner">${content}<br><button onclick="this.parentElement.parentElement.remove()">Close</button></div>`;
+    document.body.appendChild(popup);
   }
 
-  function insertFloatingDate(ts) {
-    const dateStr = formatDateHeader(ts);
-    if (!lastDate || lastDate !== dateStr) {
-      const dateDiv = document.createElement("div");
-      dateDiv.className = "dateHeader";
-      dateDiv.innerText = dateStr;
-      document.getElementById("messages").appendChild(dateDiv);
-      lastDate = dateStr;
+  function makeAdmin(groupId, user) {
+    db.ref(`groups/${groupId}/admin`).set(user);
+    alert(`${user} is now admin.`);
+  }
+
+  function removeMember(groupId, user) {
+    db.ref(`groups/${groupId}/members/${user}`).remove();
+    alert(`${user} removed.`);
+  }
+
+  function requestLeave(groupId) {
+    db.ref(`groups/${groupId}/leaveRequests/${currentUser}`).set(true);
+    alert("Leave request sent to admin.");
+  }
+
+  function confirmLeave(groupId, user) {
+    db.ref(`groups/${groupId}/members/${user}`).remove();
+    db.ref(`groups/${groupId}/leaveRequests/${user}`).remove();
+    alert(`${user} removed.`);
+  }
+
+  function cancelLeave(groupId, user) {
+    db.ref(`groups/${groupId}/leaveRequests/${user}`).remove();
+    alert("Leave request canceled.");
+  }
+
+  function deleteGroup(groupId) {
+    if (confirm("Are you sure? This will delete the entire group.")) {
+      db.ref(`groups/${groupId}`).remove();
+      db.ref(`groupChats/${groupId}`).remove();
+      alert("Group deleted.");
     }
   }
-
-  function requestNotificationPermission() {
-    if ("Notification" in window) {
-      Notification.requestPermission();
+  function initApp() {
+    const storedUser = localStorage.getItem("user");
+    if (!storedUser) {
+      location.href = "index.html"; // redirect to login
+      return;
     }
+
+    currentUser = storedUser;
+    document.getElementById("user-header").innerText = currentUser;
+    db.ref(`users/${currentUser}/lastSeen`).set(Date.now());
+
+    db.ref(`users/${currentUser}`).once("value", snap => {
+      if (!snap.exists()) {
+        db.ref(`users/${currentUser}`).set({
+          email: "",
+          lastSeen: Date.now(),
+          mobile: "",
+          password: ""
+        });
+      }
+    });
+
+    window.addEventListener("beforeunload", () => {
+      db.ref(`users/${currentUser}/lastSeen`).set(Date.now());
+    });
+
+    setupTypingListener();
+    loadUsersAndGroups();
   }
 
-  function sendNotification(title, body) {
-    if ("Notification" in window && Notification.permission === "granted") {
-      new Notification(title, { body });
-    }
-  }
-
-  // Call this at login
-  requestNotificationPermission();
+  initApp();
 </script>
-
-<style>
-  body {
-    font-family: Arial, sans-serif;
-    margin: 0;
-    height: 100vh;
-    overflow: hidden;
-  }
-
-  .container {
-    display: flex;
-    height: 100%;
-  }
-
-  #userList, #chatWindow {
-    flex: 1;
-    overflow-y: auto;
-    border-right: 1px solid #ccc;
-  }
-
-  #chatWindow {
-    display: flex;
-    flex-direction: column;
-  }
-
-  #chatTitle {
-    background: #075e54;
-    color: white;
-    padding: 10px;
-    font-weight: bold;
-    position: relative;
-  }
-
-  #messages {
-    flex: 1;
-    overflow-y: auto;
-    padding: 10px;
-    background: #e5ddd5;
-  }
-
-  .message {
-    background: #fff;
-    padding: 6px 12px;
-    border-radius: 6px;
-    margin-bottom: 6px;
-    max-width: 60%;
-    word-wrap: break-word;
-    position: relative;
-  }
-
-  .message.self {
-    background: #dcf8c6;
-    align-self: flex-end;
-  }
-
-  .dateHeader {
-    text-align: center;
-    font-size: 12px;
-    color: #555;
-    margin: 10px 0;
-  }
-
-  #msgInput {
-    display: flex;
-    border-top: 1px solid #ccc;
-    padding: 6px;
-  }
-
-  #msgInput input {
-    flex: 1;
-    padding: 8px;
-    border: 1px solid #ccc;
-    border-radius: 6px;
-  }
-
-  #msgInput button {
-    padding: 8px 12px;
-    margin-left: 6px;
-    background: #075e54;
-    color: white;
-    border: none;
-    border-radius: 6px;
-  }
-
-  .replyTag {
-    background: #f1f0f0;
-    padding: 4px 8px;
-    margin-bottom: 4px;
-    font-size: 12px;
-    color: #444;
-    border-left: 3px solid #34b7f1;
-  }
-
-  .chatItem {
-    padding: 10px;
-    cursor: pointer;
-    border-bottom: 1px solid #ccc;
-  }
-
-  .chatItem:hover {
-    background: #f1f1f1;
-  }
-
-  .menu button {
-    display: block;
-    width: 100%;
-    padding: 6px;
-    background: white;
-    border: none;
-    text-align: left;
-    cursor: pointer;
-  }
-
-  .menu button:hover {
-    background: #eee;
-  }
-</style>
-
 </body>
 </html>
