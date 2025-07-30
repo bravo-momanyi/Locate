@@ -252,11 +252,11 @@
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
     let currentUser = localStorage.getItem('user');
-    if (!currentUser) location.href = 'login.html';
+    if (!currentUser) location.href = 'app.html';
     document.getElementById('currentUser').innerText = "Logged in as " + currentUser;
 
     function goToDashboard() {
-      location.href = 'dashboard.html';
+      location.href = 'app.html';
     }
 
     const userListEl = document.getElementById('userSection');
