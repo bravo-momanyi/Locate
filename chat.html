@@ -642,6 +642,12 @@
 });
 
     }
+  ``db.ref(`calls/${currentUser}`).on("child_removed", snap => {
+  if (callHandled || minimized) {
+    endCall("ended");
+    alert("Call ended by the other user.");
+  }
+});
 
     function setupPeer() {
       pc = new RTCPeerConnection(servers);
@@ -661,57 +667,78 @@
     }
 
     // === Incoming Calls ===
-    db.ref(`calls/${currentUser}`).on("value", async snap => {
-      const data = snap.val();
-      if (!data || data.from === currentUser) return;
+    let callHandled = false;
+let callTimeoutTimer = null;
+let minimized = false;
 
-      const accept = confirm(`${data.from} is calling. Accept?`);
-      if (!accept) return;
-      if (pc && pc.signalingState !== "closed") {
-  pc.close();
+db.ref(`calls/${currentUser}`).on("value", async snap => {
+  const data = snap.val();
+  if (!data || data.from === currentUser || callHandled) return;
+
+  // Prevent re-trigger
+  callHandled = true;
+
+  showIncomingPopup(data.from, data.video);
+
+  // Auto-timeout after 60 seconds
+  callTimeoutTimer = setTimeout(() => {
+    if (!callHandled) return;
+    endCall("timeout");
+    alert("Missed call from " + data.from);
+  }, 60000);
+});
+
+function showIncomingPopup(fromUser, isVideo) {
+  callModal.classList.remove("hidden");
+  callTitle.textContent = `${fromUser} is calling...`;
+
+  // Add accept, reject, and cancel buttons dynamically if needed
+  callModal.innerHTML = `
+    <div class="bg-white p-6 rounded-lg text-center space-y-4 w-full max-w-md mx-auto">
+      <h3 class="text-xl font-bold">${fromUser} is calling...</h3>
+      <div class="flex justify-center gap-4">
+        <button id="acceptCall" class="bg-green-500 text-white px-4 py-2 rounded">Accept</button>
+        <button id="cancelCall" class="bg-yellow-500 text-white px-4 py-2 rounded">Cancel</button>
+        <button id="rejectCall" class="bg-red-600 text-white px-4 py-2 rounded">Reject</button>
+      </div>
+    </div>
+  `;
+
+  document.getElementById("acceptCall").onclick = async () => {
+    clearTimeout(callTimeoutTimer);
+    await acceptIncomingCall(fromUser, isVideo);
+  };
+
+  document.getElementById("rejectCall").onclick = () => {
+    clearTimeout(callTimeoutTimer);
+    endCall("rejected");
+  };
+
+  document.getElementById("cancelCall").onclick = () => {
+    callModal.classList.add("hidden");
+    minimized = true; // Still ringing in background
+  };
 }
 
-      callModal.classList.remove("hidden");
-      callTitle.textContent = `In call with ${data.from}`;
-
-      localStream = await navigator.mediaDevices.getUserMedia({
-        video: data.video,
-        audio: true
-      });
-
-      localVideo.srcObject = localStream;
-
-      setupPeer();
-      localStream.getTracks().forEach(track => pc.addTrack(track, localStream));
-
-      await pc.setRemoteDescription(new RTCSessionDescription(JSON.parse(data.offer)));
-
-      const answer = await pc.createAnswer();
-      await pc.setLocalDescription(answer);
-
-      db.ref(`calls/${currentUser}`).update({
-        answer: JSON.stringify(answer)
-      });
-
-      const incomingLog = {
-        with: data.from,
-        type: data.video ? "video" : "audio",
-        time: Date.now(),
-        direction: "incoming"
-      };
-      db.ref(`callsHistory/${currentUser}`).push(incomingLog);
-    });
-
     // === End Call ===
-    endCallBtn.onclick = () => {
-      callModal.classList.add("hidden");
+    function endCall(reason = "ended") {
+  callModal.classList.add("hidden");
+  callHandled = false;
+  minimized = false;
+  clearTimeout(callTimeoutTimer);
 
-      if (pc) pc.close();
-      if (localStream) localStream.getTracks().forEach(t => t.stop());
+  if (pc) pc.close();
+  if (localStream) localStream.getTracks().forEach(t => t.stop());
 
-      db.ref(`calls/${currentUser}`).remove();
-      db.ref(`calls/${selectedChat?.id}`).remove();
-    };
+  if (selectedChat) {
+    db.ref(`calls/${selectedChat.id}`).remove();
+  }
+  db.ref(`calls/${currentUser}`).remove();
+
+  if (reason === "rejected" || reason === "timeout") {
+    console.log("Call " + reason);
+  }
+}
 
     // === Load Call Logs to Console ===
     db.ref(`callsHistory/${currentUser}`).once("value", snap => {
