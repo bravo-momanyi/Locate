@@ -118,19 +118,19 @@ if ("Notification" in window && Notification.permission !== "granted") {
 }
 
 // Load Users and Groups
-function loadUsers() {
-  db.ref("users").on("value", snapshot => {
-    userList.innerHTML = "";
-    snapshot.forEach(child => {
-      const user = child.val();
-      if (user.username === currentUser) return;
-      const li = document.createElement("li");
-      li.className = "p-3 hover:bg-gray-100 cursor-pointer";
-      li.textContent = user.username;
-      li.onclick = () => openChat(user.username, false);
-      userList.appendChild(li);
-    });
+db.ref("users").on("value", snapshot => {
+  userList.innerHTML = "";
+  snapshot.forEach(child => {
+    const username = child.key;
+    if (username === currentUser) return;
+    const li = document.createElement("li");
+    li.className = "p-3 hover:bg-gray-100 cursor-pointer";
+    li.textContent = username;
+    li.onclick = () => openChat(username, false);
+    userList.appendChild(li);
   });
+});
+
 
   db.ref("groups").on("child_added", snap => {
     const group = snap.val();
