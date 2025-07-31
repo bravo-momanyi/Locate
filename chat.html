@@ -133,17 +133,8 @@
     const storage = firebase.storage();
 
     // Get current user from session
-    let currentUser = localStorage.getItem("username");
+    let currentUser = prompt("Enter your username:");
 
-if (!currentUser) {
-  currentUser = prompt("Enter your username:");
-  if (!currentUser) {
-    alert("Username is required to continue.");
-    location.href = "index.html";
-  } else {
-    localStorage.setItem("username", currentUser);
-  }
-}
 
     // Elements
     const userList = document.getElementById("userList");
