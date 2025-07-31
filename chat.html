@@ -189,18 +189,6 @@
       userList.appendChild(li);
     });
 
-    // Theme toggle
-   
-    toggleThemeBtn.onclick = () => {
-      document.documentElement.classList.toggle("dark");
-      localStorage.setItem("theme", document.documentElement.classList.contains("dark") ? "dark" : "light");
-    };
-
-    // Apply saved theme
-    if (localStorage.getItem("theme") === "dark") {
-      document.documentElement.classList.add("dark");
-    }
-
     // Search messages
     searchInput.oninput = () => {
       const query = searchInput.value.toLowerCase();
