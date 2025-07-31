@@ -190,7 +190,7 @@
     });
 
     // Theme toggle
-    const toggleThemeBtn = document.getElementById("toggleTheme");
+   
     toggleThemeBtn.onclick = () => {
       document.documentElement.classList.toggle("dark");
       localStorage.setItem("theme", document.documentElement.classList.contains("dark") ? "dark" : "light");
