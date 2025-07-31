@@ -1,18 +1,42 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>All Users</title>
+  <title>Logged In + All Users</title>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
   <style>
-    body { font-family: sans-serif; padding: 20px; }
-    table { border-collapse: collapse; width: 100%; }
-    th, td { padding: 8px 12px; border: 1px solid #ddd; }
-    th { background-color: #f4f4f4; }
+    body {
+      font-family: Arial, sans-serif;
+      padding: 20px;
+      background-color: #f9f9f9;
+    }
+    h2, h3 {
+      margin-bottom: 10px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 15px;
+    }
+    th, td {
+      padding: 10px;
+      border: 1px solid #ccc;
+      text-align: left;
+    }
+    th {
+      background-color: #f0f0f0;
+    }
+    .error {
+      color: red;
+    }
   </style>
 </head>
 <body>
-  <h2>All Registered Users</h2>
+  <h2>Session + Users</h2>
+  <p id="currentUser"></p>
+  <p class="error" id="errorMessage"></p>
+
+  <h3>All Users</h3>
   <table>
     <thead>
       <tr>
@@ -25,7 +49,7 @@
   </table>
 
   <script>
-    // Firebase Config
+    // Firebase config
     const firebaseConfig = {
       apiKey: "AIzaSyBfkUJS81minjxj0DFz4pzNnGzCtb5ZJss",
       authDomain: "locater-42fb4.firebaseapp.com",
@@ -36,28 +60,40 @@
       appId: "1:250348367998:web:d734b2b4c735b5684ae82f"
     };
 
-    // Init Firebase
+    // Initialize Firebase
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
 
+    const currentUserEl = document.getElementById("currentUser");
+    const errorMessageEl = document.getElementById("errorMessage");
     const tableBody = document.getElementById("userTableBody");
 
-    db.ref("users").once("value").then(snapshot => {
-      tableBody.innerHTML = "";
-      snapshot.forEach(child => {
-        const username = child.key;
-        const data = child.val();
-        const tr = document.createElement("tr");
-        tr.innerHTML = `
-          <td>${username}</td>
-          <td>${data.email || "-"}</td>
-          <td>${data.mobile || "-"}</td>
-        `;
-        tableBody.appendChild(tr);
+    // Read current user from sessionStorage
+    const username = sessionStorage.getItem("username");
+
+    if (!username) {
+      errorMessageEl.textContent = "No user is logged in. Please log in via app.html first.";
+    } else {
+      currentUserEl.textContent = `You are logged in as: ${username}`;
+
+      // Load all users
+      db.ref("users").once("value").then(snapshot => {
+        tableBody.innerHTML = "";
+        snapshot.forEach(child => {
+          const uname = child.key;
+          const userData = child.val();
+          const tr = document.createElement("tr");
+          tr.innerHTML = `
+            <td>${uname}</td>
+            <td>${userData.email || "-"}</td>
+            <td>${userData.mobile || "-"}</td>
+          `;
+          tableBody.appendChild(tr);
+        });
+      }).catch(err => {
+        errorMessageEl.textContent = "Error fetching users: " + err.message;
       });
-    }).catch(err => {
-      console.error("Error loading users:", err);
-    });
+    }
   </script>
 </body>
 </html>
