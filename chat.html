@@ -132,7 +132,7 @@
 
     // Get current user from session
     const currentUser = sessionStorage.getItem('username') || localStorage.getItem('username');
-    if (!username) {
+    if (!currentUser) {
       alert('Session expired');
       location.href = 'index.html';
     }
