@@ -134,7 +134,7 @@ db.ref("users").on("value", snapshot => {
 
   db.ref("groups").on("child_added", snap => {
     const group = snap.val();
-    if (!group.members.includes(currentUser)) return;
+    if (!group.members || !group.members[currentUser]) return;
     const li = document.createElement("li");
     li.className = "p-3 hover:bg-gray-100 cursor-pointer text-green-600";
     li.textContent = `# ${group.name}`;
