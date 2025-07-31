@@ -1,15 +1,28 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Firebase User Read Test</title>
+  <title>All Users</title>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
+  <style>
+    body { font-family: sans-serif; padding: 20px; }
+    table { border-collapse: collapse; width: 100%; }
+    th, td { padding: 8px 12px; border: 1px solid #ddd; }
+    th { background-color: #f4f4f4; }
+  </style>
 </head>
 <body>
-  <h2>User Info Test</h2>
-  <p><strong>Username:</strong> <span id="usernameDisplay"></span></p>
-  <p><strong>Email:</strong> <span id="email"></span></p>
-  <p><strong>Mobile:</strong> <span id="mobile"></span></p>
+  <h2>All Registered Users</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Username</th>
+        <th>Email</th>
+        <th>Mobile</th>
+      </tr>
+    </thead>
+    <tbody id="userTableBody"></tbody>
+  </table>
 
   <script>
     // Firebase Config
@@ -27,32 +40,23 @@
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
 
-    // Get or prompt for username
-    let currentUser = sessionStorage.getItem("username");
-    if (!currentUser) {
-      currentUser = prompt("Enter your username:");
-      if (!currentUser) {
-        alert("Username is required");
-        location.reload();
-      } else {
-        sessionStorage.setItem("username", currentUser);
-      }
-    }
+    const tableBody = document.getElementById("userTableBody");
 
-    // Display username
-    document.getElementById("usernameDisplay").textContent = currentUser;
-
-    // Read user data
-    db.ref("users/" + currentUser).once("value").then(snapshot => {
-      const data = snapshot.val();
-      if (!data) {
-        alert("User not found.");
-        return;
-      }
-      document.getElementById("email").textContent = data.email || "(none)";
-      document.getElementById("mobile").textContent = data.mobile || "(none)";
-    }).catch(error => {
-      console.error("Error reading user:", error);
+    db.ref("users").once("value").then(snapshot => {
+      tableBody.innerHTML = "";
+      snapshot.forEach(child => {
+        const username = child.key;
+        const data = child.val();
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td>${username}</td>
+          <td>${data.email || "-"}</td>
+          <td>${data.mobile || "-"}</td>
+        `;
+        tableBody.appendChild(tr);
+      });
+    }).catch(err => {
+      console.error("Error loading users:", err);
     });
   </script>
 </body>
