@@ -1,152 +1,215 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>WebRTC Firebase Call Test</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>WebRTC Call Test</title>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
   <style>
-    video {
-      width: 45%;
-      margin: 10px;
-      background: black;
+    body { font-family: sans-serif; padding: 20px; }
+    #videoContainer { display: flex; gap: 10px; margin-top: 20px; }
+    video { width: 300px; height: 200px; background: black; }
+    #callModal {
+      position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.6); display: none;
+      align-items: center; justify-content: center;
+      z-index: 999;
     }
-    #controls button {
-      margin: 5px;
-      padding: 10px;
+    #callPopup {
+      background: white; padding: 20px; border-radius: 10px; text-align: center;
     }
+    #callPopup button { margin: 5px; }
   </style>
 </head>
 <body>
-  <h2>WebRTC Firebase Call Test</h2>
 
-  <label>
-    Your Name: <input type="text" id="username" />
-  </label>
-  <br><br>
-  <label>
-    Call User: <input type="text" id="target" />
-  </label>
-  <br><br>
+<h2>WebRTC Call Test</h2>
+<p>Logged in as: <strong id="currentUserLabel"></strong></p>
 
-  <div id="controls">
-    <button onclick="startCall()">Start Call</button>
-    <button onclick="endCall()">End Call</button>
+<label>Select user to call:</label>
+<select id="userList"></select>
+<br><br>
+<button id="audioCallBtn">📞 Audio Call</button>
+<button id="videoCallBtn">🎥 Video Call</button>
+
+<div id="callModal">
+  <div id="callPopup">
+    <p id="callStatus">Incoming call...</p>
+    <button id="acceptBtn">Accept</button>
+    <button id="rejectBtn">Reject</button>
+    <button id="cancelBtn">Cancel</button>
   </div>
+</div>
 
+<div id="videoContainer">
   <video id="localVideo" autoplay muted></video>
   <video id="remoteVideo" autoplay></video>
+</div>
 
-  <script>
-    const firebaseConfig = {
-      apiKey: "AIzaSyBfkUJS81minjxj0DFz4pzNnGzCtb5ZJss",
-      authDomain: "locater-42fb4.firebaseapp.com",
-      databaseURL: "https://locater-42fb4-default-rtdb.firebaseio.com",
-      projectId: "locater-42fb4",
-      storageBucket: "locater-42fb4.appspot.com",
-      messagingSenderId: "250348367998",
-      appId: "1:250348367998:web:d734b2b4c735b5684ae82f"
+<script>
+  const firebaseConfig = {
+    apiKey: "AIzaSyBfkUJS81minjxj0DFz4pzNnGzCtb5ZJss",
+    authDomain: "locater-42fb4.firebaseapp.com",
+    databaseURL: "https://locater-42fb4-default-rtdb.firebaseio.com",
+    projectId: "locater-42fb4",
+    storageBucket: "locater-42fb4.appspot.com",
+    messagingSenderId: "250348367998",
+    appId: "1:250348367998:web:d734b2b4c735b5684ae82f"
+  };
+  firebase.initializeApp(firebaseConfig);
+  const db = firebase.database();
+
+  const currentUser = prompt("Enter your username");
+  sessionStorage.setItem("username", currentUser);
+  document.getElementById("currentUserLabel").textContent = currentUser;
+
+  const userList = document.getElementById("userList");
+  const audioBtn = document.getElementById("audioCallBtn");
+  const videoBtn = document.getElementById("videoCallBtn");
+  const localVideo = document.getElementById("localVideo");
+  const remoteVideo = document.getElementById("remoteVideo");
+  const callModal = document.getElementById("callModal");
+  const callStatus = document.getElementById("callStatus");
+  const acceptBtn = document.getElementById("acceptBtn");
+  const rejectBtn = document.getElementById("rejectBtn");
+  const cancelBtn = document.getElementById("cancelBtn");
+
+  const servers = { iceServers: [{ urls: "stun:stun.l.google.com:19302" }] };
+  let pc = null, stream = null, remoteStream = null;
+  let target = null;
+  let timeout = null;
+
+  db.ref("users").once("value", snap => {
+    snap.forEach(child => {
+      const name = child.key;
+      if (name !== currentUser) {
+        const opt = document.createElement("option");
+        opt.value = name;
+        opt.textContent = name;
+        userList.appendChild(opt);
+      }
+    });
+  });
+
+  audioBtn.onclick = () => startCall(false);
+  videoBtn.onclick = () => startCall(true);
+
+  async function startCall(withVideo) {
+    target = userList.value;
+    stream = await navigator.mediaDevices.getUserMedia({ video: withVideo, audio: true });
+    localVideo.srcObject = stream;
+
+    pc = createPeerConnection();
+    stream.getTracks().forEach(t => pc.addTrack(t, stream));
+
+    const offer = await pc.createOffer();
+    await pc.setLocalDescription(offer);
+
+    const callRef = db.ref(`calls/${target}`);
+    await callRef.set({
+      from: currentUser,
+      offer: JSON.stringify(offer),
+      video: withVideo,
+      timestamp: Date.now()
+    });
+
+    // Timeout if unanswered
+    timeout = setTimeout(() => endCall("No answer"), 60000);
+
+    callModal.style.display = "flex";
+    callStatus.textContent = "Calling...";
+  }
+
+  function createPeerConnection() {
+    const peer = new RTCPeerConnection(servers);
+    remoteStream = new MediaStream();
+    remoteVideo.srcObject = remoteStream;
+
+    peer.ontrack = e => remoteStream.addTrack(e.track);
+    peer.onicecandidate = e => {
+      if (e.candidate) {
+        db.ref(`calls/${target}`).update({
+          candidate: JSON.stringify(e.candidate)
+        });
+      }
     };
+    return peer;
+  }
 
-    firebase.initializeApp(firebaseConfig);
-    const db = firebase.database();
+  // Incoming call
+  db.ref(`calls/${currentUser}`).on("value", async snap => {
+    const data = snap.val();
+    if (!data || data.from === currentUser) return;
 
-    let pc;
-    let localStream;
-    let remoteStream = new MediaStream();
-    const servers = { iceServers: [{ urls: "stun:stun.l.google.com:19302" }] };
+    target = data.from;
+    callModal.style.display = "flex";
+    callStatus.textContent = `${target} is calling...`;
 
-    const localVideo = document.getElementById("localVideo");
-    const remoteVideo = document.getElementById("remoteVideo");
+    acceptBtn.onclick = async () => {
+      stream = await navigator.mediaDevices.getUserMedia({ video: data.video, audio: true });
+      localVideo.srcObject = stream;
 
-    const usernameInput = document.getElementById("username");
-    const targetInput = document.getElementById("target");
-
-    let callRef;
-
-    async function startCall() {
-      const username = usernameInput.value.trim();
-      const target = targetInput.value.trim();
-      if (!username || !target || username === target) return alert("Enter valid usernames");
-
-      localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-      localVideo.srcObject = localStream;
-
-      pc = new RTCPeerConnection(servers);
-      localStream.getTracks().forEach(track => pc.addTrack(track, localStream));
-      pc.ontrack = e => remoteStream.addTrack(e.track);
-      remoteVideo.srcObject = remoteStream;
-
-      pc.onicecandidate = e => {
-        if (e.candidate) {
-          db.ref(`calls/${target}/candidates`).push(JSON.stringify(e.candidate));
-        }
-      };
-
-      const offer = await pc.createOffer();
-      await pc.setLocalDescription(offer);
-
-      db.ref(`calls/${target}`).set({
-        from: username,
-        offer: JSON.stringify(offer)
-      });
-
-      callRef = db.ref(`calls/${username}`);
-      callRef.on("value", async snap => {
-        const data = snap.val();
-        if (!data) return;
-        if (data.answer) {
-          await pc.setRemoteDescription(new RTCSessionDescription(JSON.parse(data.answer)));
-        }
-      });
-
-      db.ref(`calls/${username}/candidates`).on("child_added", snap => {
-        const candidate = JSON.parse(snap.val());
-        pc.addIceCandidate(new RTCIceCandidate(candidate));
-      });
-
-      alert("Call started. Waiting for answer...");
-    }
-
-    db.ref("calls").on("child_added", async snap => {
-      const yourName = usernameInput.value.trim();
-      const data = snap.val();
-      if (snap.key !== yourName || !data.offer) return;
-
-      const accept = confirm(`${data.from} is calling you. Accept?`);
-      if (!accept) return;
-
-      localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-      localVideo.srcObject = localStream;
-
-      pc = new RTCPeerConnection(servers);
-      localStream.getTracks().forEach(track => pc.addTrack(track, localStream));
-      pc.ontrack = e => remoteStream.addTrack(e.track);
-      remoteVideo.srcObject = remoteStream;
-
-      pc.onicecandidate = e => {
-        if (e.candidate) {
-          db.ref(`calls/${data.from}/candidates`).push(JSON.stringify(e.candidate));
-        }
-      };
+      pc = createPeerConnection();
+      stream.getTracks().forEach(t => pc.addTrack(t, stream));
 
       await pc.setRemoteDescription(new RTCSessionDescription(JSON.parse(data.offer)));
       const answer = await pc.createAnswer();
       await pc.setLocalDescription(answer);
-      db.ref(`calls/${yourName}`).update({ answer: JSON.stringify(answer) });
 
-      db.ref(`calls/${yourName}/candidates`).on("child_added", snap => {
-        const candidate = JSON.parse(snap.val());
-        pc.addIceCandidate(new RTCIceCandidate(candidate));
+      db.ref(`calls/${currentUser}`).update({
+        answer: JSON.stringify(answer)
       });
-    });
 
-    function endCall() {
-      if (pc) pc.close();
-      db.ref(`calls/${usernameInput.value}`).remove();
-      db.ref(`calls/${targetInput.value}`).remove();
-      alert("Call ended.");
+      callStatus.textContent = `In call with ${target}`;
+    };
+
+    rejectBtn.onclick = () => {
+      db.ref(`calls/${currentUser}`).remove();
+      callModal.style.display = "none";
+    };
+
+    cancelBtn.onclick = () => {
+      callModal.style.display = "none"; // Hide, but don't remove
+    };
+  });
+
+  // Handle answer + ICE from remote
+  db.ref(`calls/${currentUser}`).on("value", async snap => {
+    const data = snap.val();
+    if (!data) return;
+
+    if (data.answer && pc && !pc.remoteDescription) {
+      await pc.setRemoteDescription(new RTCSessionDescription(JSON.parse(data.answer)));
+      clearTimeout(timeout);
+      callStatus.textContent = `In call with ${target}`;
     }
-  </script>
+
+    if (data.candidate && pc) {
+      try {
+        await pc.addIceCandidate(new RTCIceCandidate(JSON.parse(data.candidate)));
+      } catch (err) {
+        console.error("ICE Error:", err);
+      }
+    }
+  });
+
+  function endCall(reason) {
+    alert(`Call ended: ${reason}`);
+    if (pc) pc.close();
+    if (stream) stream.getTracks().forEach(t => t.stop());
+
+    db.ref(`calls/${currentUser}`).remove();
+    db.ref(`calls/${target}`).remove();
+
+    callModal.style.display = "none";
+    callStatus.textContent = "Call ended";
+  }
+
+  // Close peer on unload
+  window.onbeforeunload = () => {
+    db.ref(`calls/${currentUser}`).remove();
+    if (pc) pc.close();
+    if (stream) stream.getTracks().forEach(t => t.stop());
+  };
+</script>
 </body>
 </html>
