@@ -133,7 +133,12 @@
     const storage = firebase.storage();
 
     // Get current user from session
-    let currentUser = prompt("Enter your username:");
+    const username = sessionStorage.getItem('username') || localStorage.getItem('username');
+    if (!username) {
+      alert('Session expired');
+      location.href = 'index.html';
+    }
+    document.getElementById('username').textContent = username;
 
 
     // Elements
