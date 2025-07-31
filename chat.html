@@ -133,9 +133,17 @@
     const storage = firebase.storage();
 
     // Get current user from session
-    const currentUser = sessionStorage.getItem("username");
-    if (!currentUser) location.href = "index.html";
-    document.getElementById("welcomeUserMobile").textContent = currentUser;
+    let currentUser = sessionStorage.getItem("username");
+
+if (!currentUser) {
+  currentUser = prompt("Enter your username:");
+  if (!currentUser) {
+    alert("Username is required to continue.");
+    location.href = "index.html";
+  } else {
+    sessionStorage.setItem("username", currentUser);
+  }
+}
 
     // Elements
     const userList = document.getElementById("userList");
