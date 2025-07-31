@@ -113,10 +113,8 @@
       </div>
     </div>
   </div>
-
-  <!-- Script Logic -->
-  <script>
-    // Firebase configuration
+<script>
+   // Firebase configuration
     const firebaseConfig = {
       apiKey: "AIzaSyBfkUJS81minjxj0DFz4pzNnGzCtb5ZJss",
       authDomain: "locater-42fb4.firebaseapp.com",
@@ -769,3 +767,8 @@
     db.ref(`users/${currentUser}/online`).set(true);
     db.ref(`users/${currentUser}/online`).onDisconnect().set(false);
     db.ref(`users/${currentUser}/lastSeen`).onDisconnect().set(Date.now());
+
+</script>
+</body>
+</html>
+   
