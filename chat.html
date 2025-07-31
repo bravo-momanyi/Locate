@@ -696,21 +696,7 @@
       });
     });
     // === Toggle Dark Mode ===
-    const toggleThemeBtn = document.getElementById("toggleTheme");
-
-    toggleThemeBtn.onclick = () => {
-      document.documentElement.classList.toggle("dark");
-      localStorage.setItem(
-        "theme",
-        document.documentElement.classList.contains("dark") ? "dark" : "light"
-      );
-    };
-
-    // Apply theme on page load
-    if (localStorage.getItem("theme") === "dark") {
-      document.documentElement.classList.add("dark");
-    }
-
+  
     // === Block User ===
     document.getElementById("blockUser").onclick = () => {
       if (!selectedChat || selectedChat.isGroup) return;
