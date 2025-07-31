@@ -237,14 +237,35 @@
       return `messages/${ids[0]}_${ids[1]}`;
     }
     // Render each message
-    function renderMessage(msg, id) {
-      const div = document.createElement("div");
-      div.dataset.id = id;
-      div.className = `relative max-w-xs px-4 py-2 rounded shadow text-sm break-words ${
-        msg.sender === currentUser ? "bg-blue-100 ml-auto" : "bg-gray-100"
-      }`;
-      div.innerHTML = msg.text || (msg.fileUrl ? `<a href="${msg.fileUrl}" target="_blank">📎 ${msg.fileName}</a>` : "");
+   function renderMessage(msg, id) {
+  const div = document.createElement("div");
+  div.dataset.id = id;
+  div.className = `relative max-w-xs px-4 py-2 rounded shadow text-sm break-words ${
+    msg.sender === currentUser ? "bg-blue-100 ml-auto" : "bg-gray-100"
+  }`;
 
+  div.innerHTML = msg.text || (msg.fileUrl ? `<a href="${msg.fileUrl}" target="_blank">📎 ${msg.fileName}</a>` : "");
+
+  // Ticks & status
+  if (msg.sender === currentUser) {
+    const ticks = document.createElement("span");
+    ticks.className = "absolute bottom-1 right-2 text-xs";
+
+    if (msg.status === "read") {
+      ticks.textContent = "✓✓";
+      ticks.classList.add("text-blue-500");
+    } else if (msg.status === "delivered") {
+      ticks.textContent = "✓✓";
+    } else {
+      ticks.textContent = "✓";
+    }
+    div.appendChild(ticks);
+  } else {
+    // ✅ Fix: check if selectedChat exists before accessing it
+    if (selectedChat && !selectedChat.isGroup) {
+      db.ref(`${getChatPath()}/${id}/status`).set("read");
+    }
+  }
       // Message ticks
       if (msg.sender === currentUser) {
         const ticks = document.createElement("span");
