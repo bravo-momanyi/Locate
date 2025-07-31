@@ -646,6 +646,9 @@
 
       const accept = confirm(`${data.from} is calling. Accept?`);
       if (!accept) return;
+      if (pc && pc.signalingState !== "closed") {
+  pc.close();
+}
 
       callModal.classList.remove("hidden");
       callTitle.textContent = `In call with ${data.from}`;
