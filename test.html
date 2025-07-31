@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>WebRTC Firebase Call Test</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
+  <style>
+    video {
+      width: 45%;
+      margin: 10px;
+      background: black;
+    }
+    #controls button {
+      margin: 5px;
+      padding: 10px;
+    }
+  </style>
+</head>
+<body>
+  <h2>WebRTC Firebase Call Test</h2>
+
+  <label>
+    Your Name: <input type="text" id="username" />
+  </label>
+  <br><br>
+  <label>
+    Call User: <input type="text" id="target" />
+  </label>
+  <br><br>
+
+  <div id="controls">
+    <button onclick="startCall()">Start Call</button>
+    <button onclick="endCall()">End Call</button>
+  </div>
+
+  <video id="localVideo" autoplay muted></video>
+  <video id="remoteVideo" autoplay></video>
+
+  <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyBfkUJS81minjxj0DFz4pzNnGzCtb5ZJss",
+      authDomain: "locater-42fb4.firebaseapp.com",
+      databaseURL: "https://locater-42fb4-default-rtdb.firebaseio.com",
+      projectId: "locater-42fb4",
+      storageBucket: "locater-42fb4.appspot.com",
+      messagingSenderId: "250348367998",
+      appId: "1:250348367998:web:d734b2b4c735b5684ae82f"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+
+    let pc;
+    let localStream;
+    let remoteStream = new MediaStream();
+    const servers = { iceServers: [{ urls: "stun:stun.l.google.com:19302" }] };
+
+    const localVideo = document.getElementById("localVideo");
+    const remoteVideo = document.getElementById("remoteVideo");
+
+    const usernameInput = document.getElementById("username");
+    const targetInput = document.getElementById("target");
+
+    let callRef;
+
+    async function startCall() {
+      const username = usernameInput.value.trim();
+      const target = targetInput.value.trim();
+      if (!username || !target || username === target) return alert("Enter valid usernames");
+
+      localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+      localVideo.srcObject = localStream;
+
+      pc = new RTCPeerConnection(servers);
+      localStream.getTracks().forEach(track => pc.addTrack(track, localStream));
+      pc.ontrack = e => remoteStream.addTrack(e.track);
+      remoteVideo.srcObject = remoteStream;
+
+      pc.onicecandidate = e => {
+        if (e.candidate) {
+          db.ref(`calls/${target}/candidates`).push(JSON.stringify(e.candidate));
+        }
+      };
+
+      const offer = await pc.createOffer();
+      await pc.setLocalDescription(offer);
+
+      db.ref(`calls/${target}`).set({
+        from: username,
+        offer: JSON.stringify(offer)
+      });
+
+      callRef = db.ref(`calls/${username}`);
+      callRef.on("value", async snap => {
+        const data = snap.val();
+        if (!data) return;
+        if (data.answer) {
+          await pc.setRemoteDescription(new RTCSessionDescription(JSON.parse(data.answer)));
+        }
+      });
+
+      db.ref(`calls/${username}/candidates`).on("child_added", snap => {
+        const candidate = JSON.parse(snap.val());
+        pc.addIceCandidate(new RTCIceCandidate(candidate));
+      });
+
+      alert("Call started. Waiting for answer...");
+    }
+
+    db.ref("calls").on("child_added", async snap => {
+      const yourName = usernameInput.value.trim();
+      const data = snap.val();
+      if (snap.key !== yourName || !data.offer) return;
+
+      const accept = confirm(`${data.from} is calling you. Accept?`);
+      if (!accept) return;
+
+      localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+      localVideo.srcObject = localStream;
+
+      pc = new RTCPeerConnection(servers);
+      localStream.getTracks().forEach(track => pc.addTrack(track, localStream));
+      pc.ontrack = e => remoteStream.addTrack(e.track);
+      remoteVideo.srcObject = remoteStream;
+
+      pc.onicecandidate = e => {
+        if (e.candidate) {
+          db.ref(`calls/${data.from}/candidates`).push(JSON.stringify(e.candidate));
+        }
+      };
+
+      await pc.setRemoteDescription(new RTCSessionDescription(JSON.parse(data.offer)));
+      const answer = await pc.createAnswer();
+      await pc.setLocalDescription(answer);
+      db.ref(`calls/${yourName}`).update({ answer: JSON.stringify(answer) });
+
+      db.ref(`calls/${yourName}/candidates`).on("child_added", snap => {
+        const candidate = JSON.parse(snap.val());
+        pc.addIceCandidate(new RTCIceCandidate(candidate));
+      });
+    });
+
+    function endCall() {
+      if (pc) pc.close();
+      db.ref(`calls/${usernameInput.value}`).remove();
+      db.ref(`calls/${targetInput.value}`).remove();
+      alert("Call ended.");
+    }
+  </script>
+</body>
+</html>
