@@ -642,7 +642,7 @@
 });
 
     }
-  ``db.ref(`calls/${currentUser}`).on("child_removed", snap => {
+  db.ref(`calls/${currentUser}`).on("child_removed", snap => {
   if (callHandled || minimized) {
     endCall("ended");
     alert("Call ended by the other user.");
