@@ -1,154 +1,149 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Firebase WebRTC Call</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <style>
-    body { font-family: sans-serif; padding: 20px; background: #f0f0f0; }
-    video { width: 100%; max-width: 400px; margin: 10px 0; background: black; }
-  </style>
+  <title>Direct WebRTC Call</title>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
+  <style>
+    #localVideo, #remoteVideo {
+      width: 45%; height: 200px; background: black; margin: 10px;
+    }
+    #callPopup {
+      background: #eee; padding: 10px; border: 1px solid #ccc; margin-top: 10px;
+    }
+  </style>
 </head>
 <body>
+  <h2>Logged in as: <span id="currentUser"></span></h2>
+  <h3>Click on a user to call:</h3>
+  <ul id="userList"></ul>
 
-<h2>Firebase WebRTC Call (Test)</h2>
+  <div id="callPopup" style="display:none;">
+    <p id="incomingCallText"></p>
+    <button onclick="acceptCall()">Accept</button>
+    <button onclick="rejectCall()">Reject</button>
+  </div>
 
-<div>
-  <button onclick="startCall()">Start Call</button>
-  <p id="callCodeArea"></p>
-</div>
+  <video id="localVideo" autoplay muted playsinline></video>
+  <video id="remoteVideo" autoplay playsinline></video>
 
-<div>
-  <input id="callCodeInput" placeholder="Enter Call Code" />
-  <button onclick="joinCall()">Join Call</button>
-</div>
+  <script>
+    // Firebase config
+    const firebaseConfig = {
+      apiKey: "AIzaSyBfkUJS81minjxj0DFz4pzNnGzCtb5ZJss",
+      authDomain: "locater-42fb4.firebaseapp.com",
+      databaseURL: "https://locater-42fb4-default-rtdb.firebaseio.com",
+      projectId: "locater-42fb4",
+      storageBucket: "locater-42fb4.appspot.com",
+      messagingSenderId: "250348367998",
+      appId: "1:250348367998:web:d734b2b4c735b5684ae82f"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
 
-<h3>Local Video</h3>
-<video id="localVideo" autoplay muted playsinline></video>
+    // Prompt for current user
+    let currentUser = prompt("Enter your username:");
+    if (!currentUser) location.reload();
+    document.getElementById("currentUser").textContent = currentUser;
 
-<h3>Remote Video</h3>
-<video id="remoteVideo" autoplay playsinline></video>
+    const userList = document.getElementById("userList");
+    const localVideo = document.getElementById("localVideo");
+    const remoteVideo = document.getElementById("remoteVideo");
+    const callPopup = document.getElementById("callPopup");
+    const incomingCallText = document.getElementById("incomingCallText");
 
-<script>
-  // Firebase Config (your project)
-  const firebaseConfig = {
-    apiKey: "AIzaSyBfkUJS81minjxj0DFz4pzNnGzCtb5ZJss",
-    authDomain: "locater-42fb4.firebaseapp.com",
-    databaseURL: "https://locater-42fb4-default-rtdb.firebaseio.com",
-    projectId: "locater-42fb4",
-    storageBucket: "locater-42fb4.appspot.com",
-    messagingSenderId: "250348367998",
-    appId: "1:250348367998:web:d734b2b4c735b5684ae82f"
-  };
-  firebase.initializeApp(firebaseConfig);
-  const db = firebase.database();
+    const servers = { iceServers: [{ urls: "stun:stun.l.google.com:19302" }] };
+    let pc = null, localStream = null;
 
-  // Elements
-  const localVideo = document.getElementById('localVideo');
-  const remoteVideo = document.getElementById('remoteVideo');
-  const callCodeArea = document.getElementById('callCodeArea');
-  const callCodeInput = document.getElementById('callCodeInput');
+    // List users
+    db.ref("users").on("value", snap => {
+      userList.innerHTML = "";
+      snap.forEach(child => {
+        const user = child.key;
+        if (user === currentUser) return;
+        const li = document.createElement("li");
+        li.textContent = user;
+        li.onclick = () => startCall(user);
+        userList.appendChild(li);
+      });
+    });
 
-  // WebRTC
-  const pc = new RTCPeerConnection({
-    iceServers: [{ urls: "stun:stun.l.google.com:19302" }]
-  });
+    async function startCall(targetUser) {
+      pc = new RTCPeerConnection(servers);
+      localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+      localStream.getTracks().forEach(track => pc.addTrack(track, localStream));
+      localVideo.srcObject = localStream;
 
-  let localStream;
-  let callId = "";
+      pc.onicecandidate = e => {
+        if (e.candidate) {
+          db.ref("calls/" + targetUser + "/candidates").push(JSON.stringify(e.candidate));
+        }
+      };
 
-  // Handle incoming remote stream
-  const remoteStream = new MediaStream();
-  remoteVideo.srcObject = remoteStream;
-  pc.ontrack = (event) => {
-    remoteStream.addTrack(event.track);
-  };
+      pc.ontrack = e => {
+        remoteVideo.srcObject = e.streams[0];
+      };
 
-  // ICE Candidate Handling
-  pc.onicecandidate = (event) => {
-    if (event.candidate) {
-      const candidate = event.candidate.toJSON();
-      db.ref(`calls/${callId}/candidates/${isCaller ? 'caller' : 'callee'}`).push(candidate);
+      const offer = await pc.createOffer();
+      await pc.setLocalDescription(offer);
+      db.ref("calls/" + targetUser).set({ from: currentUser, offer: JSON.stringify(offer) });
     }
-  };
 
-  let isCaller = false;
-
-  // Get user media
-  async function getMedia() {
-    localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-    localStream.getTracks().forEach(track => pc.addTrack(track, localStream));
-    localVideo.srcObject = localStream;
-  }
-
-  // Start Call
-  async function startCall() {
-    isCaller = true;
-    await getMedia();
-
-    const callRef = db.ref("calls").push();
-    callId = callRef.key;
-    callCodeArea.textContent = "Call Code: " + callId;
-
-    const offer = await pc.createOffer();
-    await pc.setLocalDescription(offer);
-
-    await callRef.set({
-      offer: JSON.stringify(offer)
-    });
-
-    // Listen for answer
-    callRef.on("value", async snap => {
+    // Incoming call listener
+    db.ref("calls/" + currentUser).on("value", async snap => {
       const data = snap.val();
-      if (!pc.currentRemoteDescription && data?.answer) {
-        const answerDesc = new RTCSessionDescription(JSON.parse(data.answer));
-        await pc.setRemoteDescription(answerDesc);
+      if (!data || data.answer || !data.offer) return;
+
+      incomingCallText.textContent = `${data.from} is calling you...`;
+      callPopup.style.display = "block";
+
+      window.acceptCall = async () => {
+        callPopup.style.display = "none";
+        pc = new RTCPeerConnection(servers);
+        localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+        localVideo.srcObject = localStream;
+        localStream.getTracks().forEach(track => pc.addTrack(track, localStream));
+
+        pc.onicecandidate = e => {
+          if (e.candidate) {
+            db.ref("calls/" + currentUser + "/candidates").push(JSON.stringify(e.candidate));
+          }
+        };
+
+        pc.ontrack = e => {
+          remoteVideo.srcObject = e.streams[0];
+        };
+
+        await pc.setRemoteDescription(new RTCSessionDescription(JSON.parse(data.offer)));
+        const answer = await pc.createAnswer();
+        await pc.setLocalDescription(answer);
+        db.ref("calls/" + currentUser).update({ answer: JSON.stringify(answer) });
+      };
+
+      window.rejectCall = () => {
+        db.ref("calls/" + currentUser).remove();
+        callPopup.style.display = "none";
+      };
+    });
+
+    // Handle answer
+    db.ref("calls/" + currentUser + "/answer").on("value", async snap => {
+      const answer = snap.val();
+      if (answer && pc) {
+        await pc.setRemoteDescription(new RTCSessionDescription(JSON.parse(answer)));
       }
     });
 
-    // Listen for callee ICE
-    db.ref(`calls/${callId}/candidates/callee`).on("child_added", async snap => {
-      try {
-        await pc.addIceCandidate(new RTCIceCandidate(snap.val()));
-      } catch (e) {
-        console.error("ICE error (callee):", e);
+    // Handle ICE candidates
+    db.ref("calls/" + currentUser + "/candidates").on("child_added", async snap => {
+      if (pc && snap.val()) {
+        try {
+          await pc.addIceCandidate(new RTCIceCandidate(JSON.parse(snap.val())));
+        } catch (e) {
+          console.warn("ICE add error", e);
+        }
       }
     });
-  }
-
-  // Join Call
-  async function joinCall() {
-    isCaller = false;
-    callId = callCodeInput.value.trim();
-    if (!callId) return alert("Enter a call code.");
-
-    await getMedia();
-
-    const callRef = db.ref(`calls/${callId}`);
-    const callSnap = await callRef.once("value");
-    const callData = callSnap.val();
-
-    const offerDesc = new RTCSessionDescription(JSON.parse(callData.offer));
-    await pc.setRemoteDescription(offerDesc);
-
-    const answer = await pc.createAnswer();
-    await pc.setLocalDescription(answer);
-
-    await callRef.update({
-      answer: JSON.stringify(answer)
-    });
-
-    // Listen for caller ICE
-    db.ref(`calls/${callId}/candidates/caller`).on("child_added", async snap => {
-      try {
-        await pc.addIceCandidate(new RTCIceCandidate(snap.val()));
-      } catch (e) {
-        console.error("ICE error (caller):", e);
-      }
-    });
-  }
-</script>
+  </script>
 </body>
 </html>
-
