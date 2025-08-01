@@ -1,166 +1,212 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>WebRTC Firebase Test</title>
+  <title>WebRTC Test App</title>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
   <style>
-    body { font-family: sans-serif; padding: 20px; }
-    #localVideo, #remoteVideo { width: 200px; height: 150px; background: black; margin: 10px; }
-    #callBox { display: none; border: 1px solid #ccc; padding: 10px; margin-top: 20px; }
+    body { font-family: Arial, sans-serif; padding: 20px; }
+    video { width: 300px; margin: 10px 0; background: #000; }
+    input, button { margin: 5px; padding: 5px; }
   </style>
 </head>
 <body>
-  <h1>WebRTC Call Test</h1>
-  <label>Logged in as:
-    <input id="currentUser" placeholder="Enter your username" />
-  </label><br><br>
-  <label>Call user:
-    <select id="userList"></select>
-  </label><br><br>
-  <button id="callBtn">Call</button>
+  <h2>WebRTC Firebase Test Call</h2>
 
-  <div id="callBox">
-    <h3 id="callTitle">Incoming Call</h3>
-    <button id="acceptBtn">Accept</button>
-    <button id="rejectBtn">Reject</button>
-    <button id="cancelBtn">Cancel</button><br><br>
-    <video id="remoteVideo" autoplay playsinline></video>
-    <video id="localVideo" autoplay playsinline muted></video><br>
-    <button id="endCallBtn">End Call</button>
+  <div>
+    <label>Your Username:</label>
+    <input id="yourUsername" placeholder="e.g. alice" />
+    <button onclick="setUsername()">Set</button>
   </div>
 
-  <script>
-    // Firebase config
-    const firebaseConfig = {
-      apiKey: "AIzaSyBfkUJS81minjxj0DFz4pzNnGzCtb5ZJss",
-      authDomain: "locater-42fb4.firebaseapp.com",
-      databaseURL: "https://locater-42fb4-default-rtdb.firebaseio.com",
-      projectId: "locater-42fb4",
-      storageBucket: "locater-42fb4.appspot.com",
-      messagingSenderId: "250348367998",
-      appId: "1:250348367998:web:d734b2b4c735b5684ae82f"
-    };
-    firebase.initializeApp(firebaseConfig);
-    const db = firebase.database();
+  <div id="callArea" style="display:none;">
+    <p>Logged in as <strong id="meLabel"></strong></p>
 
-    const currentUserInput = document.getElementById('currentUser');
-    const userList = document.getElementById('userList');
-    const callBtn = document.getElementById('callBtn');
-    const callBox = document.getElementById('callBox');
-    const callTitle = document.getElementById('callTitle');
-    const acceptBtn = document.getElementById('acceptBtn');
-    const rejectBtn = document.getElementById('rejectBtn');
-    const cancelBtn = document.getElementById('cancelBtn');
-    const endCallBtn = document.getElementById('endCallBtn');
-    const localVideo = document.getElementById('localVideo');
-    const remoteVideo = document.getElementById('remoteVideo');
+    <div>
+      <label>Call Username:</label>
+      <input id="targetUsername" placeholder="e.g. bob" />
+      <button onclick="startCall()">Call</button>
+    </div>
 
-    let localStream, pc, isCaller = false, caller = null, callee = null;
-    const servers = { iceServers: [{ urls: "stun:stun.l.google.com:19302" }] };
+    <div id="incomingCall" style="display:none;">
+      <p><strong id="callerName"></strong> is calling you...</p>
+      <button onclick="acceptCall()">Accept</button>
+      <button onclick="rejectCall()">Reject</button>
+    </div>
 
-    // Load user list
-    db.ref('users').once('value', snap => {
-      snap.forEach(child => {
-        const user = child.key;
-        const option = document.createElement('option');
-        option.value = user;
-        option.textContent = user;
-        userList.appendChild(option);
-      });
+    <div>
+      <video id="localVideo" autoplay muted playsinline></video>
+      <video id="remoteVideo" autoplay playsinline></video>
+    </div>
+
+    <button onclick="hangUp()">Hang Up</button>
+  </div>
+
+<script>
+  // Firebase config
+  const firebaseConfig = {
+    apiKey: "AIzaSyBfkUJS81minjxj0DFz4pzNnGzCtb5ZJss",
+    authDomain: "locater-42fb4.firebaseapp.com",
+    databaseURL: "https://locater-42fb4-default-rtdb.firebaseio.com",
+    projectId: "locater-42fb4",
+    storageBucket: "locater-42fb4.appspot.com",
+    messagingSenderId: "250348367998",
+    appId: "1:250348367998:web:d734b2b4c735b5684ae82f"
+  };
+  firebase.initializeApp(firebaseConfig);
+  const db = firebase.database();
+
+  // Elements
+  const yourUsername = document.getElementById('yourUsername');
+  const targetUsername = document.getElementById('targetUsername');
+  const meLabel = document.getElementById('meLabel');
+  const callArea = document.getElementById('callArea');
+  const incomingCall = document.getElementById('incomingCall');
+  const callerName = document.getElementById('callerName');
+  const localVideo = document.getElementById('localVideo');
+  const remoteVideo = document.getElementById('remoteVideo');
+
+  let currentUser = '';
+  let peerConnection;
+  let localStream;
+  let remoteStream = new MediaStream();
+  let isCaller = false;
+  let caller = '';
+  const servers = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
+
+  function setUsername() {
+    currentUser = yourUsername.value.trim();
+    if (!currentUser) return alert("Enter your username");
+    meLabel.textContent = currentUser;
+    callArea.style.display = 'block';
+    listenForCalls();
+  }
+
+  async function startCall() {
+    const target = targetUsername.value.trim();
+    if (!target) return alert("Enter a username to call.");
+    isCaller = true;
+
+    localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+    localVideo.srcObject = localStream;
+
+    peerConnection = new RTCPeerConnection(servers);
+    setupPeer();
+
+    localStream.getTracks().forEach(track => {
+      peerConnection.addTrack(track, localStream);
     });
 
-    callBtn.onclick = async () => {
-      caller = currentUserInput.value.trim();
-      callee = userList.value.trim();
-      if (!caller || !callee || caller === callee) {
-        return alert("Enter valid usernames.");
-      }
-      isCaller = true;
-      setupConnection();
-      callTitle.textContent = `Calling ${callee}...`;
-      callBox.style.display = 'block';
+    const offer = await peerConnection.createOffer();
+    await peerConnection.setLocalDescription(offer);
 
-      const offer = await pc.createOffer();
-      await pc.setLocalDescription(offer);
-      db.ref(`calls/${callee}`).set({ from: caller, offer: JSON.stringify(offer) });
-    };
+    await db.ref(`calls/${target}`).set({
+      from: currentUser,
+      offer: JSON.stringify(offer)
+    });
+  }
 
-    // Incoming call handler
-    db.ref('calls').on('child_added', async snap => {
-      const callee = currentUserInput.value.trim();
-      if (snap.key !== callee) return;
-
+  function listenForCalls() {
+    db.ref(`calls/${currentUser}`).on('value', async snap => {
       const data = snap.val();
-      if (data.from === callee) return; // skip self
-
-      callTitle.textContent = `Incoming call from ${data.from}`;
-      callBox.style.display = 'block';
+      if (!data || data.from === currentUser) return;
 
       caller = data.from;
-      isCaller = false;
+      callerName.textContent = caller;
+      incomingCall.style.display = 'block';
 
-      acceptBtn.onclick = async () => {
-        setupConnection();
-        await pc.setRemoteDescription(new RTCSessionDescription(JSON.parse(data.offer)));
-        const answer = await pc.createAnswer();
-        await pc.setLocalDescription(answer);
-        db.ref(`calls/${caller}`).update({ answer: JSON.stringify(answer) });
-      };
+      if (data.candidate && peerConnection) {
+        try {
+          await peerConnection.addIceCandidate(new RTCIceCandidate(JSON.parse(data.candidate)));
+        } catch (e) {
+          console.warn('ICE add error:', e);
+        }
+      }
+    });
+  }
 
-      rejectBtn.onclick = () => {
-        db.ref(`calls/${callee}`).remove();
-        callBox.style.display = 'none';
-      };
+  async function acceptCall() {
+    incomingCall.style.display = 'none';
+    isCaller = false;
 
-      cancelBtn.onclick = () => {
-        callBox.style.display = 'none'; // just hide
-        // still ringing
-      };
+    localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+    localVideo.srcObject = localStream;
+
+    peerConnection = new RTCPeerConnection(servers);
+    setupPeer();
+
+    localStream.getTracks().forEach(track => {
+      peerConnection.addTrack(track, localStream);
     });
 
-    // ICE handling
-    async function setupConnection() {
-      pc = new RTCPeerConnection(servers);
-      localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-      localVideo.srcObject = localStream;
-      localStream.getTracks().forEach(track => pc.addTrack(track, localStream));
+    const snap = await db.ref(`calls/${currentUser}`).once('value');
+    const data = snap.val();
 
-      const remoteStream = new MediaStream();
-      remoteVideo.srcObject = remoteStream;
+    if (!data || !data.offer) return;
 
-      pc.ontrack = event => remoteStream.addTrack(event.track);
+    await peerConnection.setRemoteDescription(new RTCSessionDescription(JSON.parse(data.offer)));
 
-      pc.onicecandidate = event => {
-        if (event.candidate) {
-          const target = isCaller ? callee : caller;
-          db.ref(`ice/${target}`).push(JSON.stringify(event.candidate));
-        }
-      };
-    }
+    const answer = await peerConnection.createAnswer();
+    await peerConnection.setLocalDescription(answer);
 
-    // ICE receiving
-    db.ref('ice').on('child_added', async snap => {
-      const currentUser = currentUserInput.value.trim();
-      if (snap.key !== currentUser) return;
-
-      snap.ref.forEach(childSnap => {
-        const candidate = JSON.parse(childSnap.val());
-        if (pc && pc.signalingState !== 'closed' && pc.remoteDescription) {
-          pc.addIceCandidate(new RTCIceCandidate(candidate)).catch(console.error);
-        }
-        childSnap.ref.remove();
-      });
+    await db.ref(`calls/${caller}`).update({
+      answer: JSON.stringify(answer)
     });
 
-    // End call
-    endCallBtn.onclick = () => {
-      if (pc) pc.close();
-      callBox.style.display = 'none';
-      db.ref(`calls/${callee}`).remove();
-      db.ref(`calls/${caller}`).remove();
+    db.ref(`calls/${currentUser}`).on('value', async snap => {
+      const d = snap.val();
+      if (d && d.candidate && peerConnection) {
+        try {
+          await peerConnection.addIceCandidate(new RTCIceCandidate(JSON.parse(d.candidate)));
+        } catch (e) {
+          console.warn("Error adding ICE candidate:", e);
+        }
+      }
+    });
+  }
+
+  function rejectCall() {
+    incomingCall.style.display = 'none';
+    db.ref(`calls/${currentUser}`).remove();
+  }
+
+  function setupPeer() {
+    remoteStream = new MediaStream();
+    remoteVideo.srcObject = remoteStream;
+
+    peerConnection.ontrack = event => {
+      remoteStream.addTrack(event.track);
     };
-  </script>
+
+    peerConnection.onicecandidate = event => {
+      if (event.candidate) {
+        const path = isCaller ? `calls/${targetUsername.value.trim()}` : `calls/${caller}`;
+        db.ref(path).update({
+          candidate: JSON.stringify(event.candidate)
+        });
+      }
+    };
+
+    peerConnection.onconnectionstatechange = () => {
+      if (peerConnection.connectionState === "disconnected" || peerConnection.connectionState === "closed") {
+        hangUp();
+      }
+    };
+  }
+
+  function hangUp() {
+    if (peerConnection) peerConnection.close();
+    peerConnection = null;
+
+    db.ref(`calls/${currentUser}`).remove();
+    if (isCaller) db.ref(`calls/${targetUsername.value.trim()}`).remove();
+
+    localVideo.srcObject = null;
+    remoteVideo.srcObject = null;
+    localStream?.getTracks().forEach(track => track.stop());
+  }
+</script>
 </body>
 </html>
+
