@@ -138,13 +138,24 @@
           await pc.setRemoteDescription(new RTCSessionDescription(JSON.parse(data.answer)));
         }
 
-        if (data.candidate && pc.signalingState !== "closed") {
-          try {
-            await pc.addIceCandidate(new RTCIceCandidate(JSON.parse(data.candidate)));
-          } catch (e) {
-            console.error("ICE Candidate Error:", e);
-          }
-        }
+        if (data.candidate && pc && pc.signalingState !== "closed") {
+  const candidate = new RTCIceCandidate(JSON.parse(data.candidate));
+
+  // Wait until remote description is set
+  const waitForRemote = async () => {
+    while (!pc.remoteDescription) {
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+    try {
+      await pc.addIceCandidate(candidate);
+    } catch (e) {
+      console.error("ICE Candidate Error (after waiting):", e);
+    }
+  };
+
+  waitForRemote();
+}
+
       });
     }
 
