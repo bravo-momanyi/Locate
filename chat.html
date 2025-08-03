@@ -670,22 +670,21 @@
     }
 
     // === Incoming Calls ===
-    let callHandled = false;
-let callTimeoutTimer = null;
-let minimized = false;
-
-if (!data || data.from === currentUser || callHandled || minimized) return;
-
+// === Incoming Calls ===
+db.ref(`calls/${currentUser}`).on("value", async snap => {
+  const data = snap.val();
+  if (!data || data.from === currentUser || callHandled || minimized) return;
 
   showIncomingPopup(data.from, data.video);
 
-  // Auto-timeout after 60 seconds
   callTimeoutTimer = setTimeout(() => {
-    if (!callHandled) return;
-    endCall("timeout");
-    alert("Missed call from " + data.from);
+    if (!callHandled) {
+      endCall("timeout");
+      alert("Missed call from " + data.from);
+    }
   }, 60000);
 });
+
 
 function showIncomingPopup(fromUser, isVideo) {
   callModal.classList.remove("hidden");
