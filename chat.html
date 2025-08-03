@@ -668,8 +668,10 @@
         }
       };
     }
+let callHandled = false;
+let minimized = false;
+let callTimeoutTimer;
 
-    // === Incoming Calls ===
 // === Incoming Calls ===
 db.ref(`calls/${currentUser}`).on("value", async snap => {
   const data = snap.val();
