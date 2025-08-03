@@ -1,197 +1,217 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>WebRTC Test Call</title>
+  <title>WebRTC Call Test</title>
   <style>
-    body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; }
-    #users { margin: 10px; }
-    video { width: 300px; height: 200px; background: #000; margin: 10px; }
-    #incomingCallPopup {
-      display: none;
-      position: fixed;
-      top: 20px;
-      left: 20px;
-      padding: 20px;
-      background: white;
-      border: 1px solid #ccc;
-      z-index: 100;
+    body { font-family: sans-serif; }
+    #users { margin-bottom: 20px; }
+    #localVideo, #remoteVideo { width: 45%; margin: 10px; background: black; }
+    #callPopup {
+      position: fixed; top: 20px; right: 20px; width: 250px;
+      padding: 10px; background: #eee; border: 1px solid #ccc;
+      display: none; z-index: 9999;
     }
+    #callPopup.minimized { height: 40px; overflow: hidden; }
+    .btn { padding: 5px 10px; margin: 5px; cursor: pointer; }
+    #audioOnlyLabel { margin-left: 10px; }
   </style>
 </head>
 <body>
-  <h1>Test Call</h1>
+  <h2>WebRTC Firebase Call Test</h2>
   <div id="users"></div>
-  <video id="localVideo" autoplay muted playsinline></video>
+  <label>
+    <input type="checkbox" id="audioOnly">
+    <span id="audioOnlyLabel">Audio Only</span>
+  </label>
+  <br><br>
+  <video id="localVideo" autoplay playsinline muted></video>
   <video id="remoteVideo" autoplay playsinline></video>
 
-  <div id="incomingCallPopup">
-    <p id="callerInfo">Incoming call...</p>
-    <button onclick="acceptCall()">Accept</button>
-    <button onclick="rejectCall()">Reject</button>
-    <button onclick="cancelPopup()">Cancel</button>
+  <div id="callPopup">
+    <p id="callStatus">Incoming Call...</p>
+    <button class="btn" id="acceptCall">Accept</button>
+    <button class="btn" id="rejectCall">Reject</button>
+    <button class="btn" id="minimizeCall">Minimize</button>
+    <button class="btn" id="endCall" style="display:none;">End Call</button>
   </div>
 
+  <!-- Firebase & WebRTC -->
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
 
   <script>
     const firebaseConfig = {
-      apiKey: "AIzaSyDhBr_m8D2A5xQqCctYwhuAZlmnC4BldUw",
+      apiKey: "AIzaSyBtfAJZ3fVzKUQmWWHFVpHEiCjJt_r16FY",
       authDomain: "locater-42fb4.firebaseapp.com",
       databaseURL: "https://locater-42fb4-default-rtdb.firebaseio.com",
       projectId: "locater-42fb4",
       storageBucket: "locater-42fb4.appspot.com",
-      messagingSenderId: "19144314605",
-      appId: "1:19144314605:web:bf92bbfdac2626d77b6028"
+      messagingSenderId: "225921476711",
+      appId: "1:225921476711:web:830e588aab15f3a9cfbab0"
     };
 
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
+    const username = prompt("Enter your username:");
+    const usersDiv = document.getElementById('users');
+    const audioOnlyCheckbox = document.getElementById('audioOnly');
+    const localVideo = document.getElementById('localVideo');
+    const remoteVideo = document.getElementById('remoteVideo');
+    const callPopup = document.getElementById('callPopup');
+    const callStatus = document.getElementById('callStatus');
+    const acceptBtn = document.getElementById('acceptCall');
+    const rejectBtn = document.getElementById('rejectCall');
+    const minimizeBtn = document.getElementById('minimizeCall');
+    const endCallBtn = document.getElementById('endCall');
 
-    let currentUser = prompt("Enter your username:");
-    let pc = null;
-    let localStream = null;
-    let remoteStream = null;
-    let pendingCandidates = [];
+    let pc, localStream, ringingTimeout;
+    const servers = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
 
-    const usersDiv = document.getElementById("users");
-    const localVideo = document.getElementById("localVideo");
-    const remoteVideo = document.getElementById("remoteVideo");
-    const popup = document.getElementById("incomingCallPopup");
-    const callerInfo = document.getElementById("callerInfo");
-
-    const callRef = db.ref("calls");
-
-    db.ref("users").once("value", snap => {
-      const users = snap.val();
-      for (const user in users) {
-        if (user === currentUser) continue;
-        const btn = document.createElement("button");
-        btn.innerText = "Call " + user;
-        btn.onclick = () => startCall(user);
-        usersDiv.appendChild(btn);
-      }
-    });
-
-    function showPopup(caller) {
-      callerInfo.innerText = `Call from ${caller}`;
-      popup.style.display = "block";
+    function getUserList() {
+      firebase.database().ref('users').once('value', snap => {
+        usersDiv.innerHTML = '';
+        snap.forEach(child => {
+          const user = child.key;
+          if (user !== username) {
+            const btn = document.createElement('button');
+            btn.className = "btn";
+            btn.innerText = `Call ${user}`;
+            btn.onclick = () => callUser(user);
+            usersDiv.appendChild(btn);
+          }
+        });
+      });
     }
 
-    function cancelPopup() {
-      popup.style.display = "none";
-    }
+    async function callUser(targetUser) {
+      await setupMedia(audioOnlyCheckbox.checked);
+      pc = createPeerConnection(targetUser);
 
-    function rejectCall() {
-      if (incomingCallFrom) {
-        db.ref(`calls/${incomingCallFrom}/status`).set("rejected");
-      }
-      cancelPopup();
-    }
+      const offer = await pc.createOffer();
+      await pc.setLocalDescription(offer);
 
-    function acceptCall() {
-      popup.style.display = "none";
-      setupConnection(incomingCallFrom, false); // isCaller = false
-    }
-
-    function createPeerConnection(remoteUser, isCaller) {
-      pc = new RTCPeerConnection({
-        iceServers: [{ urls: "stun:stun.l.google.com:19302" }]
+      await db.ref(`calls/${targetUser}`).set({
+        type: 'offer',
+        from: username,
+        offer,
+        audioOnly: audioOnlyCheckbox.checked
       });
 
-      remoteStream = new MediaStream();
-      remoteVideo.srcObject = remoteStream;
+      callPopup.style.display = 'block';
+      callStatus.innerText = `Calling ${targetUser}...`;
+      endCallBtn.style.display = 'inline-block';
+      ringingTimeout = setTimeout(() => endCall(), 60000);
+    }
 
-      pc.ontrack = e => {
-        e.streams[0].getTracks().forEach(track => remoteStream.addTrack(track));
+    function createPeerConnection(peerUser) {
+      const peer = new RTCPeerConnection(servers);
+
+      localStream.getTracks().forEach(track => peer.addTrack(track, localStream));
+
+      peer.ontrack = e => {
+        if (e.streams && e.streams[0]) {
+          remoteVideo.srcObject = e.streams[0];
+        }
       };
 
-      pc.onicecandidate = e => {
+      peer.onicecandidate = e => {
         if (e.candidate) {
-          db.ref(`calls/${remoteUser}/ice`).push(JSON.stringify(e.candidate));
+          db.ref(`signals/${peerUser}/${username}`).push({ type: 'candidate', candidate: e.candidate });
         }
       };
+
+      return peer;
     }
 
-    async function setupConnection(remoteUser, isCaller) {
-      createPeerConnection(remoteUser, isCaller);
-      localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+    async function setupMedia(audioOnly = false) {
+      const constraints = audioOnly ? { audio: true, video: false } : { audio: true, video: true };
+      localStream = await navigator.mediaDevices.getUserMedia(constraints);
       localVideo.srcObject = localStream;
-      localStream.getTracks().forEach(track => pc.addTrack(track, localStream));
-
-      if (isCaller) {
-        const offer = await pc.createOffer();
-        await pc.setLocalDescription(offer);
-        await db.ref(`calls/${remoteUser}`).set({ from: currentUser, offer: JSON.stringify(offer), status: "ringing" });
-      } else {
-        db.ref(`calls/${currentUser}/offer`).once("value", async snap => {
-          const offer = JSON.parse(snap.val());
-          await pc.setRemoteDescription(new RTCSessionDescription(offer));
-          const answer = await pc.createAnswer();
-          await pc.setLocalDescription(answer);
-          await db.ref(`calls/${currentUser}/answer`).set(JSON.stringify(answer));
-
-          for (const c of pendingCandidates) {
-            await pc.addIceCandidate(new RTCIceCandidate(c));
-          }
-          pendingCandidates = [];
-        });
-      }
-
-      // Listen for remote ICE
-      db.ref(`calls/${currentUser}/ice`).on("child_added", async snap => {
-        const ice = JSON.parse(snap.val());
-        if (pc.remoteDescription) {
-          try {
-            await pc.addIceCandidate(new RTCIceCandidate(ice));
-          } catch (err) {
-            console.error("ICE add error", err);
-          }
-        } else {
-          pendingCandidates.push(ice);
-        }
-      });
-
-      // If receiver, listen for answer
-      if (isCaller) {
-        db.ref(`calls/${remoteUser}/answer`).on("value", async snap => {
-          if (snap.exists()) {
-            const answer = JSON.parse(snap.val());
-            await pc.setRemoteDescription(new RTCSessionDescription(answer));
-          }
-        });
-
-        // End call after 1 minute if no answer
-        setTimeout(() => {
-          db.ref(`calls/${remoteUser}/status`).once("value", snap => {
-            if (snap.val() !== "answered") {
-              endCall(remoteUser);
-            }
-          });
-        }, 60000);
-      }
     }
 
-    async function startCall(targetUser) {
-      await setupConnection(targetUser, true);
-    }
-
-    function endCall(remoteUser) {
-      if (pc) pc.close();
-      pc = null;
-      db.ref(`calls/${remoteUser}`).remove();
-    }
-
-    let incomingCallFrom = null;
-
-    // Listen for incoming calls
-    db.ref(`calls/${currentUser}`).on("value", snap => {
+    db.ref(`calls/${username}`).on('value', async snap => {
       const data = snap.val();
-      if (data && data.status === "ringing") {
-        incomingCallFrom = data.from;
-        showPopup(incomingCallFrom);
+      if (!data) return;
+      if (data.type === 'offer') {
+        showCallPopup(data.from, data.audioOnly);
       }
     });
+
+    function showCallPopup(fromUser, isAudio) {
+      callPopup.style.display = 'block';
+      callPopup.classList.remove('minimized');
+      callStatus.innerText = `Incoming ${isAudio ? 'Audio' : 'Video'} call from ${fromUser}`;
+      acceptBtn.onclick = () => acceptCall(fromUser, isAudio);
+      rejectBtn.onclick = () => {
+        db.ref(`calls/${username}`).remove();
+        callPopup.style.display = 'none';
+      };
+      minimizeBtn.onclick = () => {
+        callPopup.classList.add('minimized');
+      };
+
+      ringingTimeout = setTimeout(() => {
+        db.ref(`calls/${username}`).remove();
+        callPopup.style.display = 'none';
+      }, 60000);
+    }
+
+    async function acceptCall(fromUser, isAudio) {
+      clearTimeout(ringingTimeout);
+      await setupMedia(isAudio);
+      pc = createPeerConnection(fromUser);
+
+      await pc.setRemoteDescription(new RTCSessionDescription(data.offer));
+      const answer = await pc.createAnswer();
+      await pc.setLocalDescription(answer);
+
+      await db.ref(`calls/${fromUser}`).set({
+        type: 'answer',
+        from: username,
+        answer
+      });
+
+      callStatus.innerText = `In call with ${fromUser}`;
+      endCallBtn.style.display = 'inline-block';
+      callPopup.classList.remove('minimized');
+    }
+
+    endCallBtn.onclick = () => endCall();
+
+    async function endCall() {
+      if (pc) pc.close();
+      if (localStream) {
+        localStream.getTracks().forEach(track => track.stop());
+      }
+      localVideo.srcObject = null;
+      remoteVideo.srcObject = null;
+      callPopup.style.display = 'none';
+      endCallBtn.style.display = 'none';
+      clearTimeout(ringingTimeout);
+      await db.ref(`calls/${username}`).remove();
+      await db.ref(`calls`).orderByChild('from').equalTo(username).once('value', snap => {
+        snap.forEach(child => db.ref(`calls/${child.key}`).remove());
+      });
+    }
+
+    db.ref(`signals/${username}`).on('child_added', async snap => {
+      const msg = snap.val();
+      if (!msg || !pc) return;
+
+      try {
+        if (msg.type === 'answer') {
+          await pc.setRemoteDescription(new RTCSessionDescription(msg.answer));
+        } else if (msg.type === 'candidate') {
+          if (pc.signalingState !== 'closed') {
+            await pc.addIceCandidate(new RTCIceCandidate(msg.candidate));
+          }
+        }
+      } catch (e) {
+        console.error('Signaling error:', e);
+      }
+    });
+
+    getUserList();
   </script>
 </body>
 </html>
