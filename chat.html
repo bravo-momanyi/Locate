@@ -655,8 +655,11 @@
       remoteVideo.srcObject = remoteStream;
 
       pc.ontrack = event => {
-        remoteStream.addTrack(event.track);
-      };
+  event.streams[0].getTracks().forEach(track => {
+    remoteStream.addTrack(track);
+  });
+};
+
 
       pc.onicecandidate = event => {
         if (event.candidate) {
@@ -671,12 +674,8 @@
 let callTimeoutTimer = null;
 let minimized = false;
 
-db.ref(`calls/${currentUser}`).on("value", async snap => {
-  const data = snap.val();
-  if (!data || data.from === currentUser || callHandled) return;
+if (!data || data.from === currentUser || callHandled || minimized) return;
 
-  // Prevent re-trigger
-  callHandled = true;
 
   showIncomingPopup(data.from, data.video);
 
@@ -719,6 +718,56 @@ function showIncomingPopup(fromUser, isVideo) {
     minimized = true; // Still ringing in background
   };
 }
+  async function acceptIncomingCall(fromUser, withVideo) {
+  callModal.classList.remove("hidden");
+  callTitle.textContent = "In Call...";
+  localStream = await navigator.mediaDevices.getUserMedia({
+    video: withVideo,
+    audio: true
+  });
+  localVideo.srcObject = localStream;
+
+  setupPeer();
+  localStream.getTracks().forEach(track => pc.addTrack(track, localStream));
+
+  const callRef = db.ref(`calls/${currentUser}`);
+  const snap = await callRef.once("value");
+  const data = snap.val();
+  if (!data || !data.offer) return;
+
+  await pc.setRemoteDescription(new RTCSessionDescription(JSON.parse(data.offer)));
+
+  const answer = await pc.createAnswer();
+  await pc.setLocalDescription(answer);
+  callHandled = true;
+
+  await callRef.update({
+    answer: JSON.stringify(answer)
+  });
+
+  // Track ICE candidates
+  callRef.on("value", async snap => {
+    const data = snap.val();
+    if (!data || data.from === currentUser) return;
+    if (data.candidate && pc && pc.signalingState !== "closed") {
+      try {
+        await pc.addIceCandidate(new RTCIceCandidate(JSON.parse(data.candidate)));
+      } catch (err) {
+        console.error("Error adding ICE candidate", err);
+      }
+    }
+  });
+
+  // Log call history
+  const callLog = {
+    with: fromUser,
+    type: withVideo ? "video" : "audio",
+    time: Date.now(),
+    direction: "incoming"
+  };
+  db.ref(`callsHistory/${currentUser}`).push(callLog);
+}
+
 
     // === End Call ===
     function endCall(reason = "ended") {
