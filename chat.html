@@ -36,6 +36,15 @@
       object-fit: cover;
     }
   </style>
+  <style>
+  #contextMenu {
+    min-width: 150px;
+    background: white;
+    border: 1px solid #ddd;
+    position: absolute;
+    z-index: 9999;
+  }
+</style>
 </head>
 <body class="flex flex-col md:flex-row h-screen bg-white dark:bg-gray-900 text-black dark:text-white">
 
@@ -189,6 +198,21 @@
       userList.appendChild(li);
     });
 
+  db.ref(getChatPath()).on("child_changed", snap => {
+  const id = snap.key;
+  const updatedMsg = snap.val();
+  const bubble = document.querySelector(`[data-id="${id}"]`);
+  if (bubble) bubble.remove();
+  renderMessage(updatedMsg, id);
+});
+
+db.ref(getChatPath()).on("child_removed", snap => {
+  const id = snap.key;
+  const bubble = document.querySelector(`[data-id="${id}"]`);
+  if (bubble) bubble.remove();
+});
+
+
     // Search messages
     searchInput.oninput = () => {
       const query = searchInput.value.toLowerCase();
@@ -237,16 +261,30 @@
       return `messages/${ids[0]}_${ids[1]}`;
     }
     // Render each message
-   function renderMessage(msg, id) {
+    function renderMessage(msg, id) {
   const div = document.createElement("div");
   div.dataset.id = id;
   div.className = `relative max-w-xs px-4 py-2 rounded shadow text-sm break-words ${
     msg.sender === currentUser ? "bg-blue-100 ml-auto" : "bg-gray-100"
   }`;
-
   div.innerHTML = msg.text || (msg.fileUrl ? `<a href="${msg.fileUrl}" target="_blank">📎 ${msg.fileName}</a>` : "");
 
-  // Ticks & status
+  // Right-click popup
+  div.oncontextmenu = e => {
+    e.preventDefault();
+    contextMsgId = id;
+    contextMsg = msg;
+    contextMenu.style.top = `${e.clientY}px`;
+    contextMenu.style.left = `${e.clientX}px`;
+    contextMenu.classList.remove("hidden");
+  };
+
+  // Read status
+  if (msg.sender !== currentUser && selectedChat && !selectedChat.isGroup) {
+    db.ref(`${getChatPath()}/${id}/status`).set("read");
+  }
+
+  // Ticks
   if (msg.sender === currentUser) {
     const ticks = document.createElement("span");
     ticks.className = "absolute bottom-1 right-2 text-xs";
@@ -259,105 +297,50 @@
     } else {
       ticks.textContent = "✓";
     }
+
     div.appendChild(ticks);
-  } else {
-    // ✅ Fix: check if selectedChat exists before accessing it
-    if (selectedChat && !selectedChat.isGroup) {
-      db.ref(`${getChatPath()}/${id}/status`).set("read");
-    }
   }
-      // Message ticks
-      if (msg.sender === currentUser) {
-        const ticks = document.createElement("span");
-        ticks.className = "absolute bottom-1 right-2 text-xs";
-        if (msg.status === "read") {
-          ticks.textContent = "✓✓";
-          ticks.classList.add("text-blue-500");
-        } else if (msg.status === "delivered") {
-          ticks.textContent = "✓✓";
-        } else {
-          ticks.textContent = "✓";
-        }
-        div.appendChild(ticks);
 
-        // Edit icon
-        if (!msg.deleted) {
-          const edit = document.createElement("span");
-          edit.textContent = " ✏️";
-          edit.className = "cursor-pointer ml-2 text-blue-500";
-          div.appendChild(edit);
-        }
-
-        // Delete icon
-        const del = document.createElement("span");
-        del.textContent = " ❌";
-        del.className = "cursor-pointer ml-2 text-red-500";
-        div.appendChild(del);
-      } else {
-        // Mark as read if it's incoming
-        if (!selectedChat.isGroup) {
-          db.ref(`${getChatPath()}/${id}/status`).set("read");
-        }
-      }
-
-      // Reactions
-      if (msg.reactions) {
-        const reactionBar = document.createElement("div");
-        reactionBar.className = "text-sm mt-1";
-        for (const [user, emoji] of Object.entries(msg.reactions)) {
-          const span = document.createElement("span");
-          span.textContent = emoji;
-          span.className = "mr-1";
-          reactionBar.appendChild(span);
-        }
-        div.appendChild(reactionBar);
-      }
-
-      // Swipe to reply (mobile)
-      let startX = null;
-      div.addEventListener("touchstart", e => {
-        startX = e.touches[0].clientX;
-      });
-      div.addEventListener("touchend", e => {
-        if (!startX) return;
-        const endX = e.changedTouches[0].clientX;
-        if (endX - startX > 80 && msg.sender !== currentUser) {
-          quoteMessage(msg.text);
-        }
-        startX = null;
-      });
-
-      // Reply
-      const reply = document.createElement("span");
-      reply.textContent = " ↩️";
-      reply.className = "cursor-pointer ml-2 text-green-500";
-      div.appendChild(reply);
-
-      // Star
-      const star = document.createElement("span");
-      star.textContent = " ⭐";
-      star.className = "cursor-pointer ml-2 text-yellow-500";
-      div.appendChild(star);
-
-      // React
-      const react = document.createElement("span");
-      react.textContent = " 😊";
-      react.className = "cursor-pointer ml-2";
-      div.appendChild(react);
-
-      messagesEl.appendChild(div);
-      messagesEl.scrollTop = messagesEl.scrollHeight;
-
-      // Push Notification if incoming
-      if (msg.sender !== currentUser && document.hidden) {
-        new Notification(`New message from ${msg.sender}`, {
-          body: msg.text,
-          icon: "/assets/whatsapp-icon.png"
-        });
-      }
+  // Reactions
+  if (msg.reactions) {
+    const reactionBar = document.createElement("div");
+    reactionBar.className = "text-sm mt-1";
+    for (const [user, emoji] of Object.entries(msg.reactions)) {
+      const span = document.createElement("span");
+      span.textContent = emoji;
+      span.className = "mr-1";
+      reactionBar.appendChild(span);
     }
+    div.appendChild(reactionBar);
+  }
 
-    // Quoting messages (replies)
+  // Swipe to reply (mobile)
+  let startX = null;
+  div.addEventListener("touchstart", e => {
+    startX = e.touches[0].clientX;
+  });
+  div.addEventListener("touchend", e => {
+    if (!startX) return;
+    const endX = e.changedTouches[0].clientX;
+    if (endX - startX > 80 && msg.sender !== currentUser) {
+      quoteMessage(msg.text);
+    }
+    startX = null;
+  });
+
+  messagesEl.appendChild(div);
+  messagesEl.scrollTop = messagesEl.scrollHeight;
+
+  // Push Notification
+  if (msg.sender !== currentUser && document.hidden && Notification.permission === "granted") {
+    new Notification(`New message from ${msg.sender}`, {
+      body: msg.text,
+      icon: "/assets/whatsapp-icon.png"
+    });
+  }
+}
+
+ // Quoting messages (replies)
     function quoteMessage(text) {
       quoteText = text;
       messageInput.value = `> ${text}\n`;
@@ -838,6 +821,47 @@ function showIncomingPopup(fromUser, isVideo) {
     db.ref(`users/${currentUser}/online`).set(true);
     db.ref(`users/${currentUser}/online`).onDisconnect().set(false);
     db.ref(`users/${currentUser}/lastSeen`).onDisconnect().set(Date.now());
+
+  const contextMenu = document.createElement("div");
+contextMenu.id = "contextMenu";
+contextMenu.className = "absolute bg-white border rounded shadow-md text-sm z-50 hidden";
+contextMenu.innerHTML = `
+  <div class="p-2 hover:bg-gray-200 cursor-pointer" data-action="reply">↩️ Reply</div>
+  <div class="p-2 hover:bg-gray-200 cursor-pointer" data-action="edit">✏️ Edit</div>
+  <div class="p-2 hover:bg-gray-200 cursor-pointer" data-action="delete">❌ Delete</div>
+  <div class="p-2 hover:bg-gray-200 cursor-pointer" data-action="react">😊 React</div>
+`;
+document.body.appendChild(contextMenu);
+
+let contextMsgId = null;
+let contextMsg = null;
+
+document.body.addEventListener("click", () => {
+  contextMenu.classList.add("hidden");
+});
+
+contextMenu.onclick = e => {
+  const action = e.target.dataset.action;
+  if (!action || !contextMsgId || !contextMsg) return;
+
+  switch (action) {
+    case "reply":
+      quoteMessage(contextMsg.text);
+      break;
+    case "edit":
+      editMessage(contextMsgId, contextMsg.text);
+      break;
+    case "delete":
+      deleteMessage(contextMsgId);
+      break;
+    case "react":
+      addReaction(contextMsgId);
+      break;
+  }
+
+  contextMenu.classList.add("hidden");
+};
+
 
 </script>
 </body>
