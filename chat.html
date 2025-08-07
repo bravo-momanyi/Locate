@@ -221,7 +221,7 @@
 
   let selectedChat = null, typingTimer, quoteText = "";
   let allUsers = {}, allGroups = {}, recentsData = [];
-  let messagesListener = null, renderedMsgIds = new Set();
+  let messagesListener = null;
 
   // --- Theme ---
   function setTheme(theme) {
@@ -235,7 +235,6 @@
       toggleThemeBtn.innerText = "🌓";
     }
     localStorage.setItem("theme", theme);
-    // update all
     document.querySelectorAll("#sidebar, #chatArea, .sidebar-header").forEach(e => {
       e.classList.toggle("dark", theme === "dark");
     });
@@ -448,14 +447,16 @@
     }
   };
 
-  // --- Open Chat ---
+  // --- Open Chat (fix message order and prevent duplicate rendering) ---
   async function openChat(id, isGroup = false, groupName = "") {
     selectedChat = { id, isGroup, groupName };
-    messagesEl.innerHTML = "";
-    renderedMsgIds.clear();
     chatName.textContent = isGroup ? `# ${groupName || id}` : allUsers[id]?.name || id;
     chatStatus.textContent = isGroup ? "Group" : "Loading...";
+
+    // Always remove previous listeners and clear content/IDs
     if (messagesListener) messagesListener.off();
+    messagesEl.innerHTML = "";
+    let renderedMsgIds = new Set();
 
     if (!isGroup) {
       db.ref(`users/${id}/lastSeen`).on("value", snap => {
@@ -470,10 +471,29 @@
     await updateBlockButton();
 
     const path = getChatPath();
+
+    // 1. Fetch all messages, sort by timestamp, and render them ONCE
+    db.ref(path).once("value", snap => {
+      const msgs = [];
+      snap.forEach(child => {
+        const msg = child.val();
+        msg._id = child.key;
+        msgs.push(msg);
+      });
+      msgs.sort((a, b) => a.timestamp - b.timestamp); // oldest first
+      messagesEl.innerHTML = "";
+      renderedMsgIds.clear();
+      msgs.forEach(msg => {
+        renderMessage(msg, msg._id);
+        renderedMsgIds.add(msg._id);
+      });
+    });
+
+    // 2. Attach listeners for live updates (new, edit, delete)
     messagesListener = db.ref(path);
     messagesListener.off();
     messagesListener.on("child_added", snap => {
-      if (renderedMsgIds.has(snap.key)) return; // Prevent duplicate rendering
+      if (renderedMsgIds.has(snap.key)) return;
       renderedMsgIds.add(snap.key);
       renderMessage(snap.val(), snap.key);
     });
@@ -493,6 +513,7 @@
       renderedMsgIds.delete(id);
     });
   }
+
   function getChatPath() {
     if (!selectedChat) return "";
     if (selectedChat.isGroup) return `groupMessages/${selectedChat.id}`;
