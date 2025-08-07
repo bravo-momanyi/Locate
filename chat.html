@@ -13,97 +13,55 @@
     body { min-width: 0; }
     #mainContainer { display: flex; width: 100vw; height: 100vh; min-width: 0; }
     #sidebar {
-      width: 320px;
-      min-width: 220px;
-      max-width: 400px;
-      background: #f3f4f6;
-      border-right: 1px solid #d1d5db;
-      display: flex;
-      flex-direction: column;
-      height: 100vh;
-      overflow-y: auto;
+      width: 320px; min-width: 220px; max-width: 400px;
+      background: #f3f4f6; border-right: 1px solid #d1d5db;
+      display: flex; flex-direction: column; height: 100vh; overflow-y: auto;
       transition: background 0.3s, color 0.3s;
     }
     #chatArea {
-      flex: 1;
-      min-width: 0;
-      background: #fff;
-      display: flex;
-      flex-direction: column;
-      height: 100vh;
+      flex: 1; min-width: 0; background: #fff;
+      display: flex; flex-direction: column; height: 100vh;
       transition: background 0.3s, color 0.3s;
     }
+    #chatHeader {
+      position: sticky; top: 0; z-index: 40;
+      background: #f3f4f6; border-bottom: 1px solid #d1d5db;
+      display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
+      padding: 0.5rem 1rem; min-height: 56px;
+    }
+    #chatTitle { font-size: 1.15rem; font-weight: bold; color: #065f46; }
+    #chatSearchBar {
+      border-radius: 6px; background: #fff; border: 1px solid #d1d5db;
+      padding: 0.25rem 0.75rem; font-size: 1rem; min-width: 160px;
+    }
+    #messages { flex: 1; overflow-y: auto; padding: 1rem; background: #fff; transition: background 0.3s; }
+    #messageForm { position: sticky; bottom: 0; z-index: 20; background: #f3f4f6; }
     .msg-light { background-color: #d4f8e8 !important; color: #222 !important; }
     .msg-dark { background-color: #065f46 !important; color: #fff !important; }
-    .badge { background: #e53e3e; color: #fff; font-size: 0.75rem; border-radius: 999px; padding: 0.15rem 0.5rem; margin-left: 0.5rem; font-weight: bold; min-width: 1.5rem; text-align: center; display: inline-block; }
-    .badge-green { background: #38a169; }
-    .badge-blue { background: #3182ce; }
-    .badge-gray { background: #a0aec0; }
-    .sidebar-search:focus { outline: 2px solid #3182ce; outline-offset: 0; }
-    .sidebar-header {
-      background: #065f46;
-      color: #fff;
-      padding: 1rem;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      transition: background 0.3s, color 0.3s;
-    }
-    .sidebar-header .dashboard-btn {
-      background: #fff;
-      color: #065f46;
-      padding: 0.5rem 1rem;
-      border-radius: 0.375rem;
-      font-weight: 500;
-      transition: background 0.2s;
-      margin-left: 1rem;
-    }
-    .sidebar-header .dashboard-btn:hover { background: #d4f8e8; }
-    .theme-btn {
-      font-size: 1.2rem;
-      background: transparent;
-      color: #fff;
-      padding: 0.3rem 0.5rem;
-      border-radius: 0.375rem;
-      border: none;
-      transition: background 0.2s;
-      cursor: pointer;
-      margin-left: 1rem;
-    }
-    .theme-btn:hover { background: #d4f8e8; color: #065f46; }
     #contextMenu { min-width: 180px; background: white; border: 1px solid #ddd; position: fixed; z-index: 9999; box-shadow: 0 2px 20px rgba(0,0,0,0.12);}
-    @media (max-width: 768px) {
+    @media (max-width:768px) {
       #sidebar { width: 100vw; min-width: 0; max-width: 100vw; position: absolute; left: 0; top: 0; bottom: 0; z-index: 40; }
       #mainContainer { flex-direction: column; }
       #chatArea { width: 100vw; min-width: 0; }
       #sidebar.hide { display: none !important; }
       #chatArea.hide { display: none !important; }
+      #chatHeader { position: sticky; top: 0; left: 0; width: 100vw; }
     }
-    @media (min-width: 768px) {
-      #sidebar { display: block !important; }
-      #mainContainer { flex-direction: row; }
-      #chatArea { display: flex !important; }
-    }
-    body.dark, body.dark #sidebar, body.dark #chatArea {
-      background: #222 !important;
-      color: #fff !important;
+    body.dark, body.dark #sidebar, body.dark #chatArea, body.dark #chatHeader, body.dark #messageForm {
+      background: #222 !important; color: #fff !important;
     }
     body.dark .sidebar-header { background: #222 !important; color: #d4f8e8 !important;}
     body.dark .dashboard-btn { background: #065f46 !important; color: #fff !important;}
-    #chatHeader { position: relative; }
-    #backBtn { position: static; }
-    #messageForm { position: sticky; bottom: 0; z-index: 20; }
   </style>
 </head>
 <body class="bg-white text-black transition-colors duration-300">
 <div id="mainContainer">
-  <!-- Sidebar (Users + Groups) -->
   <aside id="sidebar">
-    <div class="sidebar-header">
+    <div class="sidebar-header flex items-center justify-between p-4 bg-emerald-700 text-white">
       <span class="font-bold text-lg">WhatsApp Clone</span>
       <span class="">Welcome, <span id="welcomeUserSidebar"></span></span>
-      <button id="dashboardBtn" class="dashboard-btn">Dashboard</button>
-      <button id="toggleTheme" class="theme-btn">🌓</button>
+      <button id="dashboardBtn" class="dashboard-btn ml-2">Dashboard</button>
+      <button id="toggleTheme" class="theme-btn ml-2">🌓</button>
     </div>
     <div class="p-4 border-b flex flex-col gap-2">
       <div class="flex justify-between items-center">
@@ -125,24 +83,21 @@
       <ul id="userList" class="divide-y"></ul>
     </div>
   </aside>
-  <!-- Chat Area -->
   <main id="chatArea" class="hide flex flex-col h-full">
-    <div id="chatHeader" class="flex items-center justify-between px-4 py-2 border-b bg-gray-100 dark:bg-gray-800">
+    <div id="chatHeader">
       <div class="flex items-center gap-2">
         <button id="backBtn" class="text-blue-600 pr-2 md:hidden">&larr;</button>
-        <div>
-          <h2 id="chatName" class="text-lg font-semibold"></h2>
-          <p id="chatStatus" class="text-sm text-gray-500"></p>
-        </div>
+        <span id="chatTitle"></span>
       </div>
+      <input id="chatSearchBar" placeholder="Search messages..." />
       <div class="flex items-center gap-2">
-        <button id="audioCallBtn" class="bg-green-500 text-white px-3 py-1 rounded text-sm shadow">📞 Audio</button>
-        <button id="videoCallBtn" class="bg-blue-600 text-white px-3 py-1 rounded text-sm shadow">🎥 Video</button>
-        <button id="blockUser" class="text-sm text-red-500 ml-2">🚫 Block</button>
+        <button id="audioCallBtn" class="bg-green-500 text-white px-3 py-1 rounded text-sm shadow">📞</button>
+        <button id="videoCallBtn" class="bg-blue-600 text-white px-3 py-1 rounded text-sm shadow">🎥</button>
+        <button id="blockUser" class="text-sm text-red-500 ml-2">🚫</button>
       </div>
     </div>
-    <div id="messages" class="flex-1 overflow-y-auto p-4 space-y-2 bg-white dark:bg-gray-800 transition-colors duration-300"></div>
-    <form id="messageForm" class="flex items-center p-2 border-t gap-2 bg-gray-50 dark:bg-gray-900 sticky bottom-0">
+    <div id="messages" class="flex-1 overflow-y-auto p-4 space-y-2"></div>
+    <form id="messageForm" class="flex items-center p-2 border-t gap-2">
       <input id="messageInput" type="text" placeholder="Type a message" class="flex-1 border px-3 py-2 rounded" />
       <input type="file" id="fileInput" class="hidden" />
       <button type="button" id="attachBtn" class="text-blue-600">📎</button>
@@ -187,8 +142,8 @@
   const groupList = document.getElementById("groupList");
   const recentsList = document.getElementById("recentsList");
   const messagesEl = document.getElementById("messages");
-  const chatName = document.getElementById("chatName");
-  const chatStatus = document.getElementById("chatStatus");
+  const chatTitle = document.getElementById("chatTitle");
+  const chatSearchBar = document.getElementById("chatSearchBar");
   const messageForm = document.getElementById("messageForm");
   const messageInput = document.getElementById("messageInput");
   const attachBtn = document.getElementById("attachBtn");
@@ -213,6 +168,7 @@
   let selectedChat = null, typingTimer, quoteText = "";
   let allUsers = {}, allGroups = {}, recentsData = [];
   let messagesListener = null;
+  let allMessages = [];
 
   // --- Theme ---
   function setTheme(theme) {
@@ -273,6 +229,7 @@
   }
   db.ref("groups").on("value", refreshGroupList);
 
+  // --- Recents, filtering, etc. ---
   function loadRecents() {
     recentsData = [];
     db.ref("messages").once("value").then(snapshot => {
@@ -370,14 +327,10 @@
   }
   sidebarSearch.oninput = filterSidebarLists;
 
-  // --- Back Button for mobile ---
+  // --- Back Button ---
   function showSidebar() {
     chatListEl.classList.remove("hide");
     chatWindowEl.classList.add("hide");
-  }
-  function showChatArea() {
-    chatListEl.classList.add("hide");
-    chatWindowEl.classList.remove("hide");
   }
   backBtn.onclick = showSidebar;
 
@@ -436,72 +389,7 @@
     }
   };
 
-  // --- Open Chat (fix message order and prevent duplicate rendering) ---
-  async function openChat(id, isGroup = false, groupName = "") {
-    selectedChat = { id, isGroup, groupName };
-    chatName.textContent = isGroup ? `# ${groupName || id}` : allUsers[id]?.name || id;
-    chatStatus.textContent = isGroup ? "Group" : "Loading...";
-    if (messagesListener) messagesListener.off();
-    messagesEl.innerHTML = "";
-    let renderedMsgIds = new Set();
-
-    if (!isGroup) {
-      db.ref(`users/${id}/lastSeen`).on("value", snap => {
-        const val = snap.val();
-        if (!val) return;
-        chatStatus.textContent = `last seen ${new Date(val).toLocaleTimeString()}`;
-      });
-    } else {
-      chatStatus.textContent = "Group";
-    }
-    showChatArea();
-    await updateBlockButton();
-
-    const path = getChatPath();
-
-    // 1. Fetch all messages, sort by timestamp, and render them ONCE
-    db.ref(path).once("value", snap => {
-      const msgs = [];
-      snap.forEach(child => {
-        const msg = child.val();
-        msg._id = child.key;
-        msgs.push(msg);
-      });
-      msgs.sort((a, b) => a.timestamp - b.timestamp); // oldest first
-      messagesEl.innerHTML = "";
-      renderedMsgIds.clear();
-      msgs.forEach(msg => {
-        renderMessage(msg, msg._id);
-        renderedMsgIds.add(msg._id);
-      });
-    });
-
-    // 2. Attach listeners for live updates (new, edit, delete)
-    messagesListener = db.ref(path);
-    messagesListener.off();
-    messagesListener.on("child_added", snap => {
-      // Only render if not already rendered
-      if (renderedMsgIds.has(snap.key)) return;
-      renderedMsgIds.add(snap.key);
-      renderMessage(snap.val(), snap.key);
-    });
-    messagesListener.on("child_changed", snap => {
-      const id = snap.key;
-      const updatedMsg = snap.val();
-      const bubble = document.querySelector(`[data-id="${id}"]`);
-      if (bubble) bubble.remove();
-      renderedMsgIds.delete(id);
-      renderMessage(updatedMsg, id);
-      renderedMsgIds.add(id);
-    });
-    messagesListener.on("child_removed", snap => {
-      const id = snap.key;
-      const bubble = document.querySelector(`[data-id="${id}"]`);
-      if (bubble) bubble.remove();
-      renderedMsgIds.delete(id);
-    });
-  }
-
+  // --- Messaging and Group Messaging ---
   function getChatPath() {
     if (!selectedChat) return "";
     if (selectedChat.isGroup) return `groupMessages/${selectedChat.id}`;
@@ -509,7 +397,85 @@
     return `messages/${ids[0]}_${ids[1]}`;
   }
 
-  // --- Context Menu, always inside screen, only for sender and <1 min old ---
+  // --- Open Chat ---
+  async function openChat(id, isGroup = false, groupName = "") {
+    selectedChat = { id, isGroup, groupName };
+    chatTitle.textContent = isGroup ? `# ${groupName || id}` : allUsers[id]?.name || id;
+    messagesEl.innerHTML = "";
+    allMessages = [];
+
+    if (messagesListener) messagesListener.off();
+
+    // Set up listeners for chat status (last seen, etc.)
+    if (!isGroup) {
+      db.ref(`users/${id}/lastSeen`).on("value", snap => {
+        const val = snap.val();
+        if (!val) return;
+        chatTitle.title = `last seen ${new Date(val).toLocaleTimeString()}`;
+      });
+    } else {
+      chatTitle.title = "Group";
+    }
+    showChatArea();
+    await updateBlockButton();
+
+    const path = getChatPath();
+
+    // Fetch all messages, sort, and render
+    db.ref(path).once("value", snap => {
+      allMessages = [];
+      snap.forEach(child => {
+        const msg = child.val();
+        msg._id = child.key;
+        allMessages.push(msg);
+      });
+      allMessages.sort((a, b) => a.timestamp - b.timestamp);
+      renderMessagesFiltered(chatSearchBar.value);
+    });
+
+    // Attach listeners for live updates
+    messagesListener = db.ref(path);
+    messagesListener.off();
+    messagesListener.on("child_added", snap => {
+      const msg = snap.val();
+      msg._id = snap.key;
+      // Prevent duplicate (by _id) and always preserve order
+      if (!allMessages.find(m => m._id === msg._id)) {
+        allMessages.push(msg);
+        allMessages.sort((a, b) => a.timestamp - b.timestamp);
+        renderMessagesFiltered(chatSearchBar.value);
+      }
+    });
+    messagesListener.on("child_changed", snap => {
+      const msg = snap.val();
+      msg._id = snap.key;
+      const idx = allMessages.findIndex(m => m._id === msg._id);
+      if (idx !== -1) {
+        allMessages[idx] = msg;
+        renderMessagesFiltered(chatSearchBar.value);
+      }
+    });
+    messagesListener.on("child_removed", snap => {
+      const _id = snap.key;
+      allMessages = allMessages.filter(m => m._id !== _id);
+      renderMessagesFiltered(chatSearchBar.value);
+    });
+  }
+
+  // --- Real time search/filter messages ---
+  chatSearchBar.oninput = () => renderMessagesFiltered(chatSearchBar.value);
+  function renderMessagesFiltered(query) {
+    messagesEl.innerHTML = "";
+    const lower = (query||"").toLowerCase();
+    allMessages
+      .filter(msg =>
+        !query || (msg.text && msg.text.toLowerCase().includes(lower)) ||
+        (msg.fileName && msg.fileName.toLowerCase().includes(lower))
+      )
+      .forEach(msg => renderMessage(msg, msg._id));
+  }
+
+  // --- Context Menu ---
   let contextMsgId = null, contextMsg = null, contextMenuOpen = false;
   function showContextMenu(actions, x, y) {
     let menuHtml = "";
@@ -519,11 +485,8 @@
     contextMenu.innerHTML = menuHtml;
     contextMenu.classList.remove("hidden");
     contextMenuOpen = true;
-
-    // Calculate best position
-    const menuWidth = 180;
-    const menuHeight = 40 * actions.length;
-    const padding = 10;
+    // Position context menu always inside screen
+    const menuWidth = 180, menuHeight = 40 * actions.length, padding = 8;
     let left = x, top = y;
     if (left + menuWidth > window.innerWidth) left = window.innerWidth - menuWidth - padding;
     if (top + menuHeight > window.innerHeight) top = window.innerHeight - menuHeight - padding;
@@ -564,6 +527,7 @@
     db.ref(`${getChatPath()}/${msgId}/reactions/${currentUser}`).set(emoji);
   }
   function deleteForMe(id) {
+    // Just remove from DOM; not from Firebase
     const bubble = document.querySelector(`[data-id="${id}"]`);
     if (bubble) bubble.remove();
   }
@@ -587,9 +551,7 @@
     div.innerHTML = msg.text || (msg.fileUrl ? `<a href="${msg.fileUrl}" target="_blank" class="underline text-blue-700">${msg.fileName}</a>` : "");
 
     function getMenuActions() {
-      const actions = [
-        { label: "Reply", action: "reply" }
-      ];
+      const actions = [{ label: "Reply", action: "reply" }];
       if (isSender) {
         actions.push({ label: "Edit", action: "edit" });
         actions.push({ label: "Delete for Me", action: "deleteMe" });
@@ -673,24 +635,20 @@
     if (!selectedChat || selectedChat.isGroup) return;
     db.ref(`typing/${selectedChat.id}`).set(isTyping ? currentUser : "");
   }
-  db.ref(`typing/${currentUser}`).on("value", snap => {
-    const typer = snap.val();
-    // (typing indicator logic can be added here if needed)
-  });
 
   messageForm.onsubmit = async e => {
     e.preventDefault();
     const text = messageInput.value.trim();
     if (!text || !selectedChat) return;
-    if (selectedChat.isGroup) return;
-    if (await enforceBlock()) {
+    if (!selectedChat.isGroup && await enforceBlock()) {
       alert("You or the other user have blocked each other. Messaging is not allowed.");
       return;
     }
-    const blockedRef = db.ref(`blocked/${selectedChat.id}/${currentUser}`);
-    const blockedSnap = await blockedRef.once("value");
-    if (blockedSnap.exists()) { alert("You are blocked by this user."); return; }
-
+    if (!selectedChat.isGroup) {
+      const blockedRef = db.ref(`blocked/${selectedChat.id}/${currentUser}`);
+      const blockedSnap = await blockedRef.once("value");
+      if (blockedSnap.exists()) { alert("You are blocked by this user."); return; }
+    }
     const msg = {
       sender: currentUser,
       text: quoteText ? `${quoteText}\n\n${text}` : text,
