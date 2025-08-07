@@ -10,41 +10,23 @@
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-storage-compat.js"></script>
   <style>
     @media (max-width: 768px) {
-      #chatList {
-        display: none;
-      }
-      #chatWindow {
-        display: flex !important;
-      }
+      #chatList { display: none; }
+      #chatWindow { display: flex !important; }
     }
-
     @media (min-width: 768px) {
-      #chatWindow {
-        display: flex;
-      }
+      #chatWindow { display: flex; }
     }
-
     video#localVideo {
-      width: 100px;
-      height: 100px;
-      object-fit: cover;
+      width: 100px; height: 100px; object-fit: cover;
     }
-
     video#remoteVideo {
-      width: 100%;
-      height: 300px;
-      object-fit: cover;
+      width: 100%; height: 300px; object-fit: cover;
+    }
+    #contextMenu {
+      min-width: 150px; background: white; border: 1px solid #ddd;
+      position: absolute; z-index: 9999;
     }
   </style>
-  <style>
-  #contextMenu {
-    min-width: 150px;
-    background: white;
-    border: 1px solid #ddd;
-    position: absolute;
-    z-index: 9999;
-  }
-</style>
 </head>
 <body class="flex flex-col md:flex-row h-screen bg-white dark:bg-gray-900 text-black dark:text-white">
 
@@ -94,22 +76,23 @@
       <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded">Send</button>
     </form>
 
-    <!-- Call Controls (moved to top right to avoid overlap) -->
-    <div id="callControls" class="fixed top-4 right-4 flex flex-col space-y-2 z-50">
+    <!-- Call Controls -->
+    <div id="callControls" class="absolute bottom-20 right-4 flex flex-col space-y-2 z-50">
       <button id="audioCallBtn" class="bg-green-500 text-white px-4 py-2 rounded shadow">📞 Audio</button>
       <button id="videoCallBtn" class="bg-blue-600 text-white px-4 py-2 rounded shadow">🎥 Video</button>
     </div>
 
     <!-- Call Modal -->
     <div id="callModal" class="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center hidden z-50">
-      <div class="bg-white p-6 rounded-lg text-center space-y-4 w-full max-w-md mx-auto">
+      <div id="callModalContent" class="bg-white p-6 rounded-lg text-center space-y-4 w-full max-w-md mx-auto">
         <h3 id="callTitle" class="text-xl font-bold">Calling...</h3>
         <video id="remoteVideo" autoplay playsinline class="bg-black rounded"></video>
-        <video id="localVideo" autoplay playsinline muted class="rounded-full absolute bottom-4 right-4 z-10 border-2 border-white"></video>
+        <video id="localVideo" autoplay playsinline muted class="rounded-full absolute bottom-4 right-4 border-2 border-white"></video>
         <button id="endCallBtn" class="bg-red-600 text-white px-4 py-2 rounded">End Call</button>
       </div>
     </div>
   </main>
+
   <!-- Group Modal -->
   <div id="groupModal" class="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center hidden z-40">
     <div class="bg-white p-4 rounded-lg w-96 space-y-4">
@@ -122,748 +105,705 @@
       </div>
     </div>
   </div>
+
 <script>
-   // Firebase configuration
-    const firebaseConfig = {
-      apiKey: "AIzaSyBfkUJS81minjxj0DFz4pzNnGzCtb5ZJss",
-      authDomain: "locater-42fb4.firebaseapp.com",
-      databaseURL: "https://locater-42fb4-default-rtdb.firebaseio.com",
-      projectId: "locater-42fb4",
-      storageBucket: "locater-42fb4.appspot.com",
-      messagingSenderId: "250348367998",
-      appId: "1:250348367998:web:d734b2b4c735b5684ae82f"
-    };
-
-    // Initialize Firebase
-    firebase.initializeApp(firebaseConfig);
-    const db = firebase.database();
-    const storage = firebase.storage();
-
-    // Get current user from session
-    const currentUser = sessionStorage.getItem('username') || localStorage.getItem('username');
-    if (!currentUser) {
-      alert('Session expired');
-      location.href = 'index.html';
-    }
-    document.getElementById('welcomeUserMobile').textContent = currentUser;
-
-
-    // Elements
-    const userList = document.getElementById("userList");
-    const messagesEl = document.getElementById("messages");
-    const chatHeader = document.getElementById("chatHeader");
-    const chatName = document.getElementById("chatName");
-    const chatStatus = document.getElementById("chatStatus");
-    const messageForm = document.getElementById("messageForm");
-    const messageInput = document.getElementById("messageInput");
-    const attachBtn = document.getElementById("attachBtn");
-    const fileInput = document.getElementById("fileInput");
-    const typingEl = document.getElementById("typing");
-    const searchInput = document.getElementById("searchInput");
-    const backBtn = document.getElementById("backBtn");
-    const chatListEl = document.getElementById("chatList");
-    const chatWindowEl = document.getElementById("chatWindow");
-
-    let selectedChat = null;
-    let typingTimer;
-    let quoteText = "";
-
-    // Notification permission
-    if ("Notification" in window && Notification.permission !== "granted") {
-      Notification.requestPermission();
-    }
-
-    // Load users from Firebase
-    db.ref("users").on("value", snapshot => {
-      userList.innerHTML = "";
-      snapshot.forEach(child => {
-        const username = child.key;
-        if (username === currentUser) return;
-        const li = document.createElement("li");
-        li.className = "p-3 hover:bg-gray-100 cursor-pointer";
-        li.textContent = username;
-        li.onclick = () => openChat(username, false);
-        userList.appendChild(li);
-      });
-    });
-
-    // Load groups
-    db.ref("groups").on("child_added", snap => {
-      const group = snap.val();
-      if (!group.members || !group.members[currentUser]) return;
-      const li = document.createElement("li");
-      li.className = "p-3 hover:bg-gray-100 cursor-pointer text-green-600";
-      li.textContent = `# ${group.name}`;
-      li.onclick = () => openChat(group.id, true);
-      userList.appendChild(li);
-    });
-
-  db.ref(getChatPath()).on("child_changed", snap => {
-  const id = snap.key;
-  const updatedMsg = snap.val();
-  const bubble = document.querySelector(`[data-id="${id}"]`);
-  if (bubble) bubble.remove();
-  renderMessage(updatedMsg, id);
-});
-
-db.ref(getChatPath()).on("child_removed", snap => {
-  const id = snap.key;
-  const bubble = document.querySelector(`[data-id="${id}"]`);
-  if (bubble) bubble.remove();
-});
-
-
-    // Search messages
-    searchInput.oninput = () => {
-      const query = searchInput.value.toLowerCase();
-      const messages = messagesEl.querySelectorAll("div[data-id]");
-      messages.forEach(m => {
-        const match = m.textContent.toLowerCase().includes(query);
-        m.style.display = match ? "" : "none";
-      });
-    };
-
-    // Handle back button (mobile)
-    backBtn.onclick = () => {
-      chatListEl.classList.remove("hidden");
-      chatWindowEl.classList.add("hidden");
-    };
-
-    // Chat open
-    function openChat(id, isGroup = false) {
-      selectedChat = { id, isGroup };
-      messagesEl.innerHTML = "";
-      chatName.textContent = isGroup ? `# ${id}` : id;
-      chatStatus.textContent = isGroup ? "Group" : "Loading...";
-
-      if (!isGroup) {
-        db.ref(`users/${id}/lastSeen`).on("value", snap => {
-          const val = snap.val();
-          if (!val) return;
-          chatStatus.textContent = `last seen ${new Date(val).toLocaleTimeString()}`;
-        });
-      }
-
-      chatListEl.classList.add("hidden");
-      chatWindowEl.classList.remove("hidden");
-
-      db.ref(getChatPath()).off();
-      db.ref(getChatPath()).on("child_added", snap => {
-        const msg = snap.val();
-        renderMessage(msg, snap.key);
-      });
-    }
-
-    function getChatPath() {
-      if (!selectedChat) return "";
-      if (selectedChat.isGroup) return `groupMessages/${selectedChat.id}`;
-      const ids = [currentUser, selectedChat.id].sort();
-      return `messages/${ids[0]}_${ids[1]}`;
-    }
-    // Render each message
-    function renderMessage(msg, id) {
-  const div = document.createElement("div");
-  div.dataset.id = id;
-  div.className = `relative max-w-xs px-4 py-2 rounded shadow text-sm break-words ${
-    msg.sender === currentUser ? "bg-blue-100 ml-auto" : "bg-gray-100"
-  }`;
-  div.innerHTML = msg.text || (msg.fileUrl ? `<a href="${msg.fileUrl}" target="_blank">📎 ${msg.fileName}</a>` : "");
-
-  // Right-click popup
-  div.oncontextmenu = e => {
-    e.preventDefault();
-    contextMsgId = id;
-    contextMsg = msg;
-    contextMenu.style.top = `${e.clientY}px`;
-    contextMenu.style.left = `${e.clientX}px`;
-    contextMenu.classList.remove("hidden");
+  // Firebase config
+  const firebaseConfig = {
+    apiKey: "AIzaSyBfkUJS81minjxj0DFz4pzNnGzCtb5ZJss",
+    authDomain: "locater-42fb4.firebaseapp.com",
+    databaseURL: "https://locater-42fb4-default-rtdb.firebaseio.com",
+    projectId: "locater-42fb4",
+    storageBucket: "locater-42fb4.appspot.com",
+    messagingSenderId: "250348367998",
+    appId: "1:250348367998:web:d734b2b4c735b5684ae82f"
   };
 
-  // Read status
-  if (msg.sender !== currentUser && selectedChat && !selectedChat.isGroup) {
-    db.ref(`${getChatPath()}/${id}/status`).set("read");
+  // Initialize Firebase
+  firebase.initializeApp(firebaseConfig);
+  const db = firebase.database();
+  const storage = firebase.storage();
+
+  // Get current user from session
+  const currentUser = sessionStorage.getItem('username') || localStorage.getItem('username');
+  if (!currentUser) {
+    alert('Session expired');
+    location.href = 'index.html';
+  }
+  document.getElementById('welcomeUserMobile').textContent = currentUser;
+
+  // Get elements
+  const userList = document.getElementById("userList");
+  const messagesEl = document.getElementById("messages");
+  const chatHeader = document.getElementById("chatHeader");
+  const chatName = document.getElementById("chatName");
+  const chatStatus = document.getElementById("chatStatus");
+  const messageForm = document.getElementById("messageForm");
+  const messageInput = document.getElementById("messageInput");
+  const attachBtn = document.getElementById("attachBtn");
+  const fileInput = document.getElementById("fileInput");
+  const typingEl = document.getElementById("typing");
+  const searchInput = document.getElementById("searchInput");
+  const backBtn = document.getElementById("backBtn");
+  const chatListEl = document.getElementById("chatList");
+  const chatWindowEl = document.getElementById("chatWindow");
+  const createGroupBtn = document.getElementById("createGroupBtn");
+  const groupModal = document.getElementById("groupModal");
+  const closeModal = document.getElementById("closeModal");
+  const groupNameInput = document.getElementById("groupName");
+  const groupUsers = document.getElementById("groupUsers");
+  const createGroup = document.getElementById("createGroup");
+
+  let selectedChat = null;
+  let typingTimer;
+  let quoteText = "";
+
+  // Notifications
+  if ("Notification" in window && Notification.permission !== "granted") {
+    Notification.requestPermission();
   }
 
-  // Ticks
-  if (msg.sender === currentUser) {
-    const ticks = document.createElement("span");
-    ticks.className = "absolute bottom-1 right-2 text-xs";
-
-    if (msg.status === "read") {
-      ticks.textContent = "✓✓";
-      ticks.classList.add("text-blue-500");
-    } else if (msg.status === "delivered") {
-      ticks.textContent = "✓✓";
-    } else {
-      ticks.textContent = "✓";
-    }
-
-    div.appendChild(ticks);
-  }
-
-  // Reactions
-  if (msg.reactions) {
-    const reactionBar = document.createElement("div");
-    reactionBar.className = "text-sm mt-1";
-    for (const [user, emoji] of Object.entries(msg.reactions)) {
-      const span = document.createElement("span");
-      span.textContent = emoji;
-      span.className = "mr-1";
-      reactionBar.appendChild(span);
-    }
-    div.appendChild(reactionBar);
-  }
-
-  // Swipe to reply (mobile)
-  let startX = null;
-  div.addEventListener("touchstart", e => {
-    startX = e.touches[0].clientX;
+  // Load users
+  db.ref("users").on("value", snapshot => {
+    userList.innerHTML = "";
+    snapshot.forEach(child => {
+      const username = child.key;
+      if (username === currentUser) return;
+      const li = document.createElement("li");
+      li.className = "p-3 hover:bg-gray-100 cursor-pointer";
+      li.textContent = username;
+      li.onclick = () => openChat(username, false);
+      userList.appendChild(li);
+    });
   });
-  div.addEventListener("touchend", e => {
-    if (!startX) return;
-    const endX = e.changedTouches[0].clientX;
-    if (endX - startX > 80 && msg.sender !== currentUser) {
-      quoteMessage(msg.text);
-    }
-    startX = null;
+
+  // Load groups
+  db.ref("groups").on("child_added", snap => {
+    const group = snap.val();
+    if (!group.members || !group.members[currentUser]) return;
+    const li = document.createElement("li");
+    li.className = "p-3 hover:bg-gray-100 cursor-pointer text-green-600";
+    li.textContent = `# ${group.name}`;
+    li.onclick = () => openChat(group.id, true, group.name);
+    userList.appendChild(li);
   });
 
-  messagesEl.appendChild(div);
-  messagesEl.scrollTop = messagesEl.scrollHeight;
+  // Search messages
+  searchInput.oninput = () => {
+    const query = searchInput.value.toLowerCase();
+    const messages = messagesEl.querySelectorAll("div[data-id]");
+    messages.forEach(m => {
+      const match = m.textContent.toLowerCase().includes(query);
+      m.style.display = match ? "" : "none";
+    });
+  };
 
-  // Push Notification
-  if (msg.sender !== currentUser && document.hidden && Notification.permission === "granted") {
-    new Notification(`New message from ${msg.sender}`, {
-      body: msg.text,
-      icon: "/assets/whatsapp-icon.png"
+  // Handle back button (mobile)
+  backBtn.onclick = () => {
+    chatListEl.classList.remove("hidden");
+    chatWindowEl.classList.add("hidden");
+  };
+
+  // Open chat
+  function openChat(id, isGroup = false, groupName = "") {
+    selectedChat = { id, isGroup, groupName };
+    messagesEl.innerHTML = "";
+    chatName.textContent = isGroup ? `# ${groupName || id}` : id;
+    chatStatus.textContent = isGroup ? "Group" : "Loading...";
+
+    if (!isGroup) {
+      db.ref(`users/${id}/lastSeen`).on("value", snap => {
+        const val = snap.val();
+        if (!val) return;
+        chatStatus.textContent = `last seen ${new Date(val).toLocaleTimeString()}`;
+      });
+    }
+
+    chatListEl.classList.add("hidden");
+    chatWindowEl.classList.remove("hidden");
+
+    db.ref(getChatPath()).off();
+    db.ref(getChatPath()).on("child_added", snap => {
+      const msg = snap.val();
+      renderMessage(msg, snap.key);
+    });
+    db.ref(getChatPath()).on("child_changed", snap => {
+      const id = snap.key;
+      const updatedMsg = snap.val();
+      const bubble = document.querySelector(`[data-id="${id}"]`);
+      if (bubble) bubble.remove();
+      renderMessage(updatedMsg, id);
+    });
+    db.ref(getChatPath()).on("child_removed", snap => {
+      const id = snap.key;
+      const bubble = document.querySelector(`[data-id="${id}"]`);
+      if (bubble) bubble.remove();
     });
   }
-}
 
- // Quoting messages (replies)
-    function quoteMessage(text) {
-      quoteText = text;
-      messageInput.value = `> ${text}\n`;
-      messageInput.focus();
-    }
+  function getChatPath() {
+    if (!selectedChat) return "";
+    if (selectedChat.isGroup) return `groupMessages/${selectedChat.id}`;
+    const ids = [currentUser, selectedChat.id].sort();
+    return `messages/${ids[0]}_${ids[1]}`;
+  }
 
-    // Send Message
-    messageForm.onsubmit = async e => {
+  // Render message bubble
+  function renderMessage(msg, id) {
+    const div = document.createElement("div");
+    div.dataset.id = id;
+    div.className = `relative max-w-xs px-4 py-2 rounded shadow text-sm break-words ${
+      msg.sender === currentUser ? "bg-blue-100 ml-auto" : "bg-gray-100"
+    }`;
+    div.innerHTML = msg.text || (msg.fileUrl ? `<a href="${msg.fileUrl}" target="_blank">📎 ${msg.fileName}</a>` : "");
+
+    // Right-click/context menu
+    div.oncontextmenu = e => {
       e.preventDefault();
-      const text = messageInput.value.trim();
-      if (!text || !selectedChat) return;
-
-      // Check if blocked
-      const blockedRef = db.ref(`blocked/${selectedChat.id}/${currentUser}`);
-      const blockedSnap = await blockedRef.once("value");
-      if (blockedSnap.exists()) {
-        alert("You are blocked by this user.");
-        return;
-      }
-
-      const msg = {
-        sender: currentUser,
-        text: quoteText ? `${quoteText}\n\n${text}` : text,
-        timestamp: Date.now(),
-        status: "sent"
-      };
-
-      const ref = db.ref(getChatPath()).push();
-      await ref.set(msg);
-      quoteText = "";
-      messageInput.value = "";
-      sendTyping(false);
-
-      // Immediately mark delivered if user is online
-      if (!selectedChat.isGroup) {
-        const statusRef = db.ref(`users/${selectedChat.id}/online`);
-        statusRef.once("value", snap => {
-          if (snap.val()) {
-            ref.update({ status: "delivered" });
-          }
-        });
-      }
+      contextMsgId = id;
+      contextMsg = msg;
+      showContextMenu(e.clientX, e.clientY);
     };
 
-    // Typing indicator
-    messageInput.oninput = () => {
-      sendTyping(true);
-      clearTimeout(typingTimer);
-      typingTimer = setTimeout(() => sendTyping(false), 2000);
-    };
-
-    function sendTyping(isTyping) {
-      if (!selectedChat || selectedChat.isGroup) return;
-      db.ref(`typing/${selectedChat.id}`).set(isTyping ? currentUser : "");
+    // Read/delivery status
+    if (msg.sender !== currentUser && selectedChat && !selectedChat.isGroup) {
+      db.ref(`${getChatPath()}/${id}/status`).set("read");
     }
-
-    // Listen for typing from others
-    db.ref(`typing/${currentUser}`).on("value", snap => {
-      const typer = snap.val();
-      typingEl.classList.toggle("hidden", !typer);
-      if (typer) typingEl.textContent = `${typer} is typing...`;
-    });
-    // File Attachments
-    attachBtn.onclick = () => fileInput.click();
-
-    fileInput.onchange = async () => {
-      const file = fileInput.files[0];
-      if (!file || !selectedChat) return;
-
-      const ref = storage.ref().child(`attachments/${Date.now()}_${file.name}`);
-      await ref.put(file);
-      const url = await ref.getDownloadURL();
-
-      const msg = {
-        sender: currentUser,
-        fileUrl: url,
-        fileName: file.name,
-        timestamp: Date.now()
-      };
-
-      await db.ref(getChatPath()).push(msg);
-    };
-
-    // Delete Message
-    function deleteMessage(id) {
-      const msgRef = db.ref(`${getChatPath()}/${id}`);
-      msgRef.once("value", snap => {
-        const msg = snap.val();
-        if (!msg) return;
-
-        const timeElapsed = Date.now() - msg.timestamp;
-        const canDeleteForEveryone = msg.sender === currentUser && timeElapsed <= 60000;
-
-        const confirmText = canDeleteForEveryone
-          ? "Delete for everyone or just for you?"
-          : "Delete for me only?";
-
-        const confirmed = confirm(confirmText);
-
-        if (confirmed && canDeleteForEveryone) {
-          msgRef.update({
-            text: "🚫 This message was deleted.",
-            fileUrl: null,
-            fileName: null,
-            deleted: true
-          });
-        } else {
-          // Local delete only
-          const bubble = document.querySelector(`[data-id="${id}"]`);
-          if (bubble) bubble.remove();
-        }
-      });
-    }
-
-    // Edit Message
-    function editMessage(id, oldText) {
-      const newText = prompt("Edit your message:", oldText);
-      if (newText && newText.trim() && newText !== oldText) {
-        db.ref(`${getChatPath()}/${id}`).update({
-          text: newText + " (edited)"
-        });
+    if (msg.sender === currentUser) {
+      const ticks = document.createElement("span");
+      ticks.className = "absolute bottom-1 right-2 text-xs";
+      if (msg.status === "read") {
+        ticks.textContent = "✓✓";
+        ticks.classList.add("text-blue-500");
+      } else if (msg.status === "delivered") {
+        ticks.textContent = "✓✓";
+      } else {
+        ticks.textContent = "✓";
       }
+      div.appendChild(ticks);
     }
-
-    // Starred Messages
-    function toggleStar(id, msg) {
-      const ref = db.ref(`stars/${currentUser}/${id}`);
-      ref.once("value", snap => {
-        if (snap.exists()) {
-          ref.remove();
-        } else {
-          ref.set({ ...msg, chatId: getChatPath() });
-        }
-      });
-    }
-
-    // Load starred messages on load
-    db.ref(`stars/${currentUser}`).once("value", snap => {
-      snap.forEach(child => {
-        renderMessage(child.val(), child.key);
-      });
-    });
 
     // Reactions
-    function addReaction(msgId) {
-      const emoji = prompt("React with emoji:");
-      if (!emoji) return;
-      db.ref(`${getChatPath()}/${msgId}/reactions/${currentUser}`).set(emoji);
+    if (msg.reactions) {
+      const reactionBar = document.createElement("div");
+      reactionBar.className = "text-sm mt-1";
+      for (const [user, emoji] of Object.entries(msg.reactions)) {
+        const span = document.createElement("span");
+        span.textContent = emoji;
+        span.className = "mr-1";
+        reactionBar.appendChild(span);
+      }
+      div.appendChild(reactionBar);
     }
 
-    // Blocking a user
-    document.getElementById("blockUser").onclick = () => {
-      if (!selectedChat || selectedChat.isGroup) return;
-      const confirmBlock = confirm(`Block ${selectedChat.id}?`);
-      if (confirmBlock) {
-        db.ref(`blocked/${currentUser}/${selectedChat.id}`).set(true);
-      }
-    };
-
-    // Last Seen & Online Tracking
-    window.addEventListener("beforeunload", () => {
-      db.ref(`users/${currentUser}/lastSeen`).set(Date.now());
+    // Swipe to reply (mobile)
+    let startX = null;
+    div.addEventListener("touchstart", e => {
+      startX = e.touches[0].clientX;
     });
-    db.ref(`users/${currentUser}/online`).set(true);
-    db.ref(`users/${currentUser}/online`).onDisconnect().set(false);
-    db.ref(`users/${currentUser}/lastSeen`).onDisconnect().set(Date.now());
-
-    // Theme Toggling
-    const toggleThemeBtn = document.getElementById("toggleTheme");
-    toggleThemeBtn.onclick = () => {
-      document.documentElement.classList.toggle("dark");
-      localStorage.setItem("theme", document.documentElement.classList.contains("dark") ? "dark" : "light");
-    };
-
-    // Apply saved theme on load
-    if (localStorage.getItem("theme") === "dark") {
-      document.documentElement.classList.add("dark");
-    }
-
-    // Responsive mobile layout fix
-    window.addEventListener("resize", () => {
-      if (window.innerWidth >= 768) {
-        chatListEl.classList.remove("hidden");
-        chatWindowEl.classList.add("md:flex");
+    div.addEventListener("touchend", e => {
+      if (!startX) return;
+      const endX = e.changedTouches[0].clientX;
+      if (endX - startX > 80 && msg.sender !== currentUser) {
+        quoteMessage(msg.text);
       }
+      startX = null;
     });
 
-    // Fix call buttons overlapping send input
-    const callControls = document.getElementById("callControls");
-    callControls.classList.remove("fixed");
-    callControls.classList.add("absolute", "bottom-20", "right-4");
+    messagesEl.appendChild(div);
+    messagesEl.scrollTop = messagesEl.scrollHeight;
 
-    // Adjust for mobile
-    if (window.innerWidth < 768) {
-      chatListEl.classList.remove("hidden");
-      chatWindowEl.classList.add("hidden");
-    }
-
-    backBtn.onclick = () => {
-      chatListEl.classList.remove("hidden");
-      chatWindowEl.classList.add("hidden");
-    };
-    // === Call Buttons ===
-    const audioCallBtn = document.getElementById("audioCallBtn");
-    const videoCallBtn = document.getElementById("videoCallBtn");
-    const callModal = document.getElementById("callModal");
-    const callTitle = document.getElementById("callTitle");
-    const endCallBtn = document.getElementById("endCallBtn");
-    const localVideo = document.getElementById("localVideo");
-    const remoteVideo = document.getElementById("remoteVideo");
-
-    let pc = null;
-    let localStream = null;
-    let remoteStream = null;
-    let isCaller = false;
-
-    const servers = {
-      iceServers: [{ urls: "stun:stun.l.google.com:19302" }]
-    };
-
-    audioCallBtn.onclick = () => startCall(false);
-    videoCallBtn.onclick = () => startCall(true);
-
-    async function startCall(withVideo) {
-      if (!selectedChat || selectedChat.isGroup) {
-        alert("Calls are only supported in private chats.");
-        return;
-      }
-
-      isCaller = true;
-      callModal.classList.remove("hidden");
-      callTitle.textContent = "Calling...";
-
-      localStream = await navigator.mediaDevices.getUserMedia({
-        video: withVideo,
-        audio: true
+    // Push Notification
+    if (msg.sender !== currentUser && document.hidden && Notification.permission === "granted") {
+      new Notification(`New message from ${msg.sender}`, {
+        body: msg.text,
+        icon: "/assets/whatsapp-icon.png"
       });
-
-      localVideo.srcObject = localStream;
-
-      setupPeer();
-      localStream.getTracks().forEach(track => pc.addTrack(track, localStream));
-
-      const offer = await pc.createOffer();
-      await pc.setLocalDescription(offer);
-
-      const callRef = db.ref(`calls/${selectedChat.id}`);
-      callRef.set({
-        from: currentUser,
-        offer: JSON.stringify(offer),
-        video: withVideo
-      });
-
-      const callLog = {
-        with: selectedChat.id,
-        type: withVideo ? "video" : "audio",
-        time: Date.now(),
-        direction: "outgoing"
-      };
-      db.ref(`callsHistory/${currentUser}`).push(callLog);
-
-      callRef.on("value", async snap => {
-  const data = snap.val();
-  if (!data || data.from === currentUser) return;
-
-  try {
-    if (data.answer && pc && pc.signalingState !== "closed") {
-      await pc.setRemoteDescription(new RTCSessionDescription(JSON.parse(data.answer)));
     }
-
-    if (data.candidate && pc && pc.signalingState !== "closed") {
-      await pc.addIceCandidate(new RTCIceCandidate(JSON.parse(data.candidate)));
-    }
-  } catch (err) {
-    console.error("ICE error", err);
   }
-});
 
-    }
-  db.ref(`calls/${currentUser}`).on("child_removed", snap => {
-  if (callHandled || minimized) {
-    endCall("ended");
-    alert("Call ended by the other user.");
+  // Quoting messages (replies)
+  function quoteMessage(text) {
+    quoteText = text;
+    messageInput.value = `> ${text}\n`;
+    messageInput.focus();
   }
-});
 
-    function setupPeer() {
-      pc = new RTCPeerConnection(servers);
-      remoteStream = new MediaStream();
-      remoteVideo.srcObject = remoteStream;
+  // Send Message
+  messageForm.onsubmit = async e => {
+    e.preventDefault();
+    const text = messageInput.value.trim();
+    if (!text || !selectedChat) return;
 
-      pc.ontrack = event => {
-  event.streams[0].getTracks().forEach(track => {
-    remoteStream.addTrack(track);
-  });
-};
+    // Check if blocked
+    const blockedRef = db.ref(`blocked/${selectedChat.id}/${currentUser}`);
+    const blockedSnap = await blockedRef.once("value");
+    if (blockedSnap.exists()) {
+      alert("You are blocked by this user.");
+      return;
+    }
 
+    const msg = {
+      sender: currentUser,
+      text: quoteText ? `${quoteText}\n\n${text}` : text,
+      timestamp: Date.now(),
+      status: "sent"
+    };
 
-      pc.onicecandidate = event => {
-        if (event.candidate) {
-          const ref = db.ref(`calls/${isCaller ? selectedChat.id : currentUser}`);
-          ref.update({ candidate: JSON.stringify(event.candidate) });
+    const ref = db.ref(getChatPath()).push();
+    await ref.set(msg);
+    quoteText = "";
+    messageInput.value = "";
+    sendTyping(false);
+
+    // Delivered if user is online
+    if (!selectedChat.isGroup) {
+      const statusRef = db.ref(`users/${selectedChat.id}/online`);
+      statusRef.once("value", snap => {
+        if (snap.val()) {
+          ref.update({ status: "delivered" });
         }
-      };
+      });
     }
-let callHandled = false;
-let minimized = false;
-let callTimeoutTimer;
+  };
 
-// === Incoming Calls ===
-db.ref(`calls/${currentUser}`).on("value", async snap => {
-  const data = snap.val();
-  if (!data || data.from === currentUser || callHandled || minimized) return;
+  // Typing indicator
+  messageInput.oninput = () => {
+    sendTyping(true);
+    clearTimeout(typingTimer);
+    typingTimer = setTimeout(() => sendTyping(false), 2000);
+  };
 
-  showIncomingPopup(data.from, data.video);
+  function sendTyping(isTyping) {
+    if (!selectedChat || selectedChat.isGroup) return;
+    db.ref(`typing/${selectedChat.id}`).set(isTyping ? currentUser : "");
+  }
 
-  callTimeoutTimer = setTimeout(() => {
-    if (!callHandled) {
-      endCall("timeout");
-      alert("Missed call from " + data.from);
+  // Listen for typing from others
+  db.ref(`typing/${currentUser}`).on("value", snap => {
+    const typer = snap.val();
+    typingEl.classList.toggle("hidden", !typer);
+    if (typer) typingEl.textContent = `${typer} is typing...`;
+  });
+
+  // File Attachments
+  attachBtn.onclick = () => fileInput.click();
+  fileInput.onchange = async () => {
+    const file = fileInput.files[0];
+    if (!file || !selectedChat) return;
+
+    // Basic validation
+    if (file.size > 10 * 1024 * 1024) {
+      alert("File is too large (max 10MB).");
+      return;
     }
-  }, 60000);
-});
 
+    const ref = storage.ref().child(`attachments/${Date.now()}_${file.name}`);
+    await ref.put(file);
+    const url = await ref.getDownloadURL();
 
-function showIncomingPopup(fromUser, isVideo) {
-  callModal.classList.remove("hidden");
-  callTitle.textContent = `${fromUser} is calling...`;
+    const msg = {
+      sender: currentUser,
+      fileUrl: url,
+      fileName: file.name,
+      timestamp: Date.now()
+    };
 
-  // Add accept, reject, and cancel buttons dynamically if needed
-  callModal.innerHTML = `
-    <div class="bg-white p-6 rounded-lg text-center space-y-4 w-full max-w-md mx-auto">
+    await db.ref(getChatPath()).push(msg);
+  };
+
+  // Delete Message
+  function deleteMessage(id) {
+    const msgRef = db.ref(`${getChatPath()}/${id}`);
+    msgRef.once("value", snap => {
+      const msg = snap.val();
+      if (!msg) return;
+      const timeElapsed = Date.now() - msg.timestamp;
+      const canDeleteForEveryone = msg.sender === currentUser && timeElapsed <= 60000;
+      const confirmText = canDeleteForEveryone
+        ? "Delete for everyone or just for you?" : "Delete for me only?";
+      const confirmed = confirm(confirmText);
+      if (confirmed && canDeleteForEveryone) {
+        msgRef.update({
+          text: "🚫 This message was deleted.",
+          fileUrl: null,
+          fileName: null,
+          deleted: true
+        });
+      } else {
+        // Local delete only
+        const bubble = document.querySelector(`[data-id="${id}"]`);
+        if (bubble) bubble.remove();
+      }
+    });
+  }
+
+  // Edit Message
+  function editMessage(id, oldText) {
+    const newText = prompt("Edit your message:", oldText);
+    if (newText && newText.trim() && newText !== oldText) {
+      db.ref(`${getChatPath()}/${id}`).update({
+        text: newText + " (edited)"
+      });
+    }
+  }
+
+  // Starred Messages
+  function toggleStar(id, msg) {
+    const ref = db.ref(`stars/${currentUser}/${id}`);
+    ref.once("value", snap => {
+      if (snap.exists()) {
+        ref.remove();
+      } else {
+        ref.set({ ...msg, chatId: getChatPath() });
+      }
+    });
+  }
+  db.ref(`stars/${currentUser}`).once("value", snap => {
+    snap.forEach(child => {
+      renderMessage(child.val(), child.key);
+    });
+  });
+
+  // Reactions
+  function addReaction(msgId) {
+    const emoji = prompt("React with emoji:");
+    if (!emoji) return;
+    db.ref(`${getChatPath()}/${msgId}/reactions/${currentUser}`).set(emoji);
+  }
+
+  // Blocking a user
+  document.getElementById("blockUser").onclick = () => {
+    if (!selectedChat || selectedChat.isGroup) return;
+    const confirmBlock = confirm(`Block ${selectedChat.id}?`);
+    if (confirmBlock) {
+      db.ref(`blocked/${currentUser}/${selectedChat.id}`).set(true);
+      alert(`${selectedChat.id} has been blocked.`);
+    }
+  };
+
+  // Last Seen & Online Tracking
+  window.addEventListener("beforeunload", () => {
+    db.ref(`users/${currentUser}/lastSeen`).set(Date.now());
+  });
+  db.ref(`users/${currentUser}/online`).set(true);
+  db.ref(`users/${currentUser}/online`).onDisconnect().set(false);
+  db.ref(`users/${currentUser}/lastSeen`).onDisconnect().set(Date.now());
+
+  // Theme Toggling
+  const toggleThemeBtn = document.getElementById("toggleTheme");
+  toggleThemeBtn.onclick = () => {
+    document.documentElement.classList.toggle("dark");
+    localStorage.setItem("theme", document.documentElement.classList.contains("dark") ? "dark" : "light");
+  };
+  if (localStorage.getItem("theme") === "dark") {
+    document.documentElement.classList.add("dark");
+  }
+
+  // Responsive mobile layout fix
+  window.addEventListener("resize", () => {
+    if (window.innerWidth >= 768) {
+      chatListEl.classList.remove("hidden");
+      chatWindowEl.classList.add("md:flex");
+    }
+  });
+
+  // Mobile initial state
+  if (window.innerWidth < 768) {
+    chatListEl.classList.remove("hidden");
+    chatWindowEl.classList.add("hidden");
+  }
+
+  // === Call Buttons ===
+  const audioCallBtn = document.getElementById("audioCallBtn");
+  const videoCallBtn = document.getElementById("videoCallBtn");
+  const callModal = document.getElementById("callModal");
+  const callTitle = document.getElementById("callTitle");
+  const endCallBtn = document.getElementById("endCallBtn");
+  const localVideo = document.getElementById("localVideo");
+  const remoteVideo = document.getElementById("remoteVideo");
+  const callModalContent = document.getElementById("callModalContent");
+
+  let pc = null;
+  let localStream = null;
+  let remoteStream = null;
+  let isCaller = false;
+  let callHandled = false;
+  let minimized = false;
+  let callTimeoutTimer;
+
+  const servers = { iceServers: [{ urls: "stun:stun.l.google.com:19302" }] };
+
+  audioCallBtn.onclick = () => startCall(false);
+  videoCallBtn.onclick = () => startCall(true);
+
+  async function startCall(withVideo) {
+    if (!selectedChat || selectedChat.isGroup) {
+      alert("Calls are only supported in private chats.");
+      return;
+    }
+    isCaller = true;
+    callModal.classList.remove("hidden");
+    callTitle.textContent = "Calling...";
+
+    localStream = await navigator.mediaDevices.getUserMedia({
+      video: withVideo, audio: true
+    });
+    localVideo.srcObject = localStream;
+
+    setupPeer();
+    localStream.getTracks().forEach(track => pc.addTrack(track, localStream));
+
+    const offer = await pc.createOffer();
+    await pc.setLocalDescription(offer);
+
+    const callRef = db.ref(`calls/${selectedChat.id}`);
+    callRef.set({
+      from: currentUser,
+      offer: JSON.stringify(offer),
+      video: withVideo
+    });
+
+    const callLog = {
+      with: selectedChat.id,
+      type: withVideo ? "video" : "audio",
+      time: Date.now(),
+      direction: "outgoing"
+    };
+    db.ref(`callsHistory/${currentUser}`).push(callLog);
+
+    callRef.on("value", async snap => {
+      const data = snap.val();
+      if (!data || data.from === currentUser) return;
+      try {
+        if (data.answer && pc && pc.signalingState !== "closed") {
+          await pc.setRemoteDescription(new RTCSessionDescription(JSON.parse(data.answer)));
+        }
+        if (data.candidate && pc && pc.signalingState !== "closed") {
+          await pc.addIceCandidate(new RTCIceCandidate(JSON.parse(data.candidate)));
+        }
+      } catch (err) {
+        console.error("ICE error", err);
+      }
+    });
+  }
+
+  db.ref(`calls/${currentUser}`).on("child_removed", snap => {
+    if (callHandled || minimized) {
+      endCall("ended");
+      alert("Call ended by the other user.");
+    }
+  });
+
+  function setupPeer() {
+    pc = new RTCPeerConnection(servers);
+    remoteStream = new MediaStream();
+    remoteVideo.srcObject = remoteStream;
+    pc.ontrack = event => {
+      event.streams[0].getTracks().forEach(track => {
+        remoteStream.addTrack(track);
+      });
+    };
+    pc.onicecandidate = event => {
+      if (event.candidate) {
+        const ref = db.ref(`calls/${isCaller ? selectedChat.id : currentUser}`);
+        ref.update({ candidate: JSON.stringify(event.candidate) });
+      }
+    };
+  }
+
+  // Incoming Calls
+  db.ref(`calls/${currentUser}`).on("value", async snap => {
+    const data = snap.val();
+    if (!data || data.from === currentUser || callHandled || minimized) return;
+    showIncomingPopup(data.from, data.video);
+    callTimeoutTimer = setTimeout(() => {
+      if (!callHandled) {
+        endCall("timeout");
+        alert("Missed call from " + data.from);
+      }
+    }, 60000);
+  });
+
+  function showIncomingPopup(fromUser, isVideo) {
+    callModal.classList.remove("hidden");
+    callModalContent.innerHTML = `
       <h3 class="text-xl font-bold">${fromUser} is calling...</h3>
       <div class="flex justify-center gap-4">
         <button id="acceptCall" class="bg-green-500 text-white px-4 py-2 rounded">Accept</button>
         <button id="cancelCall" class="bg-yellow-500 text-white px-4 py-2 rounded">Cancel</button>
         <button id="rejectCall" class="bg-red-600 text-white px-4 py-2 rounded">Reject</button>
       </div>
-    </div>
-  `;
-
-  document.getElementById("acceptCall").onclick = async () => {
-    clearTimeout(callTimeoutTimer);
-    await acceptIncomingCall(fromUser, isVideo);
-  };
-
-  document.getElementById("rejectCall").onclick = () => {
-    clearTimeout(callTimeoutTimer);
-    endCall("rejected");
-  };
-
-  document.getElementById("cancelCall").onclick = () => {
-    callModal.classList.add("hidden");
-    minimized = true; // Still ringing in background
-  };
-}
-  async function acceptIncomingCall(fromUser, withVideo) {
-  callModal.classList.remove("hidden");
-  callTitle.textContent = "In Call...";
-  localStream = await navigator.mediaDevices.getUserMedia({
-    video: withVideo,
-    audio: true
-  });
-  localVideo.srcObject = localStream;
-
-  setupPeer();
-  localStream.getTracks().forEach(track => pc.addTrack(track, localStream));
-
-  const callRef = db.ref(`calls/${currentUser}`);
-  const snap = await callRef.once("value");
-  const data = snap.val();
-  if (!data || !data.offer) return;
-
-  await pc.setRemoteDescription(new RTCSessionDescription(JSON.parse(data.offer)));
-
-  const answer = await pc.createAnswer();
-  await pc.setLocalDescription(answer);
-  callHandled = true;
-
-  await callRef.update({
-    answer: JSON.stringify(answer)
-  });
-
-  // Track ICE candidates
-  callRef.on("value", async snap => {
-    const data = snap.val();
-    if (!data || data.from === currentUser) return;
-    if (data.candidate && pc && pc.signalingState !== "closed") {
-      try {
-        await pc.addIceCandidate(new RTCIceCandidate(JSON.parse(data.candidate)));
-      } catch (err) {
-        console.error("Error adding ICE candidate", err);
-      }
-    }
-  });
-
-  // Log call history
-  const callLog = {
-    with: fromUser,
-    type: withVideo ? "video" : "audio",
-    time: Date.now(),
-    direction: "incoming"
-  };
-  db.ref(`callsHistory/${currentUser}`).push(callLog);
-}
-
-
-    // === End Call ===
-    function endCall(reason = "ended") {
-  callModal.classList.add("hidden");
-  callHandled = false;
-  minimized = false;
-  clearTimeout(callTimeoutTimer);
-
-  if (pc) pc.close();
-  if (localStream) localStream.getTracks().forEach(t => t.stop());
-
-  if (selectedChat) {
-    db.ref(`calls/${selectedChat.id}`).remove();
-  }
-  db.ref(`calls/${currentUser}`).remove();
-
-  if (reason === "rejected" || reason === "timeout") {
-    console.log("Call " + reason);
-  }
-}
-
-    // === Load Call Logs to Console ===
-    db.ref(`callsHistory/${currentUser}`).once("value", snap => {
-      snap.forEach(child => {
-        const log = child.val();
-        console.log(`[${log.direction}] ${log.with} - ${log.type} at ${new Date(log.time).toLocaleTimeString()}`);
-      });
-    });
-    // === Toggle Dark Mode ===
-  
-    // === Block User ===
-    document.getElementById("blockUser").onclick = () => {
-      if (!selectedChat || selectedChat.isGroup) return;
-      const confirmBlock = confirm(`Block ${selectedChat.id}?`);
-      if (!confirmBlock) return;
-      db.ref(`blocked/${currentUser}/${selectedChat.id}`).set(true);
-      alert(`${selectedChat.id} has been blocked.`);
+    `;
+    document.getElementById("acceptCall").onclick = async () => {
+      clearTimeout(callTimeoutTimer);
+      await acceptIncomingCall(fromUser, isVideo);
     };
-
-    // === Starred Messages ===
-    function toggleStar(id, msg) {
-      const ref = db.ref(`stars/${currentUser}/${id}`);
-      ref.once("value", snap => {
-        if (snap.exists()) {
-          ref.remove();
-        } else {
-          ref.set({ ...msg, chatId: getChatPath() });
-        }
-      });
-    }
-
-    // Load Starred Messages on Startup
-    db.ref(`stars/${currentUser}`).once("value", snap => {
-      snap.forEach(child => {
-        renderMessage(child.val(), child.key);
-      });
-    });
-
-    // === React to Message ===
-    function addReaction(msgId) {
-      const emoji = prompt("React with an emoji:");
-      if (!emoji) return;
-      db.ref(`${getChatPath()}/${msgId}/reactions/${currentUser}`).set(emoji);
-    }
-
-    // === Last Seen & Online Update on Exit ===
-    window.addEventListener("beforeunload", () => {
-      db.ref(`users/${currentUser}/lastSeen`).set(Date.now());
-    });
-
-    // Online presence management
-    db.ref(`users/${currentUser}/online`).set(true);
-    db.ref(`users/${currentUser}/online`).onDisconnect().set(false);
-    db.ref(`users/${currentUser}/lastSeen`).onDisconnect().set(Date.now());
-
-  const contextMenu = document.createElement("div");
-contextMenu.id = "contextMenu";
-contextMenu.className = "absolute bg-white border rounded shadow-md text-sm z-50 hidden";
-contextMenu.innerHTML = `
-  <div class="p-2 hover:bg-gray-200 cursor-pointer" data-action="reply">↩️ Reply</div>
-  <div class="p-2 hover:bg-gray-200 cursor-pointer" data-action="edit">✏️ Edit</div>
-  <div class="p-2 hover:bg-gray-200 cursor-pointer" data-action="delete">❌ Delete</div>
-  <div class="p-2 hover:bg-gray-200 cursor-pointer" data-action="react">😊 React</div>
-`;
-document.body.appendChild(contextMenu);
-
-let contextMsgId = null;
-let contextMsg = null;
-
-document.body.addEventListener("click", () => {
-  contextMenu.classList.add("hidden");
-});
-
-contextMenu.onclick = e => {
-  const action = e.target.dataset.action;
-  if (!action || !contextMsgId || !contextMsg) return;
-
-  switch (action) {
-    case "reply":
-      quoteMessage(contextMsg.text);
-      break;
-    case "edit":
-      editMessage(contextMsgId, contextMsg.text);
-      break;
-    case "delete":
-      deleteMessage(contextMsgId);
-      break;
-    case "react":
-      addReaction(contextMsgId);
-      break;
+    document.getElementById("rejectCall").onclick = () => {
+      clearTimeout(callTimeoutTimer);
+      endCall("rejected");
+    };
+    document.getElementById("cancelCall").onclick = () => {
+      callModal.classList.add("hidden");
+      minimized = true;
+    };
   }
 
-  contextMenu.classList.add("hidden");
-};
+  async function acceptIncomingCall(fromUser, withVideo) {
+    callModal.classList.remove("hidden");
+    callModalContent.innerHTML = `
+      <h3 id="callTitle" class="text-xl font-bold">In Call...</h3>
+      <video id="remoteVideo" autoplay playsinline class="bg-black rounded"></video>
+      <video id="localVideo" autoplay playsinline muted class="rounded-full absolute bottom-4 right-4 border-2 border-white"></video>
+      <button id="endCallBtn" class="bg-red-600 text-white px-4 py-2 rounded">End Call</button>
+    `;
+    const localVideo = document.getElementById("localVideo");
+    const remoteVideo = document.getElementById("remoteVideo");
+    localStream = await navigator.mediaDevices.getUserMedia({
+      video: withVideo,
+      audio: true
+    });
+    localVideo.srcObject = localStream;
+    setupPeer();
+    localStream.getTracks().forEach(track => pc.addTrack(track, localStream);
+    );
+    const callRef = db.ref(`calls/${currentUser}`);
+    const snap = await callRef.once("value");
+    const data = snap.val();
+    if (!data || !data.offer) return;
+    await pc.setRemoteDescription(new RTCSessionDescription(JSON.parse(data.offer)));
+    const answer = await pc.createAnswer();
+    await pc.setLocalDescription(answer);
+    callHandled = true;
+    await callRef.update({ answer: JSON.stringify(answer) });
+    callRef.on("value", async snap => {
+      const data = snap.val();
+      if (!data || data.from === currentUser) return;
+      if (data.candidate && pc && pc.signalingState !== "closed") {
+        try {
+          await pc.addIceCandidate(new RTCIceCandidate(JSON.parse(data.candidate)));
+        } catch (err) {
+          console.error("Error adding ICE candidate", err);
+        }
+      }
+    });
+    const callLog = {
+      with: fromUser,
+      type: withVideo ? "video" : "audio",
+      time: Date.now(),
+      direction: "incoming"
+    };
+    db.ref(`callsHistory/${currentUser}`).push(callLog);
+    document.getElementById("endCallBtn").onclick = () => endCall();
+  }
 
+  function endCall(reason = "ended") {
+    callModal.classList.add("hidden");
+    callHandled = false;
+    minimized = false;
+    clearTimeout(callTimeoutTimer);
+    if (pc) pc.close();
+    if (localStream) localStream.getTracks().forEach(t => t.stop());
+    if (selectedChat) db.ref(`calls/${selectedChat.id}`).remove();
+    db.ref(`calls/${currentUser}`).remove();
+    if (reason === "rejected" || reason === "timeout") {
+      console.log("Call " + reason);
+    }
+  }
 
+  // Load Call Logs to Console
+  db.ref(`callsHistory/${currentUser}`).once("value", snap => {
+    snap.forEach(child => {
+      const log = child.val();
+      console.log(`[${log.direction}] ${log.with} - ${log.type} at ${new Date(log.time).toLocaleTimeString()}`);
+    });
+  });
+
+  // Context Menu
+  const contextMenu = document.createElement("div");
+  contextMenu.id = "contextMenu";
+  contextMenu.className = "absolute bg-white border rounded shadow-md text-sm z-50 hidden";
+  contextMenu.innerHTML = `
+    <div class="p-2 hover:bg-gray-200 cursor-pointer" data-action="reply">↩️ Reply</div>
+    <div class="p-2 hover:bg-gray-200 cursor-pointer" data-action="edit">✏️ Edit</div>
+    <div class="p-2 hover:bg-gray-200 cursor-pointer" data-action="delete">❌ Delete</div>
+    <div class="p-2 hover:bg-gray-200 cursor-pointer" data-action="react">😊 React</div>
+  `;
+  document.body.appendChild(contextMenu);
+
+  let contextMsgId = null;
+  let contextMsg = null;
+
+  function showContextMenu(x, y) {
+    contextMenu.style.top = `${y}px`;
+    contextMenu.style.left = `${x}px`;
+    contextMenu.classList.remove("hidden");
+  }
+
+  document.body.addEventListener("click", () => {
+    contextMenu.classList.add("hidden");
+  });
+  window.addEventListener("scroll", () => contextMenu.classList.add("hidden"));
+  window.addEventListener("resize", () => contextMenu.classList.add("hidden"));
+
+  contextMenu.onclick = e => {
+    const action = e.target.dataset.action;
+    if (!action || !contextMsgId || !contextMsg) return;
+    switch (action) {
+      case "reply":
+        quoteMessage(contextMsg.text);
+        break;
+      case "edit":
+        editMessage(contextMsgId, contextMsg.text);
+        break;
+      case "delete":
+        deleteMessage(contextMsgId);
+        break;
+      case "react":
+        addReaction(contextMsgId);
+        break;
+    }
+    contextMenu.classList.add("hidden");
+  };
+
+  // === Group Modal Logic ===
+  createGroupBtn.onclick = () => {
+    groupModal.classList.remove("hidden");
+    groupNameInput.value = "";
+    groupUsers.innerHTML = "";
+    db.ref("users").once("value", snap => {
+      snap.forEach(child => {
+        const username = child.key;
+        if (username === currentUser) return;
+        const div = document.createElement("div");
+        div.className = "flex items-center gap-2 p-1";
+        const checkbox = document.createElement("input");
+        checkbox.type = "checkbox";
+        checkbox.value = username;
+        div.appendChild(checkbox);
+        div.appendChild(document.createTextNode(username));
+        groupUsers.appendChild(div);
+      });
+    });
+  };
+
+  closeModal.onclick = () => groupModal.classList.add("hidden");
+
+  createGroup.onclick = () => {
+    const name = groupNameInput.value.trim();
+    if (!name) return alert("Group name required!");
+    const memberCheckboxes = groupUsers.querySelectorAll("input[type=checkbox]:checked");
+    if (memberCheckboxes.length < 1) return alert("Select at least one member.");
+    const members = { [currentUser]: true };
+    memberCheckboxes.forEach(cb => members[cb.value] = true);
+    const groupId = "group_" + Date.now();
+    db.ref(`groups/${groupId}`).set({
+      id: groupId,
+      name,
+      members
+    });
+    groupModal.classList.add("hidden");
+    openChat(groupId, true, name);
+  };
 </script>
 </body>
 </html>
-   
