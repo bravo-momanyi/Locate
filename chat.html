@@ -29,7 +29,7 @@
       display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
       padding: 0.5rem 1rem; min-height: 56px;
     }
-    #chatTitle { font-size: 1.15rem; font-weight: bold; color: #065f46; }
+    #chatTitle { font-size: 1.15rem; font-weight: bold; color: #065f46; cursor:pointer; }
     #chatSearchBar {
       border-radius: 6px; background: #fff; border: 1px solid #d1d5db;
       padding: 0.25rem 0.75rem; font-size: 1rem; min-width: 160px;
@@ -39,6 +39,8 @@
     .msg-light { background-color: #d4f8e8 !important; color: #222 !important; }
     .msg-dark { background-color: #065f46 !important; color: #fff !important; }
     #contextMenu { min-width: 180px; background: white; border: 1px solid #ddd; position: fixed; z-index: 9999; box-shadow: 0 2px 20px rgba(0,0,0,0.12);}
+    #groupInfoModal { position:fixed; top:0; left:0; right:0; bottom:0; z-index:99999; background:rgba(0,0,0,0.14); display:none; align-items:center; justify-content:center;}
+    #groupInfoContent { background:#fff; padding:2rem; border-radius:0.75rem; min-width:320px; max-width:90vw;}
     @media (max-width:768px) {
       #sidebar { width: 100vw; min-width: 0; max-width: 100vw; position: absolute; left: 0; top: 0; bottom: 0; z-index: 40; }
       #mainContainer { flex-direction: column; }
@@ -46,12 +48,15 @@
       #sidebar.hide { display: none !important; }
       #chatArea.hide { display: none !important; }
       #chatHeader { position: sticky; top: 0; left: 0; width: 100vw; }
+      #groupInfoContent { min-width: 90vw;}
     }
     body.dark, body.dark #sidebar, body.dark #chatArea, body.dark #chatHeader, body.dark #messageForm {
       background: #222 !important; color: #fff !important;
     }
     body.dark .sidebar-header { background: #222 !important; color: #d4f8e8 !important;}
     body.dark .dashboard-btn { background: #065f46 !important; color: #fff !important;}
+    .copy-btn { color:#065f46; background:#d4f8e8; border-radius:6px; padding:2px 8px; font-size:15px; margin-left:3px;}
+    .copy-btn:hover { background:#065f46; color:#fff;}
   </style>
 </head>
 <body class="bg-white text-black transition-colors duration-300">
@@ -105,10 +110,23 @@
     </form>
   </main>
 </div>
+<!-- Group Info Modal -->
+<div id="groupInfoModal">
+  <div id="groupInfoContent"></div>
+</div>
+<!-- Group Create Modal -->
 <div id="groupModal" class="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center hidden z-40">
   <div class="bg-white p-4 rounded-lg w-96 space-y-4">
     <h3 class="text-lg font-bold">Create Group</h3>
     <input type="text" id="groupName" class="w-full border px-3 py-2 rounded" placeholder="Group Name" />
+    <div class="flex gap-2 items-center">
+      <label class="font-semibold">Type:</label>
+      <button id="publicBtn" class="px-2 py-1 bg-emerald-100 rounded border">Public</button>
+      <button id="privateBtn" class="px-2 py-1 bg-red-100 rounded border">Private</button>
+    </div>
+    <div id="privateFields" style="display:none;">
+      <label>Password: <input type="text" id="groupPassword" class="border rounded px-2 py-1" placeholder="Set password" /></label>
+    </div>
     <div id="groupUsers" class="max-h-40 overflow-y-auto space-y-2"></div>
     <div class="flex justify-end gap-2">
       <button id="createGroup" class="bg-blue-600 text-white px-4 py-2 rounded">Create</button>
@@ -132,7 +150,6 @@
   const db = firebase.database();
   const storage = firebase.storage();
 
-  // User info and header
   const currentUser = sessionStorage.getItem('username') || localStorage.getItem('username');
   if (!currentUser) { alert('Session expired'); location.href = 'index.html'; }
   document.getElementById('welcomeUserSidebar').textContent = currentUser;
@@ -153,6 +170,10 @@
   const chatWindowEl = document.getElementById("chatArea");
   const createGroupBtn = document.getElementById("createGroupBtn");
   const groupModal = document.getElementById("groupModal");
+  const publicBtn = document.getElementById("publicBtn");
+  const privateBtn = document.getElementById("privateBtn");
+  const privateFields = document.getElementById("privateFields");
+  const groupPasswordEl = document.getElementById("groupPassword");
   const closeModal = document.getElementById("closeModal");
   const groupNameInput = document.getElementById("groupName");
   const groupUsers = document.getElementById("groupUsers");
@@ -164,11 +185,15 @@
   const audioCallBtn = document.getElementById("audioCallBtn");
   const videoCallBtn = document.getElementById("videoCallBtn");
   const contextMenu = document.getElementById("contextMenu");
+  const groupInfoModal = document.getElementById("groupInfoModal");
+  const groupInfoContent = document.getElementById("groupInfoContent");
 
   let selectedChat = null, typingTimer, quoteText = "";
   let allUsers = {}, allGroups = {}, recentsData = [];
   let messagesListener = null;
   let allMessages = [];
+  let groupType = "public";
+  let lastGroupPassword = "";
 
   // --- Theme ---
   function setTheme(theme) {
@@ -217,7 +242,7 @@
     db.ref("groups").once("value", snapshot => {
       allGroups = snapshot.val() || {};
       Object.values(allGroups).forEach(group => {
-        if (!group.members || !group.members[currentUser]) return;
+        // Show all groups. Joining handled in openChat.
         const li = document.createElement("li");
         li.className = "p-3 hover:bg-green-100 cursor-pointer text-green-700 font-semibold flex justify-between items-center";
         li.innerHTML = `<span># ${group.name}</span><span class="badge badge-green" id="badge-group-${group.id}">0</span>`;
@@ -229,7 +254,6 @@
   }
   db.ref("groups").on("value", refreshGroupList);
 
-  // --- Recents, filtering, etc. ---
   function loadRecents() {
     recentsData = [];
     db.ref("messages").once("value").then(snapshot => {
@@ -321,19 +345,36 @@
       email: allUsers[u]?.email || "",
       phone: allUsers[u]?.phone || ""
     }));
-    filterList(groupList, Object.values(allGroups).filter(g => g.members && g.members[currentUser]), g => ({
+    filterList(groupList, Object.values(allGroups), g => ({
       name: g.name || g.id, email: "", phone: ""
     }));
   }
   sidebarSearch.oninput = filterSidebarLists;
 
-  // --- Back Button ---
   function showSidebar() {
     chatListEl.classList.remove("hide");
     chatWindowEl.classList.add("hide");
   }
   backBtn.onclick = showSidebar;
 
+  // --- Group Chat Join/Password/Info ---
+  function promptGroupJoin(group) {
+    if (group.type === "private" && !group.members?.[currentUser]) {
+      const pwd = prompt("This is a private group. Enter password to join:");
+      if (pwd !== group.password) { alert("Wrong password."); return false; }
+      // Add user to group
+      db.ref(`groups/${group.id}/members/${currentUser}`).set(true);
+      alert("You have joined this group!");
+      return true;
+    }
+    if (!group.members?.[currentUser]) {
+      if (!confirm("Join this group?")) return false;
+      db.ref(`groups/${group.id}/members/${currentUser}`).set(true);
+      alert("You have joined this group!");
+      return true;
+    }
+    return true;
+  }
   // --- Block/Unblock logic and enforcement ---
   async function isBlocked(otherUser) {
     const userBlockedSnap = await db.ref(`blocked/${currentUser}/${otherUser}`).once("value");
@@ -389,7 +430,6 @@
     }
   };
 
-  // --- Messaging and Group Messaging ---
   function getChatPath() {
     if (!selectedChat) return "";
     if (selectedChat.isGroup) return `groupMessages/${selectedChat.id}`;
@@ -400,28 +440,29 @@
   // --- Open Chat ---
   async function openChat(id, isGroup = false, groupName = "") {
     selectedChat = { id, isGroup, groupName };
-    chatTitle.textContent = isGroup ? `# ${groupName || id}` : allUsers[id]?.name || id;
-    messagesEl.innerHTML = "";
     allMessages = [];
-
+    messagesEl.innerHTML = "";
     if (messagesListener) messagesListener.off();
 
-    // Set up listeners for chat status (last seen, etc.)
-    if (!isGroup) {
-      db.ref(`users/${id}/lastSeen`).on("value", snap => {
-        const val = snap.val();
-        if (!val) return;
-        chatTitle.title = `last seen ${new Date(val).toLocaleTimeString()}`;
-      });
+    if (isGroup) {
+      const group = allGroups[id];
+      if (!group) return alert("Group not found.");
+      // Handle join logic
+      if (!group.members || !group.members[currentUser]) {
+        const joined = promptGroupJoin(group);
+        if (!joined) { showSidebar(); return; }
+      }
+      chatTitle.textContent = `# ${group.name}`;
+      lastGroupPassword = group.password || "";
+      chatTitle.onclick = () => showGroupInfoModal(group);
     } else {
-      chatTitle.title = "Group";
+      chatTitle.textContent = allUsers[id]?.name || id;
+      chatTitle.onclick = null;
     }
     showChatArea();
     await updateBlockButton();
 
     const path = getChatPath();
-
-    // Fetch all messages, sort, and render
     db.ref(path).once("value", snap => {
       allMessages = [];
       snap.forEach(child => {
@@ -433,13 +474,11 @@
       renderMessagesFiltered(chatSearchBar.value);
     });
 
-    // Attach listeners for live updates
     messagesListener = db.ref(path);
     messagesListener.off();
     messagesListener.on("child_added", snap => {
       const msg = snap.val();
       msg._id = snap.key;
-      // Prevent duplicate (by _id) and always preserve order
       if (!allMessages.find(m => m._id === msg._id)) {
         allMessages.push(msg);
         allMessages.sort((a, b) => a.timestamp - b.timestamp);
@@ -461,8 +500,6 @@
       renderMessagesFiltered(chatSearchBar.value);
     });
   }
-
-  // --- Real time search/filter messages ---
   chatSearchBar.oninput = () => renderMessagesFiltered(chatSearchBar.value);
   function renderMessagesFiltered(query) {
     messagesEl.innerHTML = "";
@@ -475,6 +512,40 @@
       .forEach(msg => renderMessage(msg, msg._id));
   }
 
+  // --- Group Info Modal ---
+  function showGroupInfoModal(group) {
+    let html = `<h2 class="text-xl font-bold mb-2">${group.name}</h2>`;
+    html += `<div class="mb-2">Type: <strong>${group.type || "public"}</strong></div>`;
+    if (group.type === "private" && group.password) {
+      html += `<div class="mb-2">Password: <span id="groupPwdText">${group.password}</span>
+        <button class="copy-btn" onclick="navigator.clipboard.writeText('${group.password}')">Copy</button></div>`;
+    }
+    html += `<div class="mb-2">Members:</div><ul>`;
+    for (const member in group.members) {
+      html += `<li class="pl-2">${member}</li>`;
+    }
+    html += `</ul>`;
+    html += `<div class="mt-4 flex gap-2">
+      <button id="leaveGroupBtn" class="bg-red-500 text-white px-4 py-2 rounded">Leave Group</button>
+      <button id="closeInfoBtn" class="bg-gray-500 text-white px-4 py-2 rounded">Close</button>
+    </div>`;
+    groupInfoContent.innerHTML = html;
+    groupInfoModal.style.display = "flex";
+    document.getElementById("closeInfoBtn").onclick = () => groupInfoModal.style.display = "none";
+    document.getElementById("leaveGroupBtn").onclick = async () => {
+      await db.ref(`groups/${group.id}/members/${currentUser}`).remove();
+      groupInfoModal.style.display = "none";
+      showSidebar();
+      alert("You have left this group.");
+    };
+  }
+
+  window.showGroupInfoModal = showGroupInfoModal; // for inline button
+
+  groupInfoModal.onclick = (e) => {
+    if (e.target === groupInfoModal) groupInfoModal.style.display = "none";
+  };
+
   // --- Context Menu ---
   let contextMsgId = null, contextMsg = null, contextMenuOpen = false;
   function showContextMenu(actions, x, y) {
@@ -485,7 +556,6 @@
     contextMenu.innerHTML = menuHtml;
     contextMenu.classList.remove("hidden");
     contextMenuOpen = true;
-    // Position context menu always inside screen
     const menuWidth = 180, menuHeight = 40 * actions.length, padding = 8;
     let left = x, top = y;
     if (left + menuWidth > window.innerWidth) left = window.innerWidth - menuWidth - padding;
@@ -527,7 +597,6 @@
     db.ref(`${getChatPath()}/${msgId}/reactions/${currentUser}`).set(emoji);
   }
   function deleteForMe(id) {
-    // Just remove from DOM; not from Firebase
     const bubble = document.querySelector(`[data-id="${id}"]`);
     if (bubble) bubble.remove();
   }
@@ -597,13 +666,14 @@
       }
       div.appendChild(ticks);
     }
+    // Reactions bar
     if (msg.reactions) {
       const reactionBar = document.createElement("div");
-      reactionBar.className = "text-sm mt-1";
+      reactionBar.className = "flex gap-1 mt-1";
       for (const [user, emoji] of Object.entries(msg.reactions)) {
         const span = document.createElement("span");
         span.textContent = emoji;
-        span.className = "mr-1";
+        span.className = "inline-block px-2 py-1 rounded bg-gray-200 dark:bg-gray-700 text-lg";
         reactionBar.appendChild(span);
       }
       div.appendChild(reactionBar);
@@ -669,12 +739,10 @@
   audioCallBtn.onclick = async () => {
     if (!selectedChat || selectedChat.isGroup) { alert("Calls are only supported in private chats."); return; }
     if (await enforceBlock()) { alert("You or the other user have blocked each other. Calls are not allowed."); return; }
-    //startCall(false);
   };
   videoCallBtn.onclick = async () => {
     if (!selectedChat || selectedChat.isGroup) { alert("Calls are only supported in private chats."); return; }
     if (await enforceBlock()) { alert("You or the other user have blocked each other. Calls are not allowed."); return; }
-    //startCall(true);
   };
 
   attachBtn.onclick = () => fileInput.click();
@@ -689,9 +757,13 @@
     await db.ref(getChatPath()).push(msg);
   };
 
+  // --- Create Group Modal Logic ---
   createGroupBtn.onclick = () => {
     groupModal.classList.remove("hidden");
     groupNameInput.value = "";
+    groupPasswordEl.value = "";
+    groupType = "public";
+    privateFields.style.display = "none";
     groupUsers.innerHTML = "";
     db.ref("users").once("value", snap => {
       const usersObj = snap.val();
@@ -709,16 +781,26 @@
       });
     });
   };
+  publicBtn.onclick = () => {
+    groupType = "public";
+    privateFields.style.display = "none";
+  };
+  privateBtn.onclick = () => {
+    groupType = "private";
+    privateFields.style.display = "block";
+  };
   closeModal.onclick = () => groupModal.classList.add("hidden");
   createGroup.onclick = () => {
     const name = groupNameInput.value.trim();
     if (!name) return alert("Group name required!");
     const memberCheckboxes = groupUsers.querySelectorAll("input[type=checkbox]:checked");
     if (memberCheckboxes.length < 1) return alert("Select at least one member.");
+    let password = groupType === "private" ? groupPasswordEl.value.trim() : "";
+    if (groupType === "private" && !password) return alert("Password required for private group.");
     const members = { [currentUser]: true };
     memberCheckboxes.forEach(cb => members[cb.value] = true);
     const groupId = "group_" + Date.now();
-    db.ref(`groups/${groupId}`).set({ id: groupId, name, members });
+    db.ref(`groups/${groupId}`).set({ id: groupId, name, type: groupType, password, members });
     groupModal.classList.add("hidden");
     openChat(groupId, true, name);
   };
