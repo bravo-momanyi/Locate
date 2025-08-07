@@ -830,6 +830,54 @@
       deleted: true
     });
   }
+  async function enforceBlock() {
+  if (!selectedChat || selectedChat.isGroup) return false;
+  const otherUser = selectedChat.id;
+  const userBlockedSnap = await db.ref(`blocked/${currentUser}/${otherUser}`).once("value");
+  const otherBlockedSnap = await db.ref(`blocked/${otherUser}/${currentUser}`).once("value");
+  return userBlockedSnap.exists() || otherBlockedSnap.exists();
+}
+  function setReplyTag(msg, id) {
+  replyTag = { id, text: msg.text };
+  // If you have a tagReplyBar, show the reply tag above input
+  let tagBar = document.getElementById("tagReplyBar");
+  if (tagBar) {
+    tagBar.innerHTML = `<div class="input-tag-bar">
+      <span>Replying to: ${msg.text.slice(0,60)}${msg.text.length>60?'...':''}</span>
+      <span class="remove-tag" onclick="removeReplyTag()">×</span>
+    </div>`;
+    window.removeReplyTag = function() {
+      replyTag = null;
+      tagBar.innerHTML = '';
+    };
+  }
+}
+  function showGroupInfoModal(group) {
+  let html = `<h2 class="text-xl font-bold mb-2">${group.name}</h2>`;
+  html += `<div class="mb-2">Type: <strong>${group.type || "public"}</strong></div>`;
+  if (group.type === "private" && group.password) {
+    html += `<div class="mb-2">Password: <span id="groupPwdText">${group.password}</span>
+      <button class="copy-btn" onclick="navigator.clipboard.writeText('${group.password}')">Copy</button></div>`;
+  }
+  html += `<div class="mb-2">Members:</div><ul>`;
+  for (const member in group.members) {
+    html += `<li class="pl-2">${member}</li>`;
+  }
+  html += `</ul>`;
+  html += `<div class="mt-4 flex gap-2">
+    <button id="leaveGroupBtn" class="bg-red-500 text-white px-4 py-2 rounded">Leave Group</button>
+    <button id="closeInfoBtn" class="bg-gray-500 text-white px-4 py-2 rounded">Close</button>
+  </div>`;
+  groupInfoContent.innerHTML = html;
+  groupInfoModal.style.display = "flex";
+  document.getElementById("closeInfoBtn").onclick = () => groupInfoModal.style.display = "none";
+  document.getElementById("leaveGroupBtn").onclick = async () => {
+    await db.ref(`groups/${group.id}/members/${currentUser}`).remove();
+    groupInfoModal.style.display = "none";
+    showSidebar();
+    alert("You have left this group.");
+  };
+}
 
 </script>
 </body>
