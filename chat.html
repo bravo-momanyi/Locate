@@ -445,6 +445,26 @@
   let typingListener = null;
   let onlineListener = null;
   let lastSeenListener = null;
+  async function updateBlockButton() {
+  if (!selectedChat || selectedChat.isGroup) {
+    blockUserBtn.textContent = "🚫 Block";
+    blockUserBtn.disabled = true;
+    return;
+  }
+  const otherUser = selectedChat.id;
+  const userBlockedSnap = await db.ref(`blocked/${currentUser}/${otherUser}`).once("value");
+  const otherBlockedSnap = await db.ref(`blocked/${otherUser}/${currentUser}`).once("value");
+  if (userBlockedSnap.exists()) {
+    blockUserBtn.textContent = "✅ Unblock";
+    blockUserBtn.disabled = false;
+  } else if (otherBlockedSnap.exists()) {
+    blockUserBtn.textContent = "🚫 Blocked";
+    blockUserBtn.disabled = false;
+  } else {
+    blockUserBtn.textContent = "🚫 Block";
+    blockUserBtn.disabled = false;
+  }
+}
 
   async function openChat(id, isGroup = false, groupName = "") {
     selectedChat = { id, isGroup, groupName };
