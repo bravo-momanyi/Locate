@@ -34,6 +34,23 @@
       padding: 0.25rem 0.75rem; font-size: 1rem; min-width: 160px;
       margin-left:16px;
     }
+    #onlineIndicator {
+      font-size: 0.96em;
+      margin-left: 8px;
+      color: #059669;
+      font-weight: bold;
+    }
+    #lastSeenIndicator {
+      font-size: 0.85em;
+      margin-left: 8px;
+      color: #64748b;
+    }
+    #typingIndicator {
+      font-size: 0.96em;
+      margin-left: 8px;
+      color: #065f46;
+      font-style: italic;
+    }
     #messages { flex: 1; overflow-y: auto; padding: 1rem; background: #fff; }
     #messageForm { position: sticky; bottom: 0; background: #f3f4f6; }
     .msg-light { background-color: #d4f8e8 !important; color: #222 !important; }
@@ -41,6 +58,32 @@
     #contextMenu { min-width: 180px; background: white; border: 1px solid #ddd; position: fixed; z-index: 9999; box-shadow: 0 2px 20px rgba(0,0,0,0.12);}
     #groupInfoModal { position:fixed; top:0; left:0; right:0; bottom:0; z-index:99999; background:rgba(0,0,0,0.14); display:none; align-items:center; justify-content:center;}
     #groupInfoContent { background:#fff; padding:2rem; border-radius:0.75rem; min-width:320px; max-width:90vw;}
+    .date-sticky {
+      position: sticky;
+      top: 56px;
+      z-index: 10;
+      background: #e2e8f0;
+      text-align: center;
+      padding: 4px 0 4px 0;
+      border-radius: 8px;
+      font-size: 0.95rem;
+      font-weight: bold;
+      margin-bottom: 0.5rem;
+      color: #065f46;
+    }
+    .loading-date {
+      position: sticky;
+      top: 56px;
+      z-index: 12;
+      background: #f0fdfa;
+      text-align: center;
+      padding: 7px 0 7px 0;
+      border-radius: 8px;
+      font-size: 1.05rem;
+      font-weight: bold;
+      margin-bottom: 0.5rem;
+      color: #0e7490;
+    }
     @media (max-width:768px) {
       #sidebar { width: 100vw; min-width: 0; max-width: 100vw; position: absolute; left: 0; top: 0; bottom: 0; z-index: 40; }
       #mainContainer { flex-direction: column; }
@@ -93,11 +136,12 @@
       <div class="flex items-center gap-2">
         <button id="backBtn" class="text-blue-600 pr-2 md:hidden">&larr;</button>
         <span id="chatTitle"></span>
+        <span id="onlineIndicator"></span>
+        <span id="typingIndicator"></span>
+        <span id="lastSeenIndicator"></span>
         <input id="chatSearchBar" placeholder="Search messages..." />
       </div>
       <div class="flex items-center gap-2">
-        <button id="audioCallBtn" class="bg-green-500 text-white px-3 py-1 rounded text-sm shadow">📞</button>
-        <button id="videoCallBtn" class="bg-blue-600 text-white px-3 py-1 rounded text-sm shadow">🎥</button>
         <button id="blockUser" class="text-sm text-red-500 ml-2">🚫</button>
       </div>
     </div>
@@ -136,7 +180,7 @@
 </div>
 <div id="contextMenu" class="hidden"></div>
 <script>
-  // Firebase config (unchanged)
+  // Firebase config and variable setup unchanged...
   const firebaseConfig = {
     apiKey: "AIzaSyBfkUJS81minjxj0DFz4pzNnGzCtb5ZJss",
     authDomain: "locater-42fb4.firebaseapp.com",
@@ -182,8 +226,6 @@
   const toggleThemeBtn = document.getElementById("toggleTheme");
   const dashboardBtn = document.getElementById("dashboardBtn");
   const sidebarSearch = document.getElementById("sidebarSearch");
-  const audioCallBtn = document.getElementById("audioCallBtn");
-  const videoCallBtn = document.getElementById("videoCallBtn");
   const contextMenu = document.getElementById("contextMenu");
   const groupInfoModal = document.getElementById("groupInfoModal");
   const groupInfoContent = document.getElementById("groupInfoContent");
@@ -220,7 +262,6 @@
   setTheme(localStorage.getItem("theme") || "light");
   dashboardBtn.onclick = () => window.location.href = "app.html";
 
-  // -- Date & Time formatting --
   function formatDate(ts) {
     if (!ts) return '';
     const d = new Date(ts);
@@ -275,6 +316,7 @@
   }
   db.ref("groups").on("value", refreshGroupList);
 
+  // --- Recents with deduplication ---
   function loadRecents() {
     recentsData = [];
     const seenChats = {};
@@ -290,6 +332,7 @@
             if (msg.sender !== currentUser && msg.status !== "read") unreadCount++;
           });
           const otherUser = users.find(u => u !== currentUser);
+          // Deduplicate: Only add once per chat
           if (otherUser && !seenChats[otherUser]) {
             recentsData.push({
               type: "user",
@@ -332,6 +375,7 @@
       });
     });
   }
+
   function renderRecents() {
     recentsList.innerHTML = "";
     recentsData.forEach(item => {
@@ -397,75 +441,50 @@
     }
     return true;
   }
-  async function isBlocked(otherUser) {
-    const userBlockedSnap = await db.ref(`blocked/${currentUser}/${otherUser}`).once("value");
-    const otherBlockedSnap = await db.ref(`blocked/${otherUser}/${currentUser}`).once("value");
-    return userBlockedSnap.exists() || otherBlockedSnap.exists();
-  }
-  async function updateBlockButton() {
-    if (!selectedChat || selectedChat.isGroup) {
-      blockUserBtn.textContent = "🚫 Block";
-      blockUserBtn.disabled = true;
-      return;
-    }
-    const otherUser = selectedChat.id;
-    const userBlockedSnap = await db.ref(`blocked/${currentUser}/${otherUser}`).once("value");
-    const otherBlockedSnap = await db.ref(`blocked/${otherUser}/${currentUser}`).once("value");
-    if (userBlockedSnap.exists()) {
-      blockUserBtn.textContent = "✅ Unblock";
-      blockUserBtn.disabled = false;
-    } else if (otherBlockedSnap.exists()) {
-      blockUserBtn.textContent = "🚫 Blocked";
-      blockUserBtn.disabled = false;
-    } else {
-      blockUserBtn.textContent = "🚫 Block";
-      blockUserBtn.disabled = false;
-    }
-  }
-  async function enforceBlock() {
-    if (!selectedChat || selectedChat.isGroup) return false;
-    const otherUser = selectedChat.id;
-    const userBlockedSnap = await db.ref(`blocked/${currentUser}/${otherUser}`).once("value");
-    const otherBlockedSnap = await db.ref(`blocked/${otherUser}/${currentUser}`).once("value");
-    return userBlockedSnap.exists() || otherBlockedSnap.exists();
-  }
-  blockUserBtn.onclick = async () => {
-    if (!selectedChat || selectedChat.isGroup) return;
-    const otherUser = selectedChat.id;
-    const userBlockedSnap = await db.ref(`blocked/${currentUser}/${otherUser}`).once("value");
-    const otherBlockedSnap = await db.ref(`blocked/${otherUser}/${currentUser}`).once("value");
-    if (userBlockedSnap.exists()) {
-      if (confirm(`Unblock ${otherUser}?`)) {
-        await db.ref(`blocked/${currentUser}/${otherUser}`).remove();
-        alert(`${otherUser} has been unblocked.`);
-        updateBlockButton();
-      }
-    } else if (otherBlockedSnap.exists()) {
-      alert(`You are blocked by ${otherUser}. You cannot message or call them.`);
-    } else {
-      if (confirm(`Block ${otherUser}?`)) {
-        await db.ref(`blocked/${currentUser}/${otherUser}`).set(true);
-        alert(`${otherUser} has been blocked.`);
-        updateBlockButton();
-      }
-    }
-  };
 
-  function getChatPath() {
-    if (!selectedChat) return "";
-    if (selectedChat.isGroup) return `groupMessages/${selectedChat.id}`;
-    const ids = [currentUser, selectedChat.id].sort();
-    return `messages/${ids[0]}_${ids[1]}`;
-  }
+  let typingListener = null;
+  let onlineListener = null;
+  let lastSeenListener = null;
 
   async function openChat(id, isGroup = false, groupName = "") {
     selectedChat = { id, isGroup, groupName };
     allMessages = [];
     messagesEl.innerHTML = "";
     if (messagesListener) messagesListener.off();
+    if (typingListener) typingListener.off();
+    if (onlineListener) onlineListener.off();
+    if (lastSeenListener) lastSeenListener.off();
 
-    audioCallBtn.disabled = isGroup;
-    videoCallBtn.disabled = isGroup;
+    // Online/Last seen/Typing indicators for 1:1
+    if (!isGroup) {
+      const otherUser = id;
+      // Online
+      onlineListener = db.ref(`users/${otherUser}/online`);
+      onlineListener.on("value", snap => {
+        document.getElementById("onlineIndicator").textContent = snap.val() ? "Online" : "";
+      });
+      // Last seen
+      lastSeenListener = db.ref(`users/${otherUser}/lastSeen`);
+      lastSeenListener.on("value", snap => {
+        const v = snap.val();
+        if (!v) {
+          document.getElementById("lastSeenIndicator").textContent = "";
+          return;
+        }
+        const d = new Date(v);
+        document.getElementById("lastSeenIndicator").textContent = "Last seen " + d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
+      });
+      // Typing
+      typingListener = db.ref(`typing/${currentUser}`);
+      typingListener.on("value", snap => {
+        const typ = snap.val();
+        document.getElementById("typingIndicator").textContent = (typ === otherUser) ? "Typing..." : "";
+      });
+    } else {
+      document.getElementById("onlineIndicator").textContent = "";
+      document.getElementById("lastSeenIndicator").textContent = "";
+      document.getElementById("typingIndicator").textContent = "";
+    }
 
     if (isGroup) {
       const group = allGroups[id];
@@ -485,6 +504,9 @@
     await updateBlockButton();
 
     const path = getChatPath();
+    // Loading date bar
+    messagesEl.innerHTML = `<div class="loading-date">${formatDate(Date.now())}</div>`;
+
     db.ref(path).once("value", snap => {
       if (!snap.exists()) {
         messagesEl.innerHTML = "<div class='text-gray-500 text-center'>No messages yet.</div>";
@@ -497,6 +519,17 @@
         allMessages.push(msg);
       });
       allMessages.sort((a, b) => a.timestamp - b.timestamp);
+
+      // DEDUPLICATE: In private chats, remove any message that is a received duplicate of a sent one
+      if (!isGroup) {
+        const seen = {};
+        allMessages = allMessages.filter(msg => {
+          if (msg.sender !== currentUser && seen[msg.text + msg.timestamp]) return false;
+          seen[msg.text + msg.timestamp] = true;
+          return true;
+        });
+      }
+
       renderMessagesFiltered(chatSearchBar.value);
     });
 
@@ -505,7 +538,11 @@
     messagesListener.on("child_added", snap => {
       const msg = snap.val();
       msg._id = snap.key;
+      // Deduplicate in real time 1:1
       if (!allMessages.find(m => m._id === msg._id)) {
+        if (!isGroup && msg.sender !== currentUser) {
+          if (allMessages.some(m => m.text === msg.text && m.timestamp === msg.timestamp && m.sender === currentUser)) return;
+        }
         allMessages.push(msg);
         allMessages.sort((a, b) => a.timestamp - b.timestamp);
         renderMessagesFiltered(chatSearchBar.value);
@@ -526,6 +563,14 @@
       renderMessagesFiltered(chatSearchBar.value);
     });
   }
+
+  function getChatPath() {
+    if (!selectedChat) return "";
+    if (selectedChat.isGroup) return `groupMessages/${selectedChat.id}`;
+    const ids = [currentUser, selectedChat.id].sort();
+    return `messages/${ids[0]}_${ids[1]}`;
+  }
+
   chatSearchBar.oninput = () => renderMessagesFiltered(chatSearchBar.value);
 
   function renderMessagesFiltered(query) {
@@ -559,24 +604,7 @@
     const div = document.createElement("div");
     div.dataset.id = id;
     div.className = `relative max-w-xs px-4 py-2 rounded shadow text-sm break-words ${lightBg} ${isSender ? "ml-auto" : ""}`;
-
-    // Reply tag if present
-    if (msg.replyTo) {
-      const replyDiv = document.createElement("div");
-      replyDiv.className = "reply-tag";
-      replyDiv.textContent = msg.replyText || "Replied message";
-      replyDiv.onclick = () => {
-        const el = document.querySelector(`[data-id="${msg.replyTo}"]`);
-        if (el) {
-          el.scrollIntoView({ behavior: "smooth", block: "center" });
-          el.classList.add("ring", "ring-blue-500");
-          setTimeout(()=>el.classList.remove("ring","ring-blue-500"), 1200);
-        }
-      };
-      div.appendChild(replyDiv);
-    }
-
-    div.innerHTML += msg.text || (msg.fileUrl ? `<a href="${msg.fileUrl}" target="_blank" class="underline text-blue-700">${msg.fileName}</a>` : "");
+    div.innerHTML = msg.text || (msg.fileUrl ? `<a href="${msg.fileUrl}" target="_blank" class="underline text-blue-700">${msg.fileName}</a>` : "");
 
     function getMenuActions() {
       const actions = [{ label: "Reply", action: "reply" }];
@@ -592,64 +620,12 @@
       actions.push({ label: "React", action: "react" });
       return actions;
     }
-
-    // Right click context menu
     div.oncontextmenu = e => {
       e.preventDefault();
       contextMsgId = id;
       contextMsg = msg;
       showContextMenu(getMenuActions(), e.clientX, e.clientY);
     };
-    let startX = null;
-    div.addEventListener("touchstart", e => { startX = e.touches[0].clientX; });
-    div.addEventListener("touchend", e => {
-      if (!startX) return;
-      const endX = e.changedTouches[0].clientX;
-      if (startX !== null && endX - startX > 60) {
-        setReplyTag(msg, id);
-      }
-      startX = null;
-    });
-
-    let longPressTimer;
-    div.addEventListener("touchstart", e => {
-      longPressTimer = setTimeout(() => {
-        contextMsgId = id;
-        contextMsg = msg;
-        showContextMenu(getMenuActions(), e.touches[0].clientX, e.touches[0].clientY);
-      }, 400);
-    });
-    div.addEventListener("touchend", () => clearTimeout(longPressTimer));
-    div.addEventListener("touchmove", () => clearTimeout(longPressTimer));
-    if (msg.sender !== currentUser && selectedChat && !selectedChat.isGroup) {
-      db.ref(`${getChatPath()}/${id}/status`).set("read");
-    }
-    if (isSender) {
-      const ticks = document.createElement("span");
-      ticks.className = "absolute bottom-1 right-2 text-xs";
-      if (msg.status === "read") {
-        ticks.textContent = "✓✓";
-        ticks.classList.add("text-green-700");
-      } else if (msg.status === "delivered") {
-        ticks.textContent = "✓✓";
-      } else {
-        ticks.textContent = "✓";
-      }
-      div.appendChild(ticks);
-    }
-    // Reactions bar
-    if (msg.reactions) {
-      const reactionBar = document.createElement("div");
-      reactionBar.className = "flex gap-1 mt-1";
-      for (const [user, emoji] of Object.entries(msg.reactions)) {
-        const span = document.createElement("span");
-        span.textContent = emoji;
-        span.className = "inline-block px-2 py-1 rounded bg-gray-200 dark:bg-gray-700 text-lg";
-        reactionBar.appendChild(span);
-      }
-      div.appendChild(reactionBar);
-    }
-
     // Message time
     const timeDiv = document.createElement("div");
     timeDiv.className = "text-xs text-gray-500 mt-1";
@@ -664,18 +640,6 @@
         icon: "/assets/whatsapp-icon.png"
       });
     }
-  }
-
-  function setReplyTag(msg, id) {
-    replyTag = { id, text: msg.text };
-    document.getElementById("tagReplyBar").innerHTML = `<div class="input-tag-bar">
-      <span>Replying to: ${msg.text.slice(0,60)}${msg.text.length>60?'...':''}</span>
-      <span class="remove-tag" onclick="removeReplyTag()">×</span>
-    </div>`;
-    window.removeReplyTag = function() {
-      replyTag = null;
-      document.getElementById("tagReplyBar").innerHTML = '';
-    };
   }
 
   messageInput.oninput = () => {
@@ -711,31 +675,14 @@
       timestamp: Date.now(),
       status: "sent"
     };
-    if (replyTag) {
-      msg.replyTo = replyTag.id;
-      msg.replyText = replyTag.text;
-    }
     const ref = db.ref(getChatPath()).push();
     await ref.set(msg);
-    replyTag = null;
-    document.getElementById("tagReplyBar").innerHTML = '';
     messageInput.value = "";
     sendTyping(false);
     if (!selectedChat.isGroup) {
       const statusRef = db.ref(`users/${selectedChat.id}/online`);
       statusRef.once("value", snap => { if (snap.val()) ref.update({ status: "delivered" }); });
     }
-  };
-
-  audioCallBtn.onclick = async () => {
-    if (!selectedChat || selectedChat.isGroup) { alert("Calls are only supported in private chats."); return; }
-    if (await enforceBlock()) { alert("You or the other user have blocked each other. Calls are not allowed."); return; }
-    alert("Calling feature is a placeholder. Integrate WebRTC for real calls.");
-  };
-  videoCallBtn.onclick = async () => {
-    if (!selectedChat || selectedChat.isGroup) { alert("Calls are only supported in private chats."); return; }
-    if (await enforceBlock()) { alert("You or the other user have blocked each other. Calls are not allowed."); return; }
-    alert("Video calling feature is a placeholder. Integrate WebRTC for real video calls.");
   };
 
   attachBtn.onclick = () => fileInput.click();
