@@ -242,73 +242,174 @@
     return `messages/${ids[0]}_${ids[1]}`;
   }
 
-  function renderMessage(msg, id) {
-    const div = document.createElement("div");
-    div.dataset.id = id;
-    div.className = `relative max-w-xs px-4 py-2 rounded shadow text-sm break-words ${
-      msg.sender === currentUser ? "bg-blue-100 ml-auto" : "bg-gray-100"
-    }`;
-    div.innerHTML = msg.text || (msg.fileUrl ? `<a href="${msg.fileUrl}" target="_blank">📎 ${msg.fileName}</a>` : "");
+  // --- Replace the renderMessage function and context menu setup with this ---
 
-    div.oncontextmenu = e => {
-      e.preventDefault();
-      contextMsgId = id;
-      contextMsg = msg;
-      showContextMenu(e.clientX, e.clientY);
-    };
+function renderMessage(msg, id) {
+  const div = document.createElement("div");
+  div.dataset.id = id;
+  div.className = `relative max-w-xs px-4 py-2 rounded shadow text-sm break-words ${
+    msg.sender === currentUser ? "bg-blue-100 ml-auto" : "bg-gray-100"
+  }`;
+  div.innerHTML = msg.text || (msg.fileUrl ? `<a href="${msg.fileUrl}" target="_blank">📎 ${msg.fileName}</a>` : "");
 
-    if (msg.sender !== currentUser && selectedChat && !selectedChat.isGroup) {
-      db.ref(`${getChatPath()}/${id}/status`).set("read");
+  // Context menu logic
+  function showMenu(x, y, isMobile = false) {
+    contextMsgId = id;
+    contextMsg = msg;
+    // Build actions based on sender/time
+    const isSender = msg.sender === currentUser;
+    const timeElapsed = Date.now() - msg.timestamp;
+    let menuHtml = `
+      <div class="p-2 hover:bg-gray-200 cursor-pointer" data-action="reply">Reply</div>
+      <div class="p-2 hover:bg-gray-200 cursor-pointer" data-action="edit">Edit</div>
+      <div class="p-2 hover:bg-gray-200 cursor-pointer" data-action="deleteMe">Delete for Me</div>
+    `;
+    if (isSender && timeElapsed <= 60000) {
+      menuHtml += `<div class="p-2 hover:bg-gray-200 cursor-pointer" data-action="deleteEveryone">Delete for Everyone</div>`;
     }
-    if (msg.sender === currentUser) {
-      const ticks = document.createElement("span");
-      ticks.className = "absolute bottom-1 right-2 text-xs";
-      if (msg.status === "read") {
-        ticks.textContent = "✓✓";
-        ticks.classList.add("text-blue-500");
-      } else if (msg.status === "delivered") {
-        ticks.textContent = "✓✓";
-      } else {
-        ticks.textContent = "✓";
-      }
-      div.appendChild(ticks);
-    }
+    menuHtml += `<div class="p-2 hover:bg-gray-200 cursor-pointer" data-action="react">React</div>`;
+    contextMenu.innerHTML = menuHtml;
 
-    if (msg.reactions) {
-      const reactionBar = document.createElement("div");
-      reactionBar.className = "text-sm mt-1";
-      for (const [user, emoji] of Object.entries(msg.reactions)) {
-        const span = document.createElement("span");
-        span.textContent = emoji;
-        span.className = "mr-1";
-        reactionBar.appendChild(span);
-      }
-      div.appendChild(reactionBar);
-    }
-
-    let startX = null;
-    div.addEventListener("touchstart", e => {
-      startX = e.touches[0].clientX;
-    });
-    div.addEventListener("touchend", e => {
-      if (!startX) return;
-      const endX = e.changedTouches[0].clientX;
-      if (endX - startX > 80 && msg.sender !== currentUser) {
-        quoteMessage(msg.text);
-      }
-      startX = null;
-    });
-
-    messagesEl.appendChild(div);
-    messagesEl.scrollTop = messagesEl.scrollHeight;
-
-    if (msg.sender !== currentUser && document.hidden && Notification.permission === "granted") {
-      new Notification(`New message from ${msg.sender}`, {
-        body: msg.text,
-        icon: "/assets/whatsapp-icon.png"
-      });
+    contextMenu.style.top = `${y}px`;
+    contextMenu.style.left = `${x}px`;
+    contextMenu.classList.remove("hidden");
+    if (isMobile) {
+      contextMenu.style.position = "fixed";
+      contextMenu.style.left = "50%";
+      contextMenu.style.top = "50%";
+      contextMenu.style.transform = "translate(-50%, -50%)";
+    } else {
+      contextMenu.style.position = "absolute";
+      contextMenu.style.transform = "";
     }
   }
+
+  // Desktop: right-click
+  div.oncontextmenu = e => {
+    e.preventDefault();
+    showMenu(e.clientX, e.clientY, false);
+  };
+
+  // Mobile: long press (touch)
+  let longPressTimer;
+  div.addEventListener("touchstart", e => {
+    longPressTimer = setTimeout(() => {
+      showMenu(window.innerWidth/2, window.innerHeight/2, true);
+    }, 400);
+  });
+  div.addEventListener("touchend", e => {
+    clearTimeout(longPressTimer);
+  });
+  div.addEventListener("touchmove", e => {
+    clearTimeout(longPressTimer);
+  });
+
+  // Read/delivery status
+  if (msg.sender !== currentUser && selectedChat && !selectedChat.isGroup) {
+    db.ref(`${getChatPath()}/${id}/status`).set("read");
+  }
+  if (msg.sender === currentUser) {
+    const ticks = document.createElement("span");
+    ticks.className = "absolute bottom-1 right-2 text-xs";
+    if (msg.status === "read") {
+      ticks.textContent = "✓✓";
+      ticks.classList.add("text-blue-500");
+    } else if (msg.status === "delivered") {
+      ticks.textContent = "✓✓";
+    } else {
+      ticks.textContent = "✓";
+    }
+    div.appendChild(ticks);
+  }
+
+  // Reactions
+  if (msg.reactions) {
+    const reactionBar = document.createElement("div");
+    reactionBar.className = "text-sm mt-1";
+    for (const [user, emoji] of Object.entries(msg.reactions)) {
+      const span = document.createElement("span");
+      span.textContent = emoji;
+      span.className = "mr-1";
+      reactionBar.appendChild(span);
+    }
+    div.appendChild(reactionBar);
+  }
+
+  // Swipe to reply (mobile)
+  let startX = null;
+  div.addEventListener("touchstart", e => {
+    startX = e.touches[0].clientX;
+  });
+  div.addEventListener("touchend", e => {
+    if (!startX) return;
+    const endX = e.changedTouches[0].clientX;
+    if (endX - startX > 80 && msg.sender !== currentUser) {
+      quoteMessage(msg.text);
+    }
+    startX = null;
+  });
+
+  messagesEl.appendChild(div);
+  messagesEl.scrollTop = messagesEl.scrollHeight;
+
+  // Push Notification
+  if (msg.sender !== currentUser && document.hidden && Notification.permission === "granted") {
+    new Notification(`New message from ${msg.sender}`, {
+      body: msg.text,
+      icon: "/assets/whatsapp-icon.png"
+    });
+  }
+}
+
+// --- Context menu element ---
+const contextMenu = document.createElement("div");
+contextMenu.id = "contextMenu";
+contextMenu.className = "absolute bg-white border rounded shadow-md text-sm z-50 hidden";
+document.body.appendChild(contextMenu);
+
+let contextMsgId = null;
+let contextMsg = null;
+
+// Hide menu on click elsewhere
+document.body.addEventListener("click", () => {
+  contextMenu.classList.add("hidden");
+});
+window.addEventListener("scroll", () => contextMenu.classList.add("hidden"));
+window.addEventListener("resize", () => contextMenu.classList.add("hidden"));
+
+// Handle menu actions
+contextMenu.onclick = e => {
+  const action = e.target.dataset.action;
+  if (!action || !contextMsgId || !contextMsg) return;
+
+  switch (action) {
+    case "reply":
+      quoteMessage(contextMsg.text);
+      break;
+    case "edit":
+      editMessage(contextMsgId, contextMsg.text);
+      break;
+    case "deleteMe":
+      // "Delete for Me" always available
+      const bubble = document.querySelector(`[data-id="${contextMsgId}"]`);
+      if (bubble) bubble.remove();
+      break;
+    case "deleteEveryone":
+      // "Delete for Everyone" only if sender and <1min
+      const msgRef = db.ref(`${getChatPath()}/${contextMsgId}`);
+      msgRef.update({
+        text: "🚫 This message was deleted.",
+        fileUrl: null,
+        fileName: null,
+        deleted: true
+      });
+      break;
+    case "react":
+      addReaction(contextMsgId);
+      break;
+  }
+  contextMenu.classList.add("hidden");
+};
 
   function quoteMessage(text) {
     quoteText = text;
