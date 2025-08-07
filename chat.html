@@ -12,10 +12,14 @@
     @media (max-width: 768px) {
       #chatList { display: none; }
       #chatWindow { display: flex !important; }
+      #desktopHeader { display: none; }
+      #mobileHeader { display: block; }
     }
     @media (min-width: 768px) {
       #chatWindow { display: flex; }
       #chatList { display: block; }
+      #desktopHeader { display: flex; }
+      #mobileHeader { display: none; }
     }
     video#localVideo { width: 100px; height: 100px; object-fit: cover; }
     video#remoteVideo { width: 100%; height: 300px; object-fit: cover; }
@@ -31,30 +35,80 @@
       background-color: #065f46 !important;
       color: #fff !important;
     }
+    .badge {
+      background: #e53e3e;
+      color: #fff;
+      font-size: 0.75rem;
+      border-radius: 999px;
+      padding: 0.15rem 0.5rem;
+      margin-left: 0.5rem;
+      font-weight: bold;
+      min-width: 1.5rem;
+      text-align: center;
+      display: inline-block;
+    }
+    .badge-green {
+      background: #38a169;
+    }
+    .badge-blue {
+      background: #3182ce;
+    }
+    .badge-gray {
+      background: #a0aec0;
+    }
+    .sidebar-search:focus {
+      outline: 2px solid #3182ce;
+      outline-offset: 0;
+    }
   </style>
 </head>
 <body class="flex flex-col md:flex-row h-screen bg-white dark:bg-gray-900 text-black dark:text-white transition-colors duration-300">
 
-  <!-- Header -->
-  <header class="w-full md:hidden bg-blue-600 text-white p-4">
-    <h1 class="text-xl font-bold">Welcome, <span id="welcomeUserMobile"></span></h1>
+  <!-- Desktop Header -->
+  <header id="desktopHeader" class="w-full flex items-center justify-between bg-blue-600 text-white px-6 py-4">
+    <div>
+      <h1 class="text-xl font-bold">Welcome, <span id="welcomeUserDesktop"></span></h1>
+    </div>
+    <div class="flex items-center gap-4">
+      <button id="dashboardBtn" class="bg-white text-blue-600 px-4 py-2 rounded font-semibold hover:bg-blue-100 transition">Dashboard</button>
+      <button id="toggleTheme" class="text-xl">🌓</button>
+    </div>
+  </header>
+  <!-- Mobile Header -->
+  <header id="mobileHeader" class="w-full bg-blue-600 text-white p-4">
+    <div class="flex items-center justify-between">
+      <h1 class="text-xl font-bold">Welcome, <span id="welcomeUserMobile"></span></h1>
+      <button id="dashboardBtnMobile" class="bg-white text-blue-600 px-4 py-2 rounded font-semibold hover:bg-blue-100 transition">Dashboard</button>
+      <button id="toggleThemeMobile" class="text-xl ml-2">🌓</button>
+    </div>
   </header>
 
   <!-- Chat List Sidebar -->
-  <aside id="chatList" class="w-full md:w-1/3 lg:w-1/4 border-r border-gray-300 overflow-y-auto hidden md:block">
-    <div class="flex justify-between items-center p-4 border-b">
-      <h2 class="text-xl font-bold">Chats</h2>
-      <button id="createGroupBtn" class="text-sm text-blue-600 hover:underline">+ Group</button>
+  <aside id="chatList" class="w-full md:w-1/3 lg:w-1/4 border-r border-gray-300 overflow-y-auto hidden md:block bg-gray-50 dark:bg-gray-900">
+    <div class="p-4 border-b flex flex-col gap-2">
+      <div class="flex justify-between items-center">
+        <h2 class="text-xl font-bold">Chats</h2>
+        <button id="createGroupBtn" class="text-sm text-blue-600 hover:underline">+ Group</button>
+      </div>
+      <!-- Sidebar search bar -->
+      <input id="sidebarSearch" type="text" placeholder="Search Recents, Users, Groups..." class="sidebar-search border px-2 py-1 rounded text-sm w-full bg-white dark:bg-gray-800 dark:text-white" autocomplete="off" />
     </div>
-    <ul id="userList" class="divide-y"></ul>
-    <div class="mt-4 px-4">
+    <div class="px-4 mt-3">
+      <h2 class="text-lg font-semibold text-blue-700 mb-2">Recents</h2>
+      <ul id="recentsList" class="divide-y"></ul>
+    </div>
+    <div class="px-4 mt-3">
       <h2 class="text-lg font-semibold text-green-700">Groups</h2>
       <ul id="groupList" class="divide-y"></ul>
+    </div>
+    <div class="px-4 mt-3">
+      <h2 class="text-lg font-semibold">Users</h2>
+      <ul id="userList" class="divide-y"></ul>
     </div>
   </aside>
 
   <!-- Chat Window -->
-  <main id="chatWindow" class="flex-1 flex flex-col hidden">
+  <main id="chatWindow" class="flex-1 flex flex-col hidden bg-white dark:bg-gray-800">
     <!-- Chat Header -->
     <div id="chatHeader" class="flex items-center justify-between px-4 py-2 border-b bg-gray-100 dark:bg-gray-800">
       <div class="flex items-center gap-2">
@@ -65,9 +119,10 @@
         </div>
       </div>
       <div class="flex items-center gap-2">
-        <input id="searchInput" type="text" placeholder="Search..." class="border px-2 py-1 rounded text-sm hidden md:inline-block" />
-        <button id="toggleTheme" class="text-sm text-gray-600 hover:text-black dark:text-white dark:hover:text-gray-300">🌓</button>
-        <button id="blockUser" class="text-sm text-red-500">🚫 Block</button>
+        <!-- Call buttons now in Chat Title -->
+        <button id="audioCallBtn" class="bg-green-500 text-white px-3 py-1 rounded text-sm shadow">📞 Audio</button>
+        <button id="videoCallBtn" class="bg-blue-600 text-white px-3 py-1 rounded text-sm shadow">🎥 Video</button>
+        <button id="blockUser" class="text-sm text-red-500 ml-2">🚫 Block</button>
       </div>
     </div>
 
@@ -99,6 +154,16 @@
     </div>
   </div>
 
+  <!-- Call Modal -->
+  <div id="callModal" class="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center hidden z-50">
+    <div id="callModalContent" class="bg-white p-6 rounded-lg text-center space-y-4 w-full max-w-md mx-auto">
+      <h3 id="callTitle" class="text-xl font-bold">Calling...</h3>
+      <video id="remoteVideo" autoplay playsinline class="bg-black rounded"></video>
+      <video id="localVideo" autoplay playsinline muted class="rounded-full absolute bottom-4 right-4 border-2 border-white"></video>
+      <button id="endCallBtn" class="bg-red-600 text-white px-4 py-2 rounded">End Call</button>
+    </div>
+  </div>
+
 <script>
   // Firebase config
   const firebaseConfig = {
@@ -122,10 +187,12 @@
     location.href = 'index.html';
   }
   document.getElementById('welcomeUserMobile').textContent = currentUser;
+  document.getElementById('welcomeUserDesktop').textContent = currentUser;
 
   // Elements
   const userList = document.getElementById("userList");
   const groupList = document.getElementById("groupList");
+  const recentsList = document.getElementById("recentsList");
   const messagesEl = document.getElementById("messages");
   const chatName = document.getElementById("chatName");
   const chatStatus = document.getElementById("chatStatus");
@@ -146,6 +213,12 @@
   const createGroup = document.getElementById("createGroup");
   const blockUserBtn = document.getElementById("blockUser");
   const toggleThemeBtn = document.getElementById("toggleTheme");
+  const toggleThemeMobileBtn = document.getElementById("toggleThemeMobile");
+  const dashboardBtn = document.getElementById("dashboardBtn");
+  const dashboardBtnMobile = document.getElementById("dashboardBtnMobile");
+  const sidebarSearch = document.getElementById("sidebarSearch");
+  const audioCallBtn = document.getElementById("audioCallBtn");
+  const videoCallBtn = document.getElementById("videoCallBtn");
 
   let selectedChat = null;
   let typingTimer;
@@ -156,78 +229,178 @@
     if (theme === "dark") {
       document.documentElement.classList.add("dark");
       document.body.classList.add("dark");
+      toggleThemeBtn.innerText = "🌞";
+      toggleThemeMobileBtn.innerText = "🌞";
     } else {
       document.documentElement.classList.remove("dark");
       document.body.classList.remove("dark");
+      toggleThemeBtn.innerText = "🌓";
+      toggleThemeMobileBtn.innerText = "🌓";
     }
     localStorage.setItem("theme", theme);
+    // update message color
+    Array.from(messagesEl.children).forEach(el => {
+      el.classList.remove("msg-light", "msg-dark");
+      el.classList.add(document.documentElement.classList.contains("dark") ? "msg-dark" : "msg-light");
+    });
   }
-  toggleThemeBtn.onclick = () => {
+  toggleThemeBtn.onclick = toggleThemeMobileBtn.onclick = () => {
     const nextTheme = document.documentElement.classList.contains("dark") ? "light" : "dark";
     setTheme(nextTheme);
   };
-  // Apply saved theme on load
   setTheme(localStorage.getItem("theme") || "light");
 
+  // Dashboard Btns
+  dashboardBtn.onclick = dashboardBtnMobile.onclick = () => {
+    window.location.href = "app.html";
+  };
+
   // --- Load Users ---
+  let allUsers = {};
   function refreshUserList() {
     db.ref("users").once("value", snapshot => {
       userList.innerHTML = "";
-      const usersObj = snapshot.val();
-      if (!usersObj) {
-        const li = document.createElement("li");
-        li.className = "p-3 text-gray-500";
-        li.textContent = "No other users found.";
-        userList.appendChild(li);
-        return;
-      }
-      Object.keys(usersObj).forEach(username => {
+      allUsers = snapshot.val() || {};
+      Object.keys(allUsers).forEach(username => {
         if (username === currentUser) return;
         const li = document.createElement("li");
-        li.className = "p-3 hover:bg-gray-100 cursor-pointer";
-        li.textContent = username;
+        li.className = "p-3 hover:bg-gray-100 cursor-pointer flex justify-between items-center";
+        li.innerHTML = `<span>${allUsers[username].name || username}</span><span class="badge badge-gray" id="badge-user-${username}">0</span>`;
         li.onclick = () => openChat(username, false);
         userList.appendChild(li);
       });
+      filterSidebarLists();
     });
   }
-  // Initial load and on user updates
   db.ref("users").on("value", refreshUserList);
 
   // --- Load Groups ---
+  let allGroups = {};
   function refreshGroupList() {
     groupList.innerHTML = "";
     db.ref("groups").once("value", snapshot => {
-      const groupsObj = snapshot.val();
-      if (!groupsObj) {
-        const li = document.createElement("li");
-        li.className = "p-3 text-gray-500";
-        li.textContent = "No groups found.";
-        groupList.appendChild(li);
-        return;
-      }
-      Object.values(groupsObj).forEach(group => {
+      allGroups = snapshot.val() || {};
+      Object.values(allGroups).forEach(group => {
         if (!group.members || !group.members[currentUser]) return;
         const li = document.createElement("li");
-        li.className = "p-3 hover:bg-green-100 cursor-pointer text-green-700 font-semibold";
-        li.textContent = `# ${group.name}`;
+        li.className = "p-3 hover:bg-green-100 cursor-pointer text-green-700 font-semibold flex justify-between items-center";
+        li.innerHTML = `<span># ${group.name}</span><span class="badge badge-green" id="badge-group-${group.id}">0</span>`;
         li.onclick = () => openChat(group.id, true, group.name);
         groupList.appendChild(li);
       });
+      filterSidebarLists();
     });
   }
-  // Initial load and on group updates
   db.ref("groups").on("value", refreshGroupList);
 
-  // --- Search Messages ---
-  searchInput.oninput = () => {
-    const query = searchInput.value.toLowerCase();
-    const messages = messagesEl.querySelectorAll("div[data-id]");
-    messages.forEach(m => {
-      const match = m.textContent.toLowerCase().includes(query);
-      m.style.display = match ? "" : "none";
+  // --- Recents ---
+  let recentsData = [];
+  function loadRecents() {
+    // Find all chats and group messages where currentUser is sender or receiver, sort by last message time
+    const allChatPromises = [];
+    // Private chats
+    db.ref("messages").once("value").then(snapshot => {
+      snapshot.forEach(child => {
+        const chatId = child.key;
+        const users = chatId.split('_');
+        if (users.includes(currentUser)) {
+          let lastMsg = null, unreadCount = 0;
+          child.forEach(msgSnap => {
+            const msg = msgSnap.val();
+            if (!lastMsg || msg.timestamp > lastMsg.timestamp) lastMsg = { ...msg, _id: msgSnap.key };
+            if (msg.sender !== currentUser && msg.status !== "read") unreadCount++;
+          });
+          const otherUser = users.find(u => u !== currentUser);
+          if (otherUser) {
+            recentsData.push({
+              type: "user",
+              id: otherUser,
+              name: allUsers[otherUser]?.name || otherUser,
+              email: allUsers[otherUser]?.email || "",
+              phone: allUsers[otherUser]?.phone || "",
+              timestamp: lastMsg?.timestamp || 0,
+              unread: unreadCount
+            });
+          }
+        }
+      });
+      // Group chats
+      db.ref("groupMessages").once("value").then(groupSnap => {
+        groupSnap.forEach(child => {
+          const groupId = child.key;
+          if (allGroups[groupId]?.members?.[currentUser]) {
+            let lastMsg = null, unreadCount = 0;
+            child.forEach(msgSnap => {
+              const msg = msgSnap.val();
+              if (!lastMsg || msg.timestamp > lastMsg.timestamp) lastMsg = { ...msg, _id: msgSnap.key };
+              if (msg.sender !== currentUser && (!msg.status || msg.status !== "read")) unreadCount++;
+            });
+            recentsData.push({
+              type: "group",
+              id: groupId,
+              name: allGroups[groupId]?.name || groupId,
+              email: "",
+              phone: "",
+              timestamp: lastMsg?.timestamp || 0,
+              unread: unreadCount
+            });
+          }
+        });
+        // Sort recents by timestamp desc
+        recentsData.sort((a, b) => b.timestamp - a.timestamp);
+        renderRecents();
+        filterSidebarLists();
+      });
     });
-  };
+  }
+  function renderRecents() {
+    recentsList.innerHTML = "";
+    recentsData.forEach(item => {
+      const li = document.createElement("li");
+      li.className = "p-3 hover:bg-gray-100 cursor-pointer flex justify-between items-center";
+      const badgeClass = item.type === "group" ? "badge-green" : "badge-blue";
+      li.innerHTML = `<span>${item.type === "group" ? "# " : ""}${item.name}</span>
+        <span class="badge ${badgeClass}">${item.unread}</span>`;
+      li.onclick = () => openChat(item.id, item.type === "group", item.name);
+      recentsList.appendChild(li);
+    });
+  }
+  // Reload recents when chats/groups/users change
+  function reloadRecents() {
+    recentsData = [];
+    loadRecents();
+  }
+  db.ref("users").on("value", reloadRecents);
+  db.ref("groups").on("value", reloadRecents);
+  db.ref("messages").on("value", reloadRecents);
+  db.ref("groupMessages").on("value", reloadRecents);
+
+  // --- Real Time Sidebar Search ---
+  function filterSidebarLists() {
+    const query = (sidebarSearch.value || "").toLowerCase();
+    function filterList(list, items, getFields) {
+      Array.from(list.children).forEach(li => {
+        const idx = Array.from(list.children).indexOf(li);
+        if (!items[idx]) return li.style.display = "none";
+        const { name, email, phone } = getFields(items[idx]);
+        li.style.display = (
+          name.toLowerCase().includes(query) ||
+          email.toLowerCase().includes(query) ||
+          phone.toLowerCase().includes(query)
+        ) ? "" : "none";
+      });
+    }
+    filterList(recentsList, recentsData, i => i);
+    filterList(userList, Object.keys(allUsers).filter(u => u !== currentUser), u => ({
+      name: allUsers[u]?.name || u,
+      email: allUsers[u]?.email || "",
+      phone: allUsers[u]?.phone || ""
+    }));
+    filterList(groupList, Object.values(allGroups).filter(g => g.members && g.members[currentUser]), g => ({
+      name: g.name || g.id, email: "", phone: ""
+    }));
+  }
+  sidebarSearch.oninput = filterSidebarLists;
 
   // --- Back Button (Mobile) ---
   backBtn.onclick = () => {
@@ -236,11 +409,13 @@
   };
 
   // --- Open Chat ---
+  let messagesListener = null;
   function openChat(id, isGroup = false, groupName = "") {
     selectedChat = { id, isGroup, groupName };
     messagesEl.innerHTML = "";
-    chatName.textContent = isGroup ? `# ${groupName || id}` : id;
+    chatName.textContent = isGroup ? `# ${groupName || id}` : allUsers[id]?.name || id;
     chatStatus.textContent = isGroup ? "Group" : "Loading...";
+    if (messagesListener) messagesListener.off();
 
     if (!isGroup) {
       db.ref(`users/${id}/lastSeen`).on("value", snap => {
@@ -255,19 +430,24 @@
     chatListEl.classList.add("hidden");
     chatWindowEl.classList.remove("hidden");
 
-    db.ref(getChatPath()).off();
-    db.ref(getChatPath()).on("child_added", snap => {
+    const path = getChatPath();
+    messagesListener = db.ref(path);
+    messagesListener.off();
+    let msgMap = {}; // prevent duplicates
+    messagesListener.on("child_added", snap => {
       const msg = snap.val();
+      if (msgMap[snap.key]) return; // avoid duplicate
+      msgMap[snap.key] = true;
       renderMessage(msg, snap.key);
     });
-    db.ref(getChatPath()).on("child_changed", snap => {
+    messagesListener.on("child_changed", snap => {
       const id = snap.key;
       const updatedMsg = snap.val();
       const bubble = document.querySelector(`[data-id="${id}"]`);
       if (bubble) bubble.remove();
       renderMessage(updatedMsg, id);
     });
-    db.ref(getChatPath()).on("child_removed", snap => {
+    messagesListener.on("child_removed", snap => {
       const id = snap.key;
       const bubble = document.querySelector(`[data-id="${id}"]`);
       if (bubble) bubble.remove();
@@ -557,7 +737,7 @@
         checkbox.type = "checkbox";
         checkbox.value = username;
         div.appendChild(checkbox);
-        div.appendChild(document.createTextNode(username));
+        div.appendChild(document.createTextNode(usersObj[username].name || username));
         groupUsers.appendChild(div);
       });
     });
@@ -599,6 +779,175 @@
   if (window.innerWidth < 768) {
     chatListEl.classList.remove("hidden");
     chatWindowEl.classList.add("hidden");
+  }
+
+  // --- Call Buttons ---
+  let pc = null;
+  let localStream = null;
+  let remoteStream = null;
+  let callHandled = false;
+  let minimized = false;
+  let callTimeoutTimer;
+
+  const servers = { iceServers: [{ urls: "stun:stun.l.google.com:19302" }] };
+  const callModal = document.getElementById("callModal");
+  const callTitle = document.getElementById("callTitle");
+  const endCallBtn = document.getElementById("endCallBtn");
+  const localVideo = document.getElementById("localVideo");
+  const remoteVideo = document.getElementById("remoteVideo");
+  const callModalContent = document.getElementById("callModalContent");
+
+  audioCallBtn.onclick = () => startCall(false);
+  videoCallBtn.onclick = () => startCall(true);
+
+  function setupPeer() {
+    pc = new RTCPeerConnection(servers);
+    remoteStream = new MediaStream();
+    remoteVideo.srcObject = remoteStream;
+    pc.ontrack = event => {
+      event.streams[0].getTracks().forEach(track => {
+        remoteStream.addTrack(track);
+      });
+    };
+    pc.onicecandidate = event => {
+      if (event.candidate) {
+        const ref = db.ref(`calls/${callIsCaller ? selectedChat.id : currentUser}`);
+        ref.update({ candidate: JSON.stringify(event.candidate) });
+      }
+    };
+  }
+  let callIsCaller = false;
+  async function startCall(withVideo) {
+    if (!selectedChat || selectedChat.isGroup) {
+      alert("Calls are only supported in private chats.");
+      return;
+    }
+    callIsCaller = true;
+    callModal.classList.remove("hidden");
+    callTitle.textContent = "Calling...";
+
+    localStream = await navigator.mediaDevices.getUserMedia({
+      video: withVideo, audio: true
+    });
+    localVideo.srcObject = localStream;
+
+    setupPeer();
+    localStream.getTracks().forEach(track => pc.addTrack(track, localStream));
+
+    const offer = await pc.createOffer();
+    await pc.setLocalDescription(offer);
+
+    const callRef = db.ref(`calls/${selectedChat.id}`);
+    callRef.set({
+      from: currentUser,
+      offer: JSON.stringify(offer),
+      video: withVideo
+    });
+
+    callRef.on("value", async snap => {
+      const data = snap.val();
+      if (!data || data.from === currentUser) return;
+      try {
+        if (data.answer && pc && pc.signalingState !== "closed") {
+          await pc.setRemoteDescription(new RTCSessionDescription(JSON.parse(data.answer)));
+        }
+        if (data.candidate && pc && pc.signalingState !== "closed") {
+          await pc.addIceCandidate(new RTCIceCandidate(JSON.parse(data.candidate)));
+        }
+      } catch (err) {
+        console.error("ICE error", err);
+      }
+    });
+  }
+  db.ref(`calls/${currentUser}`).on("child_removed", snap => {
+    endCall("ended");
+    alert("Call ended by the other user.");
+  });
+  db.ref(`calls/${currentUser}`).on("value", async snap => {
+    const data = snap.val();
+    if (!data || data.from === currentUser || callHandled || minimized) return;
+    showIncomingPopup(data.from, data.video);
+    callTimeoutTimer = setTimeout(() => {
+      if (!callHandled) {
+        endCall("timeout");
+        alert("Missed call from " + data.from);
+      }
+    }, 60000);
+  });
+  function showIncomingPopup(fromUser, isVideo) {
+    callModal.classList.remove("hidden");
+    callModalContent.innerHTML = `
+      <h3 class="text-xl font-bold">${fromUser} is calling...</h3>
+      <div class="flex justify-center gap-4">
+        <button id="acceptCall" class="bg-green-500 text-white px-4 py-2 rounded">Accept</button>
+        <button id="cancelCall" class="bg-yellow-500 text-white px-4 py-2 rounded">Cancel</button>
+        <button id="rejectCall" class="bg-red-600 text-white px-4 py-2 rounded">Reject</button>
+      </div>
+    `;
+    document.getElementById("acceptCall").onclick = async () => {
+      clearTimeout(callTimeoutTimer);
+      await acceptIncomingCall(fromUser, isVideo);
+    };
+    document.getElementById("rejectCall").onclick = () => {
+      clearTimeout(callTimeoutTimer);
+      endCall("rejected");
+    };
+    document.getElementById("cancelCall").onclick = () => {
+      callModal.classList.add("hidden");
+      minimized = true;
+    };
+  }
+  async function acceptIncomingCall(fromUser, withVideo) {
+    callModal.classList.remove("hidden");
+    callModalContent.innerHTML = `
+      <h3 id="callTitle" class="text-xl font-bold">In Call...</h3>
+      <video id="remoteVideo" autoplay playsinline class="bg-black rounded"></video>
+      <video id="localVideo" autoplay playsinline muted class="rounded-full absolute bottom-4 right-4 border-2 border-white"></video>
+      <button id="endCallBtn" class="bg-red-600 text-white px-4 py-2 rounded">End Call</button>
+    `;
+    const localVideo = document.getElementById("localVideo");
+    const remoteVideo = document.getElementById("remoteVideo");
+    localStream = await navigator.mediaDevices.getUserMedia({
+      video: withVideo,
+      audio: true
+    });
+    localVideo.srcObject = localStream;
+    setupPeer();
+    localStream.getTracks().forEach(track => pc.addTrack(track, localStream));
+    const callRef = db.ref(`calls/${currentUser}`);
+    const snap = await callRef.once("value");
+    const data = snap.val();
+    if (!data || !data.offer) return;
+    await pc.setRemoteDescription(new RTCSessionDescription(JSON.parse(data.offer)));
+    const answer = await pc.createAnswer();
+    await pc.setLocalDescription(answer);
+    callHandled = true;
+    await callRef.update({ answer: JSON.stringify(answer) });
+    callRef.on("value", async snap => {
+      const data = snap.val();
+      if (!data || data.from === currentUser) return;
+      if (data.candidate && pc && pc.signalingState !== "closed") {
+        try {
+          await pc.addIceCandidate(new RTCIceCandidate(JSON.parse(data.candidate)));
+        } catch (err) {
+          console.error("Error adding ICE candidate", err);
+        }
+      }
+    });
+    document.getElementById("endCallBtn").onclick = () => endCall();
+  }
+  function endCall(reason = "ended") {
+    callModal.classList.add("hidden");
+    callHandled = false;
+    minimized = false;
+    clearTimeout(callTimeoutTimer);
+    if (pc) pc.close();
+    if (localStream) localStream.getTracks().forEach(t => t.stop());
+    if (selectedChat) db.ref(`calls/${selectedChat.id}`).remove();
+    db.ref(`calls/${currentUser}`).remove();
+    if (reason === "rejected" || reason === "timeout") {
+      console.log("Call " + reason);
+    }
   }
 </script>
 </body>
