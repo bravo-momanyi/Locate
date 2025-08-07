@@ -16,12 +16,8 @@
     @media (min-width: 768px) {
       #chatWindow { display: flex; }
     }
-    video#localVideo {
-      width: 100px; height: 100px; object-fit: cover;
-    }
-    video#remoteVideo {
-      width: 100%; height: 300px; object-fit: cover;
-    }
+    video#localVideo { width: 100px; height: 100px; object-fit: cover; }
+    video#remoteVideo { width: 100%; height: 300px; object-fit: cover; }
     #contextMenu {
       min-width: 150px; background: white; border: 1px solid #ddd;
       position: absolute; z-index: 9999;
@@ -157,16 +153,18 @@
   let typingTimer;
   let quoteText = "";
 
-  // Notifications
-  if ("Notification" in window && Notification.permission !== "granted") {
-    Notification.requestPermission();
-  }
-
-  // Load users
+  // Load users from Firebase and show in sidebar
   db.ref("users").on("value", snapshot => {
     userList.innerHTML = "";
-    snapshot.forEach(child => {
-      const username = child.key;
+    const usersObj = snapshot.val();
+    if (!usersObj) {
+      const li = document.createElement("li");
+      li.className = "p-3 text-gray-500";
+      li.textContent = "No other users found.";
+      userList.appendChild(li);
+      return;
+    }
+    Object.keys(usersObj).forEach(username => {
       if (username === currentUser) return;
       const li = document.createElement("li");
       li.className = "p-3 hover:bg-gray-100 cursor-pointer";
@@ -187,7 +185,6 @@
     userList.appendChild(li);
   });
 
-  // Search messages
   searchInput.oninput = () => {
     const query = searchInput.value.toLowerCase();
     const messages = messagesEl.querySelectorAll("div[data-id]");
@@ -197,13 +194,11 @@
     });
   };
 
-  // Handle back button (mobile)
   backBtn.onclick = () => {
     chatListEl.classList.remove("hidden");
     chatWindowEl.classList.add("hidden");
   };
 
-  // Open chat
   function openChat(id, isGroup = false, groupName = "") {
     selectedChat = { id, isGroup, groupName };
     messagesEl.innerHTML = "";
@@ -247,7 +242,6 @@
     return `messages/${ids[0]}_${ids[1]}`;
   }
 
-  // Render message bubble
   function renderMessage(msg, id) {
     const div = document.createElement("div");
     div.dataset.id = id;
@@ -256,7 +250,6 @@
     }`;
     div.innerHTML = msg.text || (msg.fileUrl ? `<a href="${msg.fileUrl}" target="_blank">📎 ${msg.fileName}</a>` : "");
 
-    // Right-click/context menu
     div.oncontextmenu = e => {
       e.preventDefault();
       contextMsgId = id;
@@ -264,7 +257,6 @@
       showContextMenu(e.clientX, e.clientY);
     };
 
-    // Read/delivery status
     if (msg.sender !== currentUser && selectedChat && !selectedChat.isGroup) {
       db.ref(`${getChatPath()}/${id}/status`).set("read");
     }
@@ -282,7 +274,6 @@
       div.appendChild(ticks);
     }
 
-    // Reactions
     if (msg.reactions) {
       const reactionBar = document.createElement("div");
       reactionBar.className = "text-sm mt-1";
@@ -295,7 +286,6 @@
       div.appendChild(reactionBar);
     }
 
-    // Swipe to reply (mobile)
     let startX = null;
     div.addEventListener("touchstart", e => {
       startX = e.touches[0].clientX;
@@ -312,7 +302,6 @@
     messagesEl.appendChild(div);
     messagesEl.scrollTop = messagesEl.scrollHeight;
 
-    // Push Notification
     if (msg.sender !== currentUser && document.hidden && Notification.permission === "granted") {
       new Notification(`New message from ${msg.sender}`, {
         body: msg.text,
@@ -321,20 +310,17 @@
     }
   }
 
-  // Quoting messages (replies)
   function quoteMessage(text) {
     quoteText = text;
     messageInput.value = `> ${text}\n`;
     messageInput.focus();
   }
 
-  // Send Message
   messageForm.onsubmit = async e => {
     e.preventDefault();
     const text = messageInput.value.trim();
     if (!text || !selectedChat) return;
 
-    // Check if blocked
     const blockedRef = db.ref(`blocked/${selectedChat.id}/${currentUser}`);
     const blockedSnap = await blockedRef.once("value");
     if (blockedSnap.exists()) {
@@ -355,7 +341,6 @@
     messageInput.value = "";
     sendTyping(false);
 
-    // Delivered if user is online
     if (!selectedChat.isGroup) {
       const statusRef = db.ref(`users/${selectedChat.id}/online`);
       statusRef.once("value", snap => {
@@ -366,7 +351,6 @@
     }
   };
 
-  // Typing indicator
   messageInput.oninput = () => {
     sendTyping(true);
     clearTimeout(typingTimer);
@@ -378,20 +362,17 @@
     db.ref(`typing/${selectedChat.id}`).set(isTyping ? currentUser : "");
   }
 
-  // Listen for typing from others
   db.ref(`typing/${currentUser}`).on("value", snap => {
     const typer = snap.val();
     typingEl.classList.toggle("hidden", !typer);
     if (typer) typingEl.textContent = `${typer} is typing...`;
   });
 
-  // File Attachments
   attachBtn.onclick = () => fileInput.click();
   fileInput.onchange = async () => {
     const file = fileInput.files[0];
     if (!file || !selectedChat) return;
 
-    // Basic validation
     if (file.size > 10 * 1024 * 1024) {
       alert("File is too large (max 10MB).");
       return;
@@ -411,7 +392,6 @@
     await db.ref(getChatPath()).push(msg);
   };
 
-  // Delete Message
   function deleteMessage(id) {
     const msgRef = db.ref(`${getChatPath()}/${id}`);
     msgRef.once("value", snap => {
@@ -430,14 +410,12 @@
           deleted: true
         });
       } else {
-        // Local delete only
         const bubble = document.querySelector(`[data-id="${id}"]`);
         if (bubble) bubble.remove();
       }
     });
   }
 
-  // Edit Message
   function editMessage(id, oldText) {
     const newText = prompt("Edit your message:", oldText);
     if (newText && newText.trim() && newText !== oldText) {
@@ -447,7 +425,6 @@
     }
   }
 
-  // Starred Messages
   function toggleStar(id, msg) {
     const ref = db.ref(`stars/${currentUser}/${id}`);
     ref.once("value", snap => {
@@ -464,14 +441,12 @@
     });
   });
 
-  // Reactions
   function addReaction(msgId) {
     const emoji = prompt("React with emoji:");
     if (!emoji) return;
     db.ref(`${getChatPath()}/${msgId}/reactions/${currentUser}`).set(emoji);
   }
 
-  // Blocking a user
   document.getElementById("blockUser").onclick = () => {
     if (!selectedChat || selectedChat.isGroup) return;
     const confirmBlock = confirm(`Block ${selectedChat.id}?`);
@@ -481,7 +456,6 @@
     }
   };
 
-  // Last Seen & Online Tracking
   window.addEventListener("beforeunload", () => {
     db.ref(`users/${currentUser}/lastSeen`).set(Date.now());
   });
@@ -489,7 +463,6 @@
   db.ref(`users/${currentUser}/online`).onDisconnect().set(false);
   db.ref(`users/${currentUser}/lastSeen`).onDisconnect().set(Date.now());
 
-  // Theme Toggling
   const toggleThemeBtn = document.getElementById("toggleTheme");
   toggleThemeBtn.onclick = () => {
     document.documentElement.classList.toggle("dark");
@@ -499,7 +472,6 @@
     document.documentElement.classList.add("dark");
   }
 
-  // Responsive mobile layout fix
   window.addEventListener("resize", () => {
     if (window.innerWidth >= 768) {
       chatListEl.classList.remove("hidden");
@@ -507,13 +479,11 @@
     }
   });
 
-  // Mobile initial state
   if (window.innerWidth < 768) {
     chatListEl.classList.remove("hidden");
     chatWindowEl.classList.add("hidden");
   }
 
-  // === Call Buttons ===
   const audioCallBtn = document.getElementById("audioCallBtn");
   const videoCallBtn = document.getElementById("videoCallBtn");
   const callModal = document.getElementById("callModal");
@@ -611,7 +581,6 @@
     };
   }
 
-  // Incoming Calls
   db.ref(`calls/${currentUser}`).on("value", async snap => {
     const data = snap.val();
     if (!data || data.from === currentUser || callHandled || minimized) return;
@@ -664,8 +633,7 @@
     });
     localVideo.srcObject = localStream;
     setupPeer();
-    localStream.getTracks().forEach(track => pc.addTrack(track, localStream);
-    );
+    localStream.getTracks().forEach(track => pc.addTrack(track, localStream));
     const callRef = db.ref(`calls/${currentUser}`);
     const snap = await callRef.once("value");
     const data = snap.val();
@@ -710,7 +678,6 @@
     }
   }
 
-  // Load Call Logs to Console
   db.ref(`callsHistory/${currentUser}`).once("value", snap => {
     snap.forEach(child => {
       const log = child.val();
@@ -718,7 +685,6 @@
     });
   });
 
-  // Context Menu
   const contextMenu = document.createElement("div");
   contextMenu.id = "contextMenu";
   contextMenu.className = "absolute bg-white border rounded shadow-md text-sm z-50 hidden";
@@ -765,14 +731,14 @@
     contextMenu.classList.add("hidden");
   };
 
-  // === Group Modal Logic ===
   createGroupBtn.onclick = () => {
     groupModal.classList.remove("hidden");
     groupNameInput.value = "";
     groupUsers.innerHTML = "";
     db.ref("users").once("value", snap => {
-      snap.forEach(child => {
-        const username = child.key;
+      const usersObj = snap.val();
+      if (!usersObj) return;
+      Object.keys(usersObj).forEach(username => {
         if (username === currentUser) return;
         const div = document.createElement("div");
         div.className = "flex items-center gap-2 p-1";
