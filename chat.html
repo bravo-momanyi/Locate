@@ -64,8 +64,11 @@
       justify-content: space-between;
       box-shadow: 0 2px 4px rgba(0,0,0,0.04);
       border-radius: 0 0 8px 8px;
-      position: relative;
-      z-index: 20;
+      position: fixed;
+      width: 100vw;
+      left: 0;
+      top: 0;
+      z-index: 30;
     }
     .window-header .title {
       font-size: 1.25rem;
@@ -109,6 +112,7 @@
     .window-header .theme-btn:hover {
       background: #d4f8e8;
     }
+    #desktopHeaderSpacer { height: 62px; width: 100vw; display: block; }
     #contextMenu {
       min-width: 180px; background: white; border: 1px solid #ddd;
       position: absolute; z-index: 9999;
@@ -117,7 +121,7 @@
 </head>
 <body class="flex flex-col md:flex-row h-screen bg-white dark:bg-gray-900 text-black dark:text-white transition-colors duration-300">
 
-  <!-- Desktop Header (Window style!) -->
+  <!-- Desktop Header (Window style, fixed to top) -->
   <header id="desktopHeader" class="window-header">
     <div>
       <span class="title">WhatsApp Clone</span>
@@ -128,6 +132,8 @@
       <button id="toggleTheme" class="theme-btn">🌓</button>
     </div>
   </header>
+  <!-- Spacer so content is not hidden under fixed header -->
+  <div id="desktopHeaderSpacer"></div>
   <!-- Mobile Header -->
   <header id="mobileHeader" class="w-full bg-blue-600 text-white p-4 items-center justify-between">
     <div class="flex items-center justify-between w-full">
@@ -229,8 +235,8 @@
   // User info and header
   const currentUser = sessionStorage.getItem('username') || localStorage.getItem('username');
   if (!currentUser) { alert('Session expired'); location.href = 'index.html'; }
-  document.getElementById('welcomeUserMobile').textContent = currentUser;
   document.getElementById('welcomeUserDesktop').textContent = currentUser;
+  document.getElementById('welcomeUserMobile').textContent = currentUser;
 
   // Elements
   const userList = document.getElementById("userList");
@@ -244,7 +250,6 @@
   const attachBtn = document.getElementById("attachBtn");
   const fileInput = document.getElementById("fileInput");
   const typingEl = document.getElementById("typing");
-  const searchInput = document.getElementById("searchInput");
   const backBtn = document.getElementById("backBtn");
   const chatListEl = document.getElementById("chatList");
   const chatWindowEl = document.getElementById("chatWindow");
@@ -509,10 +514,11 @@
     const path = getChatPath();
     messagesListener = db.ref(path);
     messagesListener.off();
-    let msgMap = {};
+    // --- Fix: Use a Set to track rendered messages to prevent duplicates ---
+    let renderedMsgIds = new Set();
     messagesListener.on("child_added", snap => {
-      if (msgMap[snap.key]) return;
-      msgMap[snap.key] = true;
+      if (renderedMsgIds.has(snap.key)) return;
+      renderedMsgIds.add(snap.key);
       renderMessage(snap.val(), snap.key);
     });
     messagesListener.on("child_changed", snap => {
@@ -520,12 +526,15 @@
       const updatedMsg = snap.val();
       const bubble = document.querySelector(`[data-id="${id}"]`);
       if (bubble) bubble.remove();
+      renderedMsgIds.delete(id);
       renderMessage(updatedMsg, id);
+      renderedMsgIds.add(id);
     });
     messagesListener.on("child_removed", snap => {
       const id = snap.key;
       const bubble = document.querySelector(`[data-id="${id}"]`);
       if (bubble) bubble.remove();
+      renderedMsgIds.delete(id);
     });
   }
   function getChatPath() {
