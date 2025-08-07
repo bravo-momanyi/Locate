@@ -691,6 +691,10 @@
     clearTimeout(typingTimer);
     typingTimer = setTimeout(() => sendTyping(false), 2000);
   };
+  function showChatArea() {
+  chatListEl.classList.add("hide");
+  chatWindowEl.classList.remove("hide");
+}
   function sendTyping(isTyping) {
     if (!selectedChat || selectedChat.isGroup) return;
     db.ref(`typing/${selectedChat.id}`).set(isTyping ? currentUser : "");
