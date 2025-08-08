@@ -34,23 +34,22 @@
       padding: 0.25rem 0.75rem; font-size: 1rem; min-width: 160px;
       margin-left:16px;
     }
-    #onlineIndicator {
-      font-size: 0.96em;
+    #onlineLastSeenIndicator {
+      font-size: 0.95em;
       margin-left: 8px;
       color: #059669;
       font-weight: bold;
     }
-    #lastSeenIndicator {
-      font-size: 0.85em;
-      margin-left: 8px;
-      color: #64748b;
-    }
     #typingIndicator {
-      font-size: 0.96em;
+      display: inline-block;
       margin-left: 8px;
       color: #065f46;
       font-style: italic;
+      font-size: 1.1em;
+      vertical-align: middle;
+      min-width: 30px;
     }
+    #messages { flex: 1; overflow-y: auto; padding: 1rem; background: #fff; }
     #tagReplyBar {
       position: sticky;
       bottom: 60px;
@@ -75,7 +74,17 @@
       cursor: pointer;
       font-size: 1.2em;
     }
-    #messages { flex: 1; overflow-y: auto; padding: 1rem; background: #fff; }
+    .reply-tag {
+      background: #e2e8f0;
+      border-radius: 6px;
+      margin-bottom: 2px;
+      padding: 2px 8px;
+      color: #065f46;
+      display: block;
+      font-size: 0.88em;
+      cursor: pointer;
+      border-left: 3px solid #3182ce;
+    }
     #messageForm { position: sticky; bottom: 0; background: #f3f4f6; }
     .msg-light { background-color: #d4f8e8 !important; color: #222 !important; }
     .msg-dark { background-color: #065f46 !important; color: #fff !important; }
@@ -95,17 +104,6 @@
       margin-bottom: 0.5rem;
       color: #065f46;
     }
-    .reply-tag {
-      background: #e2e8f0;
-      border-radius: 6px;
-      margin-bottom: 2px;
-      padding: 2px 8px;
-      color: #065f46;
-      display: block;
-      font-size: 0.88em;
-      cursor: pointer;
-      border-left: 3px solid #3182ce;
-    }
     .loading-date {
       position: sticky;
       top: 56px;
@@ -119,6 +117,28 @@
       margin-bottom: 0.5rem;
       color: #0e7490;
     }
+    .typing-dots {
+      display: inline-block;
+      vertical-align: middle;
+      width: 32px;
+      height: 18px;
+    }
+    .typing-dots span {
+      display: inline-block;
+      width: 6px;
+      height: 6px;
+      margin: 0 2px;
+      background: #059669;
+      border-radius: 50%;
+      opacity: 0.7;
+      animation: typing-dot 1.4s infinite both;
+    }
+    .typing-dots span:nth-child(2) { animation-delay: .2s; }
+    .typing-dots span:nth-child(3) { animation-delay: .4s; }
+    @keyframes typing-dot {
+      0%, 80%, 100% { opacity: 0.2; transform: scale(0.8);}
+      40% { opacity: 1; transform: scale(1.2);}
+    }
     @media (max-width:768px) {
       #sidebar { width: 100vw; min-width: 0; max-width: 100vw; position: absolute; left: 0; top: 0; bottom: 0; z-index: 40; }
       #mainContainer { flex-direction: column; }
@@ -128,7 +148,7 @@
       #chatHeader { position: sticky; top: 0; left: 0; width: 100vw; }
       #groupInfoContent { min-width: 90vw;}
       #messageForm { position:fixed; bottom:0; left:0; right:0; width:100vw; }
-      #messages { margin-bottom:90px; }
+      #messages { margin-bottom:110px; }
       #tagReplyBar { position:fixed; bottom:60px; left:0; right:0; width:100vw; }
     }
     body.dark, body.dark #sidebar, body.dark #chatArea, body.dark #chatHeader, body.dark #messageForm {
@@ -172,9 +192,8 @@
       <div class="flex items-center gap-2">
         <button id="backBtn" class="text-blue-600 pr-2 md:hidden">&larr;</button>
         <span id="chatTitle"></span>
-        <span id="onlineIndicator"></span>
+        <span id="onlineLastSeenIndicator"></span>
         <span id="typingIndicator"></span>
-        <span id="lastSeenIndicator"></span>
         <input id="chatSearchBar" placeholder="Search messages..." />
       </div>
       <div class="flex items-center gap-2">
@@ -217,71 +236,164 @@
 </div>
 <div id="contextMenu" class="hidden"></div>
 <script>
-  // Firebase config + global setup unchanged...
+  // Firebase config and variable setup unchanged...
+  const firebaseConfig = {
+    apiKey: "AIzaSyBfkUJS81minjxj0DFz4pzNnGzCtb5ZJss",
+    authDomain: "locater-42fb4.firebaseapp.com",
+    databaseURL: "https://locater-42fb4-default-rtdb.firebaseio.com",
+    projectId: "locater-42fb4",
+    storageBucket: "locater-42fb4.appspot.com",
+    messagingSenderId: "250348367998",
+    appId: "1:250348367998:web:d734b2b4c735b5684ae82f"
+  };
+  firebase.initializeApp(firebaseConfig);
+  const db = firebase.database();
+  const storage = firebase.storage();
 
-  // ...Theme, formatDate, formatTime, sidebar lists unchanged...
+  const currentUser = sessionStorage.getItem('username') || localStorage.getItem('username');
+  if (!currentUser) { alert('Session expired'); location.href = 'index.html'; }
+  document.getElementById('welcomeUserSidebar').textContent = currentUser;
+
+  // Elements
+  const userList = document.getElementById("userList");
+  const groupList = document.getElementById("groupList");
+  const recentsList = document.getElementById("recentsList");
+  const messagesEl = document.getElementById("messages");
+  const chatTitle = document.getElementById("chatTitle");
+  const chatSearchBar = document.getElementById("chatSearchBar");
+  const messageForm = document.getElementById("messageForm");
+  const messageInput = document.getElementById("messageInput");
+  const attachBtn = document.getElementById("attachBtn");
+  const fileInput = document.getElementById("fileInput");
+  const backBtn = document.getElementById("backBtn");
+  const chatListEl = document.getElementById("sidebar");
+  const chatWindowEl = document.getElementById("chatArea");
+  const createGroupBtn = document.getElementById("createGroupBtn");
+  const groupModal = document.getElementById("groupModal");
+  const publicBtn = document.getElementById("publicBtn");
+  const privateBtn = document.getElementById("privateBtn");
+  const privateFields = document.getElementById("privateFields");
+  const groupPasswordEl = document.getElementById("groupPassword");
+  const closeModal = document.getElementById("closeModal");
+  const groupNameInput = document.getElementById("groupName");
+  const groupUsers = document.getElementById("groupUsers");
+  const createGroup = document.getElementById("createGroup");
+  const blockUserBtn = document.getElementById("blockUser");
+  const toggleThemeBtn = document.getElementById("toggleTheme");
+  const dashboardBtn = document.getElementById("dashboardBtn");
+  const sidebarSearch = document.getElementById("sidebarSearch");
+  const contextMenu = document.getElementById("contextMenu");
+  const groupInfoModal = document.getElementById("groupInfoModal");
+  const groupInfoContent = document.getElementById("groupInfoContent");
+  const tagReplyBar = document.getElementById("tagReplyBar");
+
+  let selectedChat = null, typingTimer;
+  let allUsers = {}, allGroups = {}, recentsData = [];
+  let messagesListener = null;
+  let allMessages = [];
+  let groupType = "public";
+  let lastGroupPassword = "";
+  let replyTag = null;
+  let typingOtherUser = false;
+
+  // --- Theme ---
+  function setTheme(theme) {
+    if (theme === "dark") {
+      document.documentElement.classList.add("dark");
+      document.body.classList.add("dark");
+      toggleThemeBtn.innerText = "🌞";
+    } else {
+      document.documentElement.classList.remove("dark");
+      document.body.classList.remove("dark");
+      toggleThemeBtn.innerText = "🌓";
+    }
+    localStorage.setItem("theme", theme);
+    document.querySelectorAll("#sidebar, #chatArea, .sidebar-header").forEach(e => {
+      e.classList.toggle("dark", theme === "dark");
+    });
+    Array.from(messagesEl.children).forEach(el => {
+      el.classList.remove("msg-light", "msg-dark");
+      el.classList.add(theme === "dark" ? "msg-dark" : "msg-light");
+    });
+  }
+  toggleThemeBtn.onclick = () => setTheme(document.documentElement.classList.contains("dark") ? "light" : "dark");
+  setTheme(localStorage.getItem("theme") || "light");
+  dashboardBtn.onclick = () => window.location.href = "app.html";
+
+  function formatDate(ts) {
+    if (!ts) return '';
+    const d = new Date(ts);
+    const now = new Date();
+    const msgDay = d.toDateString(), nowDay = now.toDateString();
+    if (msgDay === nowDay) return "Today";
+    const yesterday = new Date(now.getTime());
+    yesterday.setDate(yesterday.getDate() - 1);
+    if (msgDay === yesterday.toDateString()) return "Yesterday";
+    return d.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
+  }
+  function formatTime(ts) {
+    const d = new Date(ts);
+    return d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
+  }
+
+  // --- Sidebar lists and recents ---
+  // ... unchanged ...
 
   // --- Recents with deduplication ---
-  // unchanged...
+  // ... unchanged ...
 
   // --- Block Button unchanged...
 
   // --- Chat open logic ---
-  let typingListener = null;
-  let onlineListener = null;
-  let lastSeenListener = null;
-
-  function updateOnlineLastSeenTyping(otherUser) {
-    function updateOnline() {
-      db.ref(`users/${otherUser}/online`).once("value", snap => {
-        document.getElementById("onlineIndicator").textContent = snap.val() ? "Online" : "";
-      });
-    }
-    function updateLastSeen() {
-      db.ref(`users/${otherUser}/lastSeen`).once("value", snap => {
-        const v = snap.val();
-        if (!v) {
-          document.getElementById("lastSeenIndicator").textContent = "";
-          return;
-        }
-        const d = new Date(v);
-        document.getElementById("lastSeenIndicator").textContent = "Last seen " + d.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" }) + " " + d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", second: "2-digit" });
-      });
-    }
-    function updateTyping() {
-      db.ref(`typing/${currentUser}`).once("value", snap => {
-        const typ = snap.val();
-        document.getElementById("typingIndicator").textContent = (typ === otherUser) ? "Typing..." : "";
-      });
-    }
-    updateOnline();
-    updateLastSeen();
-    updateTyping();
-    // Poll every second
-    window._onlineLastSeenTypingInterval && clearInterval(window._onlineLastSeenTypingInterval);
-    window._onlineLastSeenTypingInterval = setInterval(function() {
-      updateOnline();
-      updateLastSeen();
-      updateTyping();
-    }, 1000);
-  }
-
+  let onlineLastSeenPoller = null;
   async function openChat(id, isGroup = false, groupName = "") {
     selectedChat = { id, isGroup, groupName };
     allMessages = [];
     messagesEl.innerHTML = "";
     if (messagesListener) messagesListener.off();
-    if (typingListener) typingListener.off;
-    if (onlineListener) onlineListener.off;
-    if (lastSeenListener) lastSeenListener.off;
 
+    // Online/Last seen/Typing indicators for 1:1
+    clearInterval(onlineLastSeenPoller);
     if (!isGroup) {
-      updateOnlineLastSeenTyping(id);
+      function updateOnlineLastSeenTyping() {
+        db.ref(`users/${id}/online`).once("value", snap => {
+          if (snap.val()) {
+            db.ref(`users/${id}/lastSeen`).once("value", () => {
+              document.getElementById("onlineLastSeenIndicator").textContent =
+                "Online";
+            });
+          } else {
+            db.ref(`users/${id}/lastSeen`).once("value", snap2 => {
+              const v = snap2.val();
+              if (!v) {
+                document.getElementById("onlineLastSeenIndicator").textContent = "";
+                return;
+              }
+              const d = new Date(v);
+              document.getElementById("onlineLastSeenIndicator").textContent =
+                "Last seen " +
+                d.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" }) +
+                " " + d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+            });
+          }
+        });
+        db.ref(`typing/${id}`).once("value", snap => {
+          const typ = snap.val();
+          if (typ === currentUser) {
+            typingOtherUser = true;
+            document.getElementById("typingIndicator").innerHTML = `<span class="typing-dots"><span></span><span></span><span></span></span>`;
+          } else {
+            typingOtherUser = false;
+            document.getElementById("typingIndicator").innerHTML = "";
+          }
+        });
+      }
+      updateOnlineLastSeenTyping();
+      onlineLastSeenPoller = setInterval(updateOnlineLastSeenTyping, 1000);
     } else {
-      document.getElementById("onlineIndicator").textContent = "";
-      document.getElementById("lastSeenIndicator").textContent = "";
-      document.getElementById("typingIndicator").textContent = "";
-      window._onlineLastSeenTypingInterval && clearInterval(window._onlineLastSeenTypingInterval);
+      document.getElementById("onlineLastSeenIndicator").textContent = "";
+      document.getElementById("typingIndicator").innerHTML = "";
+      clearInterval(onlineLastSeenPoller);
     }
 
     if (isGroup) {
@@ -368,7 +480,6 @@
 
   chatSearchBar.oninput = () => renderMessagesFiltered(chatSearchBar.value);
 
-  // --- Reply tag logic ---
   function setReplyTag(msg, id) {
     replyTag = { id, text: msg.text };
     let tagBar = document.getElementById("tagReplyBar");
@@ -405,6 +516,14 @@
         }
         renderMessage(msg, msg._id, lastDateDiv);
       });
+    // If typing indicator is active, show at bottom as a "message"
+    if (typingOtherUser) {
+      const typingDiv = document.createElement("div");
+      typingDiv.className = `max-w-xs px-4 py-2 rounded shadow text-sm break-words msg-light ml-auto flex items-center`;
+      typingDiv.innerHTML = `<span class="typing-dots"><span></span><span></span><span></span></span>`;
+      messagesEl.appendChild(typingDiv);
+      messagesEl.scrollTop = messagesEl.scrollHeight;
+    }
   }
 
   function renderMessage(msg, id, lastDateDiv) {
@@ -454,6 +573,58 @@
       contextMsg = msg;
       showContextMenu(getMenuActions(), e.clientX, e.clientY);
     };
+
+    let startX = null;
+    div.addEventListener("touchstart", e => { startX = e.touches[0].clientX; });
+    div.addEventListener("touchend", e => {
+      if (!startX) return;
+      const endX = e.changedTouches[0].clientX;
+      if (startX !== null && endX - startX > 60) {
+        setReplyTag(msg, id);
+      }
+      startX = null;
+    });
+
+    let longPressTimer;
+    div.addEventListener("touchstart", e => {
+      longPressTimer = setTimeout(() => {
+        contextMsgId = id;
+        contextMsg = msg;
+        showContextMenu(getMenuActions(), e.touches[0].clientX, e.touches[0].clientY);
+      }, 400);
+    });
+    div.addEventListener("touchend", () => clearTimeout(longPressTimer));
+    div.addEventListener("touchmove", () => clearTimeout(longPressTimer));
+
+    if (msg.sender !== currentUser && selectedChat && !selectedChat.isGroup) {
+      db.ref(`${getChatPath()}/${id}/status`).set("read");
+    }
+    if (isSender) {
+      const ticks = document.createElement("span");
+      ticks.className = "absolute bottom-1 right-2 text-xs";
+      if (msg.status === "read") {
+        ticks.textContent = "✓✓";
+        ticks.classList.add("text-green-700");
+      } else if (msg.status === "delivered") {
+        ticks.textContent = "✓✓";
+      } else {
+        ticks.textContent = "✓";
+      }
+      div.appendChild(ticks);
+    }
+    // Reactions bar
+    if (msg.reactions) {
+      const reactionBar = document.createElement("div");
+      reactionBar.className = "flex gap-1 mt-1";
+      for (const [user, emoji] of Object.entries(msg.reactions)) {
+        const span = document.createElement("span");
+        span.textContent = emoji;
+        span.className = "inline-block px-2 py-1 rounded bg-gray-200 dark:bg-gray-700 text-lg";
+        reactionBar.appendChild(span);
+      }
+      div.appendChild(reactionBar);
+    }
+
     // Message time
     const timeDiv = document.createElement("div");
     timeDiv.className = "text-xs text-gray-500 mt-1";
