@@ -617,6 +617,11 @@ async function openChat(id, isGroup = false, groupName = "") {
     allMessages.sort((a, b) => a.timestamp - b.timestamp);
 
     // DEDUPLICATE: In private chats, remove any message that is a received duplicate of a sent one
+    const msg = {
+        ...msgData,
+        _id: snap.key,
+        timestamp: msgData.timestamp || Date.now()
+    };
     if (!allMessages.find(m => m._id === msg._id)) {
         if (!selectedChat.isGroup && msg.sender !== currentUser) {
             if (allMessages.some(m => 
