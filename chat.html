@@ -602,7 +602,7 @@ async function openChat(id, isGroup = false, groupName = "") {
   await updateBlockButton();
 
   const path = getChatPath();
-  messagesEl.innerHTML = `<div class="loading-date">${formatDate(Date.now())}</div>`;
+  messagesEl.innerHTML = ""; // no date here
   db.ref(path).once("value", snap => {
     if (!snap.exists()) {
       messagesEl.innerHTML = "<div class='text-gray-500 text-center'>No messages yet.</div>";
