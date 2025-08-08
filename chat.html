@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>WhatsApp Clone</title>
+  <title>CHAT AND CONNECT</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
@@ -614,13 +614,18 @@ async function openChat(id, isGroup = false, groupName = "") {
     allMessages.sort((a, b) => a.timestamp - b.timestamp);
 
     // DEDUPLICATE: In private chats, remove any message that is a received duplicate of a sent one
-    if (!isGroup) {
-      const seen = {};
-      allMessages = allMessages.filter(msg => {
-        if (msg.sender !== currentUser && seen[msg.text + msg.timestamp]) return false;
-        seen[msg.text + msg.timestamp] = true;
-        return true;
-      });
+    if (!allMessages.find(m => m._id === msg._id)) {
+        if (!selectedChat.isGroup && msg.sender !== currentUser) {
+            if (allMessages.some(m => 
+                m.text === msg.text && 
+                m.timestamp === msg.timestamp && 
+                m.sender === currentUser
+            )) return;
+        }
+        
+        allMessages.push(msg);
+        allMessages.sort((a, b) => a.timestamp - b.timestamp);
+        renderMessagesFiltered(chatSearchBar.value);
     }
 
     renderMessagesFiltered(chatSearchBar.value);
@@ -832,38 +837,48 @@ function sendTyping(isTyping) {
 }
 
 messageForm.onsubmit = async e => {
-  e.preventDefault();
-  const text = messageInput.value.trim();
-  if (!text || !selectedChat) return;
-  if (!selectedChat.isGroup) {
-    if (await enforceBlock()) {
-      alert("You or the other user have blocked each other. Messaging is not allowed.");
-      return;
+    e.preventDefault();
+    const text = messageInput.value.trim();
+    if (!text || !selectedChat) return;
+    
+    if (!selectedChat.isGroup) {
+        if (await enforceBlock()) {
+            alert("You or the other user have blocked each other. Messaging is not allowed.");
+            return;
+        }
+        const blockedRef = db.ref(`blocked/${selectedChat.id}/${currentUser}`);
+        const blockedSnap = await blockedRef.once("value");
+        if (blockedSnap.exists()) {
+            alert("You are blocked by this user.");
+            return;
+        }
     }
-    const blockedRef = db.ref(`blocked/${selectedChat.id}/${currentUser}`);
-    const blockedSnap = await blockedRef.once("value");
-    if (blockedSnap.exists()) { alert("You are blocked by this user."); return; }
-  }
-  const msg = {
-    sender: currentUser,
-    text: text,
-    timestamp: Date.now(),
-    status: "sent"
-  };
-  if (replyTag) {
-    msg.replyTo = replyTag.id;
-    msg.replyText = replyTag.text;
-    replyTag = null;
-    tagReplyBar.innerHTML = '';
-  }
-  const ref = db.ref(getChatPath()).push();
-  await ref.set(msg);
-  messageInput.value = "";
-  sendTyping(false);
-  if (!selectedChat.isGroup) {
-    const statusRef = db.ref(`users/${selectedChat.id}/online`);
-    statusRef.once("value", snap => { if (snap.val()) ref.update({ status: "delivered" }); });
-  }
+
+    const msg = {
+        sender: currentUser,
+        text: text,
+        timestamp: Date.now(),
+        status: "sent"
+    };
+
+    if (replyTag) {
+        msg.replyTo = replyTag.id;
+        msg.replyText = replyTag.text;
+        replyTag = null;
+        tagReplyBar.innerHTML = '';
+    }
+
+    const ref = db.ref(getChatPath()).push();
+    await ref.set(msg);
+    messageInput.value = "";
+    sendTyping(false);
+
+    if (!selectedChat.isGroup) {
+        const statusRef = db.ref(`users/${selectedChat.id}/online`);
+        statusRef.once("value", snap => {
+            if (snap.val()) ref.update({ status: "delivered" });
+        });
+    }
 };
 
 attachBtn.onclick = () => fileInput.click();
@@ -968,11 +983,28 @@ window.addEventListener("scroll", hideContextMenu);
 window.addEventListener("resize", hideContextMenu);
 
 function editMessage(id, oldText) {
-  const newText = prompt("Edit your message:", oldText);
-  if (newText && newText.trim() && newText !== oldText) {
-    db.ref(`${getChatPath()}/${id}`).update({ text: newText + " (edited)" });
-  }
+    const messageRef = db.ref(`${getChatPath()}/${id}`);
+    messageRef.once("value", snap => {
+        const msg = snap.val();
+        if (!msg) return;
+        
+        // Check if message is editable (within 1 minute)
+        const timeElapsed = Date.now() - msg.timestamp;
+        if (timeElapsed > MESSAGE_DELETION_WINDOW) {
+            alert("Message editing is only available within 1 minute of sending.");
+            return;
+        }
+
+        const newText = prompt("Edit your message:", oldText);
+        if (newText && newText.trim() && newText !== oldText) {
+            messageRef.update({ 
+                text: newText + " (edited)",
+                editedAt: Date.now()
+            });
+        }
+    });
 }
+
 function addReaction(msgId) {
   const emoji = prompt("React with an emoji:");
   if (!emoji) return;
@@ -983,12 +1015,26 @@ function deleteForMe(id) {
   if (bubble) bubble.remove();
 }
 function deleteForEveryone(id) {
-  db.ref(`${getChatPath()}/${id}`).update({
-    text: "🚫 This message was deleted.",
-    fileUrl: null,
-    fileName: null,
-    deleted: true
-  });
+    const messageRef = db.ref(`${getChatPath()}/${id}`);
+    messageRef.once("value", snap => {
+        const msg = snap.val();
+        if (!msg) return;
+        
+        // Check if message can be deleted (within 1 minute)
+        const timeElapsed = Date.now() - msg.timestamp;
+        if (timeElapsed > MESSAGE_DELETION_WINDOW) {
+            alert("Message deletion is only available within 1 minute of sending.");
+            return;
+        }
+
+        messageRef.update({
+            text: "🚫 This message was deleted.",
+            fileUrl: null,
+            fileName: null,
+            deleted: true,
+            deletedAt: Date.now()
+        });
+    });
 }
 function showGroupInfoModal(group) {
   let html = `<h2 class="text-xl font-bold mb-2">${group.name}</h2>`;
