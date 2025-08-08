@@ -49,7 +49,6 @@
       vertical-align: middle;
       min-width: 30px;
     }
-    #messages { flex: 1; overflow-y: auto; padding: 1rem; background: #fff; }
     #tagReplyBar {
       position: sticky;
       bottom: 60px;
@@ -85,6 +84,7 @@
       cursor: pointer;
       border-left: 3px solid #3182ce;
     }
+    #messages { flex: 1; overflow-y: auto; padding: 1rem; background: #fff; }
     #messageForm { position: sticky; bottom: 0; background: #f3f4f6; }
     .msg-light { background-color: #d4f8e8 !important; color: #222 !important; }
     .msg-dark { background-color: #065f46 !important; color: #fff !important; }
@@ -236,569 +236,791 @@
 </div>
 <div id="contextMenu" class="hidden"></div>
 <script>
-  // Firebase config and variable setup unchanged...
-  const firebaseConfig = {
-    apiKey: "AIzaSyBfkUJS81minjxj0DFz4pzNnGzCtb5ZJss",
-    authDomain: "locater-42fb4.firebaseapp.com",
-    databaseURL: "https://locater-42fb4-default-rtdb.firebaseio.com",
-    projectId: "locater-42fb4",
-    storageBucket: "locater-42fb4.appspot.com",
-    messagingSenderId: "250348367998",
-    appId: "1:250348367998:web:d734b2b4c735b5684ae82f"
-  };
-  firebase.initializeApp(firebaseConfig);
-  const db = firebase.database();
-  const storage = firebase.storage();
+// Firebase config
+const firebaseConfig = {
+  apiKey: "AIzaSyBfkUJS81minjxj0DFz4pzNnGzCtb5ZJss",
+  authDomain: "locater-42fb4.firebaseapp.com",
+  databaseURL: "https://locater-42fb4-default-rtdb.firebaseio.com",
+  projectId: "locater-42fb4",
+  storageBucket: "locater-42fb4.appspot.com",
+  messagingSenderId: "250348367998",
+  appId: "1:250348367998:web:d734b2b4c735b5684ae82f"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+const storage = firebase.storage();
 
-  const currentUser = sessionStorage.getItem('username') || localStorage.getItem('username');
-  if (!currentUser) { alert('Session expired'); location.href = 'index.html'; }
-  document.getElementById('welcomeUserSidebar').textContent = currentUser;
+const currentUser = sessionStorage.getItem('username') || localStorage.getItem('username');
+if (!currentUser) { alert('Session expired'); location.href = 'index.html'; }
+document.getElementById('welcomeUserSidebar').textContent = currentUser;
 
-  // Elements
-  const userList = document.getElementById("userList");
-  const groupList = document.getElementById("groupList");
-  const recentsList = document.getElementById("recentsList");
-  const messagesEl = document.getElementById("messages");
-  const chatTitle = document.getElementById("chatTitle");
-  const chatSearchBar = document.getElementById("chatSearchBar");
-  const messageForm = document.getElementById("messageForm");
-  const messageInput = document.getElementById("messageInput");
-  const attachBtn = document.getElementById("attachBtn");
-  const fileInput = document.getElementById("fileInput");
-  const backBtn = document.getElementById("backBtn");
-  const chatListEl = document.getElementById("sidebar");
-  const chatWindowEl = document.getElementById("chatArea");
-  const createGroupBtn = document.getElementById("createGroupBtn");
-  const groupModal = document.getElementById("groupModal");
-  const publicBtn = document.getElementById("publicBtn");
-  const privateBtn = document.getElementById("privateBtn");
-  const privateFields = document.getElementById("privateFields");
-  const groupPasswordEl = document.getElementById("groupPassword");
-  const closeModal = document.getElementById("closeModal");
-  const groupNameInput = document.getElementById("groupName");
-  const groupUsers = document.getElementById("groupUsers");
-  const createGroup = document.getElementById("createGroup");
-  const blockUserBtn = document.getElementById("blockUser");
-  const toggleThemeBtn = document.getElementById("toggleTheme");
-  const dashboardBtn = document.getElementById("dashboardBtn");
-  const sidebarSearch = document.getElementById("sidebarSearch");
-  const contextMenu = document.getElementById("contextMenu");
-  const groupInfoModal = document.getElementById("groupInfoModal");
-  const groupInfoContent = document.getElementById("groupInfoContent");
-  const tagReplyBar = document.getElementById("tagReplyBar");
+// Elements
+const userList = document.getElementById("userList");
+const groupList = document.getElementById("groupList");
+const recentsList = document.getElementById("recentsList");
+const messagesEl = document.getElementById("messages");
+const chatTitle = document.getElementById("chatTitle");
+const chatSearchBar = document.getElementById("chatSearchBar");
+const messageForm = document.getElementById("messageForm");
+const messageInput = document.getElementById("messageInput");
+const attachBtn = document.getElementById("attachBtn");
+const fileInput = document.getElementById("fileInput");
+const backBtn = document.getElementById("backBtn");
+const chatListEl = document.getElementById("sidebar");
+const chatWindowEl = document.getElementById("chatArea");
+const createGroupBtn = document.getElementById("createGroupBtn");
+const groupModal = document.getElementById("groupModal");
+const publicBtn = document.getElementById("publicBtn");
+const privateBtn = document.getElementById("privateBtn");
+const privateFields = document.getElementById("privateFields");
+const groupPasswordEl = document.getElementById("groupPassword");
+const closeModal = document.getElementById("closeModal");
+const groupNameInput = document.getElementById("groupName");
+const groupUsers = document.getElementById("groupUsers");
+const createGroup = document.getElementById("createGroup");
+const blockUserBtn = document.getElementById("blockUser");
+const toggleThemeBtn = document.getElementById("toggleTheme");
+const dashboardBtn = document.getElementById("dashboardBtn");
+const sidebarSearch = document.getElementById("sidebarSearch");
+const contextMenu = document.getElementById("contextMenu");
+const groupInfoModal = document.getElementById("groupInfoModal");
+const groupInfoContent = document.getElementById("groupInfoContent");
+const tagReplyBar = document.getElementById("tagReplyBar");
 
-  let selectedChat = null, typingTimer;
-  let allUsers = {}, allGroups = {}, recentsData = [];
-  let messagesListener = null;
-  let allMessages = [];
-  let groupType = "public";
-  let lastGroupPassword = "";
-  let replyTag = null;
-  let typingOtherUser = false;
+let selectedChat = null, typingTimer;
+let allUsers = {}, allGroups = {}, recentsData = [];
+let messagesListener = null;
+let allMessages = [];
+let groupType = "public";
+let lastGroupPassword = "";
+let replyTag = null;
+let typingOtherUser = false;
+let onlineLastSeenPoller = null;
 
-  // --- Theme ---
-  function setTheme(theme) {
-    if (theme === "dark") {
-      document.documentElement.classList.add("dark");
-      document.body.classList.add("dark");
-      toggleThemeBtn.innerText = "🌞";
-    } else {
-      document.documentElement.classList.remove("dark");
-      document.body.classList.remove("dark");
-      toggleThemeBtn.innerText = "🌓";
+// Theme
+function setTheme(theme) {
+  if (theme === "dark") {
+    document.documentElement.classList.add("dark");
+    document.body.classList.add("dark");
+    toggleThemeBtn.innerText = "🌞";
+  } else {
+    document.documentElement.classList.remove("dark");
+    document.body.classList.remove("dark");
+    toggleThemeBtn.innerText = "🌓";
+  }
+  localStorage.setItem("theme", theme);
+  document.querySelectorAll("#sidebar, #chatArea, .sidebar-header").forEach(e => {
+    e.classList.toggle("dark", theme === "dark");
+  });
+  Array.from(messagesEl.children).forEach(el => {
+    el.classList.remove("msg-light", "msg-dark");
+    el.classList.add(theme === "dark" ? "msg-dark" : "msg-light");
+  });
+}
+toggleThemeBtn.onclick = () => setTheme(document.documentElement.classList.contains("dark") ? "light" : "dark");
+setTheme(localStorage.getItem("theme") || "light");
+dashboardBtn.onclick = () => window.location.href = "app.html";
+
+function formatDate(ts) {
+  if (!ts) return '';
+  const d = new Date(ts);
+  const msgDay = d.toDateString(), nowDay = (new Date()).toDateString();
+  if (msgDay === nowDay) return "Today";
+  const yesterday = new Date();
+  yesterday.setDate(yesterday.getDate() - 1);
+  if (msgDay === yesterday.toDateString()) return "Yesterday";
+  return d.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
+}
+function formatTime(ts) {
+  const d = new Date(ts);
+  return d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
+}
+
+// Sidebar lists and recents
+function refreshUserList() {
+  db.ref("users").once("value", snapshot => {
+    userList.innerHTML = "";
+    allUsers = snapshot.val() || {};
+    Object.keys(allUsers).forEach(username => {
+      if (username === currentUser) return;
+      const li = document.createElement("li");
+      li.className = "p-3 hover:bg-gray-100 cursor-pointer flex justify-between items-center";
+      li.innerHTML = `<span>${allUsers[username].name || username}</span><span class="badge badge-gray" id="badge-user-${username}">0</span>`;
+      li.onclick = () => openChat(username, false);
+      userList.appendChild(li);
+    });
+    filterSidebarLists();
+  });
+}
+db.ref("users").on("value", refreshUserList);
+
+function refreshGroupList() {
+  groupList.innerHTML = "";
+  db.ref("groups").once("value", snapshot => {
+    allGroups = snapshot.val() || {};
+    Object.values(allGroups).forEach(group => {
+      const li = document.createElement("li");
+      li.className = "p-3 hover:bg-green-100 cursor-pointer text-green-700 font-semibold flex justify-between items-center";
+      li.innerHTML = `<span># ${group.name}</span><span class="badge badge-green" id="badge-group-${group.id}">0</span>`;
+      li.onclick = () => openChat(group.id, true, group.name);
+      groupList.appendChild(li);
+    });
+    filterSidebarLists();
+  });
+}
+db.ref("groups").on("value", refreshGroupList);
+
+function loadRecents() {
+  recentsData = [];
+  const seenChats = {};
+  db.ref("messages").once("value").then(snapshot => {
+    snapshot.forEach(child => {
+      const chatId = child.key;
+      const users = chatId.split('_');
+      if (users.includes(currentUser)) {
+        let lastMsg = null, unreadCount = 0;
+        child.forEach(msgSnap => {
+          const msg = msgSnap.val();
+          if (!lastMsg || msg.timestamp > lastMsg.timestamp) lastMsg = { ...msg, _id: msgSnap.key };
+          if (msg.sender !== currentUser && msg.status !== "read") unreadCount++;
+        });
+        const otherUser = users.find(u => u !== currentUser);
+        if (otherUser && !seenChats[otherUser]) {
+          recentsData.push({
+            type: "user",
+            id: otherUser,
+            name: allUsers[otherUser]?.name || otherUser,
+            email: allUsers[otherUser]?.email || "",
+            phone: allUsers[otherUser]?.phone || "",
+            timestamp: lastMsg?.timestamp || 0,
+            unread: unreadCount
+          });
+          seenChats[otherUser] = true;
+        }
+      }
+    });
+    db.ref("groupMessages").once("value").then(groupSnap => {
+      groupSnap.forEach(child => {
+        const groupId = child.key;
+        if (allGroups[groupId]?.members?.[currentUser] && !seenChats[groupId]) {
+          let lastMsg = null, unreadCount = 0;
+          child.forEach(msgSnap => {
+            const msg = msgSnap.val();
+            if (!lastMsg || msg.timestamp > lastMsg.timestamp) lastMsg = { ...msg, _id: msgSnap.key };
+            if (msg.sender !== currentUser && (!msg.status || msg.status !== "read")) unreadCount++;
+          });
+          recentsData.push({
+            type: "group",
+            id: groupId,
+            name: allGroups[groupId]?.name || groupId,
+            email: "",
+            phone: "",
+            timestamp: lastMsg?.timestamp || 0,
+            unread: unreadCount
+          });
+          seenChats[groupId] = true;
+        }
+      });
+      recentsData.sort((a, b) => b.timestamp - a.timestamp);
+      renderRecents();
+      filterSidebarLists();
+    });
+  });
+}
+
+function renderRecents() {
+  recentsList.innerHTML = "";
+  recentsData.forEach(item => {
+    const li = document.createElement("li");
+    li.className = "p-3 hover:bg-gray-100 cursor-pointer flex justify-between items-center";
+    const badgeClass = item.type === "group" ? "badge-green" : "badge-blue";
+    li.innerHTML = `<span>${item.type === "group" ? "# " : ""}${item.name}</span>
+      <span class="badge ${badgeClass}">${item.unread}</span>`;
+    li.onclick = () => openChat(item.id, item.type === "group", item.name);
+    recentsList.appendChild(li);
+  });
+}
+function reloadRecents() { recentsData = []; loadRecents(); }
+db.ref("users").on("value", reloadRecents);
+db.ref("groups").on("value", reloadRecents);
+db.ref("messages").on("value", reloadRecents);
+db.ref("groupMessages").on("value", reloadRecents);
+
+function filterSidebarLists() {
+  const query = (sidebarSearch.value || "").toLowerCase();
+  function filterList(list, items, getFields) {
+    Array.from(list.children).forEach((li, idx) => {
+      if (!items[idx]) return li.style.display = "none";
+      const { name, email, phone } = getFields(items[idx]);
+      li.style.display = (
+        name.toLowerCase().includes(query) ||
+        email.toLowerCase().includes(query) ||
+        phone.toLowerCase().includes(query)
+      ) ? "" : "none";
+    });
+  }
+  filterList(recentsList, recentsData, i => i);
+  filterList(userList, Object.keys(allUsers).filter(u => u !== currentUser), u => ({
+    name: allUsers[u]?.name || u,
+    email: allUsers[u]?.email || "",
+    phone: allUsers[u]?.phone || ""
+  }));
+  filterList(groupList, Object.values(allGroups), g => ({
+    name: g.name || g.id, email: "", phone: ""
+  }));
+}
+sidebarSearch.oninput = filterSidebarLists;
+
+function showSidebar() {
+  chatListEl.classList.remove("hide");
+  chatWindowEl.classList.add("hide");
+}
+backBtn.onclick = showSidebar;
+
+function promptGroupJoin(group) {
+  if (group.type === "private" && !group.members?.[currentUser]) {
+    const pwd = prompt("This is a private group. Enter password to join:");
+    if (pwd !== group.password) { alert("Wrong password."); return false; }
+    db.ref(`groups/${group.id}/members/${currentUser}`).set(true);
+    alert("You have joined this group!");
+    return true;
+  }
+  if (!group.members?.[currentUser]) {
+    if (!confirm("Join this group?")) return false;
+    db.ref(`groups/${group.id}/members/${currentUser}`).set(true);
+    alert("You have joined this group!");
+    return true;
+  }
+  return true;
+}
+
+async function updateBlockButton() {
+  if (!selectedChat || selectedChat.isGroup) {
+    blockUserBtn.textContent = "🚫 Block";
+    blockUserBtn.disabled = true;
+    return;
+  }
+  const otherUser = selectedChat.id;
+  const userBlockedSnap = await db.ref(`blocked/${currentUser}/${otherUser}`).once("value");
+  const otherBlockedSnap = await db.ref(`blocked/${otherUser}/${currentUser}`).once("value");
+  if (userBlockedSnap.exists()) {
+    blockUserBtn.textContent = "✅ Unblock";
+    blockUserBtn.disabled = false;
+  } else if (otherBlockedSnap.exists()) {
+    blockUserBtn.textContent = "🚫 Blocked";
+    blockUserBtn.disabled = false;
+  } else {
+    blockUserBtn.textContent = "🚫 Block";
+    blockUserBtn.disabled = false;
+  }
+}
+
+async function enforceBlock() {
+  if (!selectedChat || selectedChat.isGroup) return false;
+  const otherUser = selectedChat.id;
+  const userBlockedSnap = await db.ref(`blocked/${currentUser}/${otherUser}`).once("value");
+  const otherBlockedSnap = await db.ref(`blocked/${otherUser}/${currentUser}`).once("value");
+  return userBlockedSnap.exists() || otherBlockedSnap.exists();
+}
+
+let contextMsgId = null, contextMsg = null, contextMenuOpen = false;
+
+// --- Chat open logic ---
+function getChatPath() {
+  if (!selectedChat) return "";
+  if (selectedChat.isGroup) return `groupMessages/${selectedChat.id}`;
+  const ids = [currentUser, selectedChat.id].sort();
+  return `messages/${ids[0]}_${ids[1]}`;
+}
+
+let onlineLastSeenPoller = null;
+async function openChat(id, isGroup = false, groupName = "") {
+  selectedChat = { id, isGroup, groupName };
+  allMessages = [];
+  messagesEl.innerHTML = "";
+  if (messagesListener) messagesListener.off();
+  clearInterval(onlineLastSeenPoller);
+
+  // Online/Last seen/Typing indicators for 1:1
+  if (!isGroup) {
+    function updateOnlineLastSeenTyping() {
+      db.ref(`users/${id}/online`).once("value", snap => {
+        if (snap.val()) {
+          document.getElementById("onlineLastSeenIndicator").textContent = "Online";
+        } else {
+          db.ref(`users/${id}/lastSeen`).once("value", snap2 => {
+            const v = snap2.val();
+            if (!v) {
+              document.getElementById("onlineLastSeenIndicator").textContent = "";
+              return;
+            }
+            const d = new Date(v);
+            document.getElementById("onlineLastSeenIndicator").textContent =
+              "Last seen " +
+              d.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" }) +
+              " " + d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+          });
+        }
+      });
+      db.ref(`typing/${id}`).once("value", snap => {
+        const typ = snap.val();
+        if (typ === currentUser) {
+          typingOtherUser = true;
+          document.getElementById("typingIndicator").innerHTML = `<span class="typing-dots"><span></span><span></span><span></span></span>`;
+        } else {
+          typingOtherUser = false;
+          document.getElementById("typingIndicator").innerHTML = "";
+        }
+      });
     }
-    localStorage.setItem("theme", theme);
-    document.querySelectorAll("#sidebar, #chatArea, .sidebar-header").forEach(e => {
-      e.classList.toggle("dark", theme === "dark");
-    });
-    Array.from(messagesEl.children).forEach(el => {
-      el.classList.remove("msg-light", "msg-dark");
-      el.classList.add(theme === "dark" ? "msg-dark" : "msg-light");
-    });
-  }
-  toggleThemeBtn.onclick = () => setTheme(document.documentElement.classList.contains("dark") ? "light" : "dark");
-  setTheme(localStorage.getItem("theme") || "light");
-  dashboardBtn.onclick = () => window.location.href = "app.html";
-
-  function formatDate(ts) {
-    if (!ts) return '';
-    const d = new Date(ts);
-    const now = new Date();
-    const msgDay = d.toDateString(), nowDay = now.toDateString();
-    if (msgDay === nowDay) return "Today";
-    const yesterday = new Date(now.getTime());
-    yesterday.setDate(yesterday.getDate() - 1);
-    if (msgDay === yesterday.toDateString()) return "Yesterday";
-    return d.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
-  }
-  function formatTime(ts) {
-    const d = new Date(ts);
-    return d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
-  }
-
-  // --- Sidebar lists and recents ---
-  // ... unchanged ...
-
-  // --- Recents with deduplication ---
-  // ... unchanged ...
-
-  // --- Block Button unchanged...
-
-  // --- Chat open logic ---
-  let onlineLastSeenPoller = null;
-  async function openChat(id, isGroup = false, groupName = "") {
-    selectedChat = { id, isGroup, groupName };
-    allMessages = [];
-    messagesEl.innerHTML = "";
-    if (messagesListener) messagesListener.off();
-
-    // Online/Last seen/Typing indicators for 1:1
+    updateOnlineLastSeenTyping();
+    onlineLastSeenPoller = setInterval(updateOnlineLastSeenTyping, 1000);
+  } else {
+    document.getElementById("onlineLastSeenIndicator").textContent = "";
+    document.getElementById("typingIndicator").innerHTML = "";
     clearInterval(onlineLastSeenPoller);
+  }
+
+  if (isGroup) {
+    const group = allGroups[id];
+    if (!group) return alert("Group not found.");
+    if (!group.members || !group.members[currentUser]) {
+      const joined = promptGroupJoin(group);
+      if (!joined) { showSidebar(); return; }
+    }
+    chatTitle.textContent = `# ${group.name}`;
+    lastGroupPassword = group.password || "";
+    chatTitle.onclick = () => showGroupInfoModal(group);
+  } else {
+    chatTitle.textContent = allUsers[id]?.name || id;
+    chatTitle.onclick = null;
+  }
+  showChatArea();
+  await updateBlockButton();
+
+  const path = getChatPath();
+  messagesEl.innerHTML = `<div class="loading-date">${formatDate(Date.now())}</div>`;
+  db.ref(path).once("value", snap => {
+    if (!snap.exists()) {
+      messagesEl.innerHTML = "<div class='text-gray-500 text-center'>No messages yet.</div>";
+      return;
+    }
+    allMessages = [];
+    snap.forEach(child => {
+      const msg = child.val();
+      msg._id = child.key;
+      allMessages.push(msg);
+    });
+    allMessages.sort((a, b) => a.timestamp - b.timestamp);
+
+    // DEDUPLICATE: In private chats, remove any message that is a received duplicate of a sent one
     if (!isGroup) {
-      function updateOnlineLastSeenTyping() {
-        db.ref(`users/${id}/online`).once("value", snap => {
-          if (snap.val()) {
-            db.ref(`users/${id}/lastSeen`).once("value", () => {
-              document.getElementById("onlineLastSeenIndicator").textContent =
-                "Online";
-            });
-          } else {
-            db.ref(`users/${id}/lastSeen`).once("value", snap2 => {
-              const v = snap2.val();
-              if (!v) {
-                document.getElementById("onlineLastSeenIndicator").textContent = "";
-                return;
-              }
-              const d = new Date(v);
-              document.getElementById("onlineLastSeenIndicator").textContent =
-                "Last seen " +
-                d.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" }) +
-                " " + d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", second: "2-digit" });
-            });
-          }
-        });
-        db.ref(`typing/${id}`).once("value", snap => {
-          const typ = snap.val();
-          if (typ === currentUser) {
-            typingOtherUser = true;
-            document.getElementById("typingIndicator").innerHTML = `<span class="typing-dots"><span></span><span></span><span></span></span>`;
-          } else {
-            typingOtherUser = false;
-            document.getElementById("typingIndicator").innerHTML = "";
-          }
-        });
-      }
-      updateOnlineLastSeenTyping();
-      onlineLastSeenPoller = setInterval(updateOnlineLastSeenTyping, 1000);
-    } else {
-      document.getElementById("onlineLastSeenIndicator").textContent = "";
-      document.getElementById("typingIndicator").innerHTML = "";
-      clearInterval(onlineLastSeenPoller);
-    }
-
-    if (isGroup) {
-      const group = allGroups[id];
-      if (!group) return alert("Group not found.");
-      if (!group.members || !group.members[currentUser]) {
-        const joined = promptGroupJoin(group);
-        if (!joined) { showSidebar(); return; }
-      }
-      chatTitle.textContent = `# ${group.name}`;
-      lastGroupPassword = group.password || "";
-      chatTitle.onclick = () => showGroupInfoModal(group);
-    } else {
-      chatTitle.textContent = allUsers[id]?.name || id;
-      chatTitle.onclick = null;
-    }
-    showChatArea();
-    await updateBlockButton();
-
-    const path = getChatPath();
-    messagesEl.innerHTML = `<div class="loading-date">${formatDate(Date.now())}</div>`;
-    db.ref(path).once("value", snap => {
-      if (!snap.exists()) {
-        messagesEl.innerHTML = "<div class='text-gray-500 text-center'>No messages yet.</div>";
-        return;
-      }
-      allMessages = [];
-      snap.forEach(child => {
-        const msg = child.val();
-        msg._id = child.key;
-        allMessages.push(msg);
+      const seen = {};
+      allMessages = allMessages.filter(msg => {
+        if (msg.sender !== currentUser && seen[msg.text + msg.timestamp]) return false;
+        seen[msg.text + msg.timestamp] = true;
+        return true;
       });
+    }
+
+    renderMessagesFiltered(chatSearchBar.value);
+  });
+
+  messagesListener = db.ref(path);
+  messagesListener.off();
+  messagesListener.on("child_added", snap => {
+    const msg = snap.val();
+    msg._id = snap.key;
+    if (!allMessages.find(m => m._id === msg._id)) {
+      if (!isGroup && msg.sender !== currentUser) {
+        if (allMessages.some(m => m.text === msg.text && m.timestamp === msg.timestamp && m.sender === currentUser)) return;
+      }
+      allMessages.push(msg);
       allMessages.sort((a, b) => a.timestamp - b.timestamp);
-
-      // DEDUPLICATE: In private chats, remove any message that is a received duplicate of a sent one
-      if (!isGroup) {
-        const seen = {};
-        allMessages = allMessages.filter(msg => {
-          if (msg.sender !== currentUser && seen[msg.text + msg.timestamp]) return false;
-          seen[msg.text + msg.timestamp] = true;
-          return true;
-        });
-      }
-
       renderMessagesFiltered(chatSearchBar.value);
-    });
-
-    messagesListener = db.ref(path);
-    messagesListener.off();
-    messagesListener.on("child_added", snap => {
-      const msg = snap.val();
-      msg._id = snap.key;
-      if (!allMessages.find(m => m._id === msg._id)) {
-        if (!isGroup && msg.sender !== currentUser) {
-          if (allMessages.some(m => m.text === msg.text && m.timestamp === msg.timestamp && m.sender === currentUser)) return;
-        }
-        allMessages.push(msg);
-        allMessages.sort((a, b) => a.timestamp - b.timestamp);
-        renderMessagesFiltered(chatSearchBar.value);
-      }
-    });
-    messagesListener.on("child_changed", snap => {
-      const msg = snap.val();
-      msg._id = snap.key;
-      const idx = allMessages.findIndex(m => m._id === msg._id);
-      if (idx !== -1) {
-        allMessages[idx] = msg;
-        renderMessagesFiltered(chatSearchBar.value);
-      }
-    });
-    messagesListener.on("child_removed", snap => {
-      const _id = snap.key;
-      allMessages = allMessages.filter(m => m._id !== _id);
+    }
+  });
+  messagesListener.on("child_changed", snap => {
+    const msg = snap.val();
+    msg._id = snap.key;
+    const idx = allMessages.findIndex(m => m._id === msg._id);
+    if (idx !== -1) {
+      allMessages[idx] = msg;
       renderMessagesFiltered(chatSearchBar.value);
-    });
-  }
-
-  function getChatPath() {
-    if (!selectedChat) return "";
-    if (selectedChat.isGroup) return `groupMessages/${selectedChat.id}`;
-    const ids = [currentUser, selectedChat.id].sort();
-    return `messages/${ids[0]}_${ids[1]}`;
-  }
-
-  chatSearchBar.oninput = () => renderMessagesFiltered(chatSearchBar.value);
-
-  function setReplyTag(msg, id) {
-    replyTag = { id, text: msg.text };
-    let tagBar = document.getElementById("tagReplyBar");
-    if (tagBar) {
-      tagBar.innerHTML = `<div class="input-tag-bar">
-        <span>Replying to: ${msg.text.slice(0,60)}${msg.text.length>60?'...':''}</span>
-        <span class="remove-tag" onclick="removeReplyTag()">×</span>
-      </div>`;
-      window.removeReplyTag = function() {
-        replyTag = null;
-        tagBar.innerHTML = '';
-      };
     }
+  });
+  messagesListener.on("child_removed", snap => {
+    const _id = snap.key;
+    allMessages = allMessages.filter(m => m._id !== _id);
+    renderMessagesFiltered(chatSearchBar.value);
+  });
+}
+
+chatSearchBar.oninput = () => renderMessagesFiltered(chatSearchBar.value);
+
+function setReplyTag(msg, id) {
+  replyTag = { id, text: msg.text };
+  let tagBar = document.getElementById("tagReplyBar");
+  if (tagBar) {
+    tagBar.innerHTML = `<div class="input-tag-bar">
+      <span>Replying to: ${msg.text.slice(0,60)}${msg.text.length>60?'...':''}</span>
+      <span class="remove-tag" onclick="removeReplyTag()">×</span>
+    </div>`;
+    window.removeReplyTag = function() {
+      replyTag = null;
+      tagBar.innerHTML = '';
+    };
   }
+}
 
-  function renderMessagesFiltered(query) {
-    messagesEl.innerHTML = "";
-    let lastDate = "";
-    let lastDateDiv = null;
-    const lower = (query||"").toLowerCase();
-    allMessages
-      .filter(msg =>
-        !query || (msg.text && msg.text.toLowerCase().includes(lower)) ||
-        (msg.fileName && msg.fileName.toLowerCase().includes(lower))
-      )
-      .forEach((msg, idx, arr) => {
-        const dateStr = formatDate(msg.timestamp);
-        if (dateStr !== lastDate) {
-          lastDate = dateStr;
-          lastDateDiv = document.createElement("div");
-          lastDateDiv.className = "date-sticky";
-          lastDateDiv.textContent = dateStr;
-          messagesEl.appendChild(lastDateDiv);
-        }
-        renderMessage(msg, msg._id, lastDateDiv);
-      });
-    // If typing indicator is active, show at bottom as a "message"
-    if (typingOtherUser) {
-      const typingDiv = document.createElement("div");
-      typingDiv.className = `max-w-xs px-4 py-2 rounded shadow text-sm break-words msg-light ml-auto flex items-center`;
-      typingDiv.innerHTML = `<span class="typing-dots"><span></span><span></span><span></span></span>`;
-      messagesEl.appendChild(typingDiv);
-      messagesEl.scrollTop = messagesEl.scrollHeight;
-    }
-  }
-
-  function renderMessage(msg, id, lastDateDiv) {
-    const isSender = msg.sender === currentUser;
-    const timeElapsed = Date.now() - msg.timestamp;
-    const showEditDeleteForEveryone = isSender && timeElapsed <= 60000;
-    const lightBg = document.documentElement.classList.contains("dark") ? "msg-dark" : "msg-light";
-    const div = document.createElement("div");
-    div.dataset.id = id;
-    div.className = `relative max-w-xs px-4 py-2 rounded shadow text-sm break-words ${lightBg} ${isSender ? "ml-auto" : ""}`;
-
-    // Reply tag if present
-    if (msg.replyTo) {
-      const replyDiv = document.createElement("div");
-      replyDiv.className = "reply-tag";
-      replyDiv.textContent = msg.replyText || "Replied message";
-      replyDiv.onclick = () => {
-        const el = document.querySelector(`[data-id="${msg.replyTo}"]`);
-        if (el) {
-          el.scrollIntoView({ behavior: "smooth", block: "center" });
-          el.classList.add("ring", "ring-blue-500");
-          setTimeout(()=>el.classList.remove("ring","ring-blue-500"), 1200);
-        }
-      };
-      div.appendChild(replyDiv);
-    }
-
-    div.innerHTML += msg.text || (msg.fileUrl ? `<a href="${msg.fileUrl}" target="_blank" class="underline text-blue-700">${msg.fileName}</a>` : "");
-
-    function getMenuActions() {
-      const actions = [{ label: "Reply", action: "reply" }];
-      if (isSender) {
-        actions.push({ label: "Edit", action: "edit" });
-        actions.push({ label: "Delete for Me", action: "deleteMe" });
-        if (showEditDeleteForEveryone) {
-          actions.push({ label: "Delete for Everyone", action: "deleteEveryone" });
-        }
-      } else {
-        actions.push({ label: "Delete for Me", action: "deleteMe" });
+function renderMessagesFiltered(query) {
+  messagesEl.innerHTML = "";
+  let lastDate = "";
+  let lastDateDiv = null;
+  const lower = (query||"").toLowerCase();
+  allMessages
+    .filter(msg =>
+      !query || (msg.text && msg.text.toLowerCase().includes(lower)) ||
+      (msg.fileName && msg.fileName.toLowerCase().includes(lower))
+    )
+    .forEach((msg, idx, arr) => {
+      const dateStr = formatDate(msg.timestamp);
+      if (dateStr !== lastDate) {
+        lastDate = dateStr;
+        lastDateDiv = document.createElement("div");
+        lastDateDiv.className = "date-sticky";
+        lastDateDiv.textContent = dateStr;
+        messagesEl.appendChild(lastDateDiv);
       }
-      actions.push({ label: "React", action: "react" });
-      return actions;
+      renderMessage(msg, msg._id, lastDateDiv);
+    });
+  // Typing indicator message
+  if (typingOtherUser) {
+    const typingDiv = document.createElement("div");
+    typingDiv.className = `max-w-xs px-4 py-2 rounded shadow text-sm break-words msg-light ml-auto flex items-center`;
+    typingDiv.innerHTML = `<span class="typing-dots"><span></span><span></span><span></span></span>`;
+    messagesEl.appendChild(typingDiv);
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+  }
+}
+
+function renderMessage(msg, id, lastDateDiv) {
+  const isSender = msg.sender === currentUser;
+  const timeElapsed = Date.now() - msg.timestamp;
+  const showEditDeleteForEveryone = isSender && timeElapsed <= 60000;
+  const lightBg = document.documentElement.classList.contains("dark") ? "msg-dark" : "msg-light";
+  const div = document.createElement("div");
+  div.dataset.id = id;
+  div.className = `relative max-w-xs px-4 py-2 rounded shadow text-sm break-words ${lightBg} ${isSender ? "ml-auto" : ""}`;
+
+  if (msg.replyTo) {
+    const replyDiv = document.createElement("div");
+    replyDiv.className = "reply-tag";
+    replyDiv.textContent = msg.replyText || "Replied message";
+    replyDiv.onclick = () => {
+      const el = document.querySelector(`[data-id="${msg.replyTo}"]`);
+      if (el) {
+        el.scrollIntoView({ behavior: "smooth", block: "center" });
+        el.classList.add("ring", "ring-blue-500");
+        setTimeout(()=>el.classList.remove("ring","ring-blue-500"), 1200);
+      }
+    };
+    div.appendChild(replyDiv);
+  }
+
+  div.innerHTML += msg.text || (msg.fileUrl ? `<a href="${msg.fileUrl}" target="_blank" class="underline text-blue-700">${msg.fileName}</a>` : "");
+
+  function getMenuActions() {
+    const actions = [{ label: "Reply", action: "reply" }];
+    if (isSender) {
+      actions.push({ label: "Edit", action: "edit" });
+      actions.push({ label: "Delete for Me", action: "deleteMe" });
+      if (showEditDeleteForEveryone) {
+        actions.push({ label: "Delete for Everyone", action: "deleteEveryone" });
+      }
+    } else {
+      actions.push({ label: "Delete for Me", action: "deleteMe" });
     }
-    div.oncontextmenu = e => {
-      e.preventDefault();
+    actions.push({ label: "React", action: "react" });
+    return actions;
+  }
+  div.oncontextmenu = e => {
+    e.preventDefault();
+    contextMsgId = id;
+    contextMsg = msg;
+    showContextMenu(getMenuActions(), e.clientX, e.clientY);
+  };
+
+  let startX = null;
+  div.addEventListener("touchstart", e => { startX = e.touches[0].clientX; });
+  div.addEventListener("touchend", e => {
+    if (!startX) return;
+    const endX = e.changedTouches[0].clientX;
+    if (startX !== null && endX - startX > 60) {
+      setReplyTag(msg, id);
+    }
+    startX = null;
+  });
+
+  let longPressTimer;
+  div.addEventListener("touchstart", e => {
+    longPressTimer = setTimeout(() => {
       contextMsgId = id;
       contextMsg = msg;
-      showContextMenu(getMenuActions(), e.clientX, e.clientY);
-    };
+      showContextMenu(getMenuActions(), e.touches[0].clientX, e.touches[0].clientY);
+    }, 400);
+  });
+  div.addEventListener("touchend", () => clearTimeout(longPressTimer));
+  div.addEventListener("touchmove", () => clearTimeout(longPressTimer));
 
-    let startX = null;
-    div.addEventListener("touchstart", e => { startX = e.touches[0].clientX; });
-    div.addEventListener("touchend", e => {
-      if (!startX) return;
-      const endX = e.changedTouches[0].clientX;
-      if (startX !== null && endX - startX > 60) {
-        setReplyTag(msg, id);
-      }
-      startX = null;
-    });
-
-    let longPressTimer;
-    div.addEventListener("touchstart", e => {
-      longPressTimer = setTimeout(() => {
-        contextMsgId = id;
-        contextMsg = msg;
-        showContextMenu(getMenuActions(), e.touches[0].clientX, e.touches[0].clientY);
-      }, 400);
-    });
-    div.addEventListener("touchend", () => clearTimeout(longPressTimer));
-    div.addEventListener("touchmove", () => clearTimeout(longPressTimer));
-
-    if (msg.sender !== currentUser && selectedChat && !selectedChat.isGroup) {
-      db.ref(`${getChatPath()}/${id}/status`).set("read");
+  if (msg.sender !== currentUser && selectedChat && !selectedChat.isGroup) {
+    db.ref(`${getChatPath()}/${id}/status`).set("read");
+  }
+  if (isSender) {
+    const ticks = document.createElement("span");
+    ticks.className = "absolute bottom-1 right-2 text-xs";
+    if (msg.status === "read") {
+      ticks.textContent = "✓✓";
+      ticks.classList.add("text-green-700");
+    } else if (msg.status === "delivered") {
+      ticks.textContent = "✓✓";
+    } else {
+      ticks.textContent = "✓";
     }
-    if (isSender) {
-      const ticks = document.createElement("span");
-      ticks.className = "absolute bottom-1 right-2 text-xs";
-      if (msg.status === "read") {
-        ticks.textContent = "✓✓";
-        ticks.classList.add("text-green-700");
-      } else if (msg.status === "delivered") {
-        ticks.textContent = "✓✓";
-      } else {
-        ticks.textContent = "✓";
-      }
-      div.appendChild(ticks);
+    div.appendChild(ticks);
+  }
+  // Reactions bar
+  if (msg.reactions) {
+    const reactionBar = document.createElement("div");
+    reactionBar.className = "flex gap-1 mt-1";
+    for (const [user, emoji] of Object.entries(msg.reactions)) {
+      const span = document.createElement("span");
+      span.textContent = emoji;
+      span.className = "inline-block px-2 py-1 rounded bg-gray-200 dark:bg-gray-700 text-lg";
+      reactionBar.appendChild(span);
     }
-    // Reactions bar
-    if (msg.reactions) {
-      const reactionBar = document.createElement("div");
-      reactionBar.className = "flex gap-1 mt-1";
-      for (const [user, emoji] of Object.entries(msg.reactions)) {
-        const span = document.createElement("span");
-        span.textContent = emoji;
-        span.className = "inline-block px-2 py-1 rounded bg-gray-200 dark:bg-gray-700 text-lg";
-        reactionBar.appendChild(span);
-      }
-      div.appendChild(reactionBar);
-    }
-
-    // Message time
-    const timeDiv = document.createElement("div");
-    timeDiv.className = "text-xs text-gray-500 mt-1";
-    timeDiv.textContent = formatTime(msg.timestamp);
-    div.appendChild(timeDiv);
-
-    messagesEl.appendChild(div);
-    messagesEl.scrollTop = messagesEl.scrollHeight;
-    if (msg.sender !== currentUser && document.hidden && Notification.permission === "granted") {
-      new Notification(`New message from ${msg.sender}`, {
-        body: msg.text,
-        icon: "/assets/whatsapp-icon.png"
-      });
-    }
+    div.appendChild(reactionBar);
   }
 
-  messageInput.oninput = () => {
-    sendTyping(true);
-    clearTimeout(typingTimer);
-    typingTimer = setTimeout(() => sendTyping(false), 2000);
-  };
-  function showChatArea() {
-    chatListEl.classList.add("hide");
-    chatWindowEl.classList.remove("hide");
-  }
-  function sendTyping(isTyping) {
-    if (!selectedChat || selectedChat.isGroup) return;
-    db.ref(`typing/${selectedChat.id}`).set(isTyping ? currentUser : "");
-  }
+  const timeDiv = document.createElement("div");
+  timeDiv.className = "text-xs text-gray-500 mt-1";
+  timeDiv.textContent = formatTime(msg.timestamp);
+  div.appendChild(timeDiv);
 
-  messageForm.onsubmit = async e => {
-    e.preventDefault();
-    const text = messageInput.value.trim();
-    if (!text || !selectedChat) return;
-    if (!selectedChat.isGroup) {
-      if (await enforceBlock()) {
-        alert("You or the other user have blocked each other. Messaging is not allowed.");
-        return;
-      }
-      const blockedRef = db.ref(`blocked/${selectedChat.id}/${currentUser}`);
-      const blockedSnap = await blockedRef.once("value");
-      if (blockedSnap.exists()) { alert("You are blocked by this user."); return; }
-    }
-    const msg = {
-      sender: currentUser,
-      text: text,
-      timestamp: Date.now(),
-      status: "sent"
-    };
-    if (replyTag) {
-      msg.replyTo = replyTag.id;
-      msg.replyText = replyTag.text;
-      replyTag = null;
-      document.getElementById("tagReplyBar").innerHTML = '';
-    }
-    const ref = db.ref(getChatPath()).push();
-    await ref.set(msg);
-    messageInput.value = "";
-    sendTyping(false);
-    if (!selectedChat.isGroup) {
-      const statusRef = db.ref(`users/${selectedChat.id}/online`);
-      statusRef.once("value", snap => { if (snap.val()) ref.update({ status: "delivered" }); });
-    }
-  };
-
-  attachBtn.onclick = () => fileInput.click();
-  fileInput.onchange = async () => {
-    const file = fileInput.files[0];
-    if (!file || !selectedChat) return;
-    if (file.size > 10 * 1024 * 1024) { alert("File is too large (max 10MB)."); return; }
-    const ref = storage.ref().child(`attachments/${Date.now()}_${file.name}`);
-    await ref.put(file);
-    const url = await ref.getDownloadURL();
-    const msg = { sender: currentUser, fileUrl: url, fileName: file.name, timestamp: Date.now() };
-    await db.ref(getChatPath()).push(msg);
-  };
-
-  // --- Group create unchanged...
-  // --- Disconnect logic unchanged...
-
-  // --- Context Menu ---
-  let contextMsgId = null, contextMsg = null, contextMenuOpen = false;
-  function showContextMenu(actions, x, y) {
-    let menuHtml = "";
-    actions.forEach(({ label, action }) => {
-      menuHtml += `<div class="p-2 hover:bg-gray-200 cursor-pointer" data-action="${action}">${label}</div>`;
-    });
-    contextMenu.innerHTML = menuHtml;
-    contextMenu.classList.remove("hidden");
-    contextMenuOpen = true;
-    const menuWidth = 180, menuHeight = 40 * actions.length, padding = 8;
-    let left = x, top = y;
-    if (left + menuWidth > window.innerWidth) left = window.innerWidth - menuWidth - padding;
-    if (top + menuHeight > window.innerHeight) top = window.innerHeight - menuHeight - padding;
-    if (left < 0) left = padding;
-    if (top < 0) top = padding;
-    contextMenu.style.left = left + "px";
-    contextMenu.style.top = top + "px";
-    contextMenu.style.transform = "";
-  }
-  function hideContextMenu() {
-    contextMenu.classList.add("hidden");
-    contextMenuOpen = false;
-  }
-  contextMenu.onclick = e => {
-    const action = e.target.dataset.action;
-    if (!action || !contextMsgId || !contextMsg) return;
-    if (action === "reply") setReplyTag(contextMsg, contextMsgId);
-    if (action === "edit") editMessage(contextMsgId, contextMsg.text);
-    if (action === "deleteMe") deleteForMe(contextMsgId);
-    if (action === "deleteEveryone") deleteForEveryone(contextMsgId);
-    if (action === "react") addReaction(contextMsgId);
-    hideContextMenu();
-  };
-  document.body.addEventListener("click", () => { if (contextMenuOpen) hideContextMenu(); });
-  window.addEventListener("scroll", hideContextMenu);
-  window.addEventListener("resize", hideContextMenu);
-
-  function editMessage(id, oldText) {
-    const newText = prompt("Edit your message:", oldText);
-    if (newText && newText.trim() && newText !== oldText) {
-      db.ref(`${getChatPath()}/${id}`).update({ text: newText + " (edited)" });
-    }
-  }
-  function addReaction(msgId) {
-    const emoji = prompt("React with an emoji:");
-    if (!emoji) return;
-    db.ref(`${getChatPath()}/${msgId}/reactions/${currentUser}`).set(emoji);
-  }
-  function deleteForMe(id) {
-    const bubble = document.querySelector(`[data-id="${id}"]`);
-    if (bubble) bubble.remove();
-  }
-  function deleteForEveryone(id) {
-    db.ref(`${getChatPath()}/${id}`).update({
-      text: "🚫 This message was deleted.",
-      fileUrl: null,
-      fileName: null,
-      deleted: true
+  messagesEl.appendChild(div);
+  messagesEl.scrollTop = messagesEl.scrollHeight;
+  if (msg.sender !== currentUser && document.hidden && Notification.permission === "granted") {
+    new Notification(`New message from ${msg.sender}`, {
+      body: msg.text,
+      icon: "/assets/whatsapp-icon.png"
     });
   }
-  async function enforceBlock() {
-    if (!selectedChat || selectedChat.isGroup) return false;
-    const otherUser = selectedChat.id;
-    const userBlockedSnap = await db.ref(`blocked/${currentUser}/${otherUser}`).once("value");
-    const otherBlockedSnap = await db.ref(`blocked/${otherUser}/${currentUser}`).once("value");
-    return userBlockedSnap.exists() || otherBlockedSnap.exists();
-  }
-  function showGroupInfoModal(group) {
-    let html = `<h2 class="text-xl font-bold mb-2">${group.name}</h2>`;
-    html += `<div class="mb-2">Type: <strong>${group.type || "public"}</strong></div>`;
-    if (group.type === "private" && group.password) {
-      html += `<div class="mb-2">Password: <span id="groupPwdText">${group.password}</span>
-        <button class="copy-btn" onclick="navigator.clipboard.writeText('${group.password}')">Copy</button></div>`;
+}
+
+messageInput.oninput = () => {
+  sendTyping(true);
+  clearTimeout(typingTimer);
+  typingTimer = setTimeout(() => sendTyping(false), 2000);
+};
+function showChatArea() {
+  chatListEl.classList.add("hide");
+  chatWindowEl.classList.remove("hide");
+}
+function sendTyping(isTyping) {
+  if (!selectedChat || selectedChat.isGroup) return;
+  db.ref(`typing/${selectedChat.id}`).set(isTyping ? currentUser : "");
+}
+
+messageForm.onsubmit = async e => {
+  e.preventDefault();
+  const text = messageInput.value.trim();
+  if (!text || !selectedChat) return;
+  if (!selectedChat.isGroup) {
+    if (await enforceBlock()) {
+      alert("You or the other user have blocked each other. Messaging is not allowed.");
+      return;
     }
-    html += `<div class="mb-2">Members:</div><ul>`;
-    for (const member in group.members) {
-      html += `<li class="pl-2">${member}</li>`;
-    }
-    html += `</ul>`;
-    html += `<div class="mt-4 flex gap-2">
-      <button id="leaveGroupBtn" class="bg-red-500 text-white px-4 py-2 rounded">Leave Group</button>
-      <button id="closeInfoBtn" class="bg-gray-500 text-white px-4 py-2 rounded">Close</button>
-    </div>`;
-    groupInfoContent.innerHTML = html;
-    groupInfoModal.style.display = "flex";
-    document.getElementById("closeInfoBtn").onclick = () => groupInfoModal.style.display = "none";
-    document.getElementById("leaveGroupBtn").onclick = async () => {
-      await db.ref(`groups/${group.id}/members/${currentUser}`).remove();
-      groupInfoModal.style.display = "none";
-      showSidebar();
-      alert("You have left this group.");
-    };
+    const blockedRef = db.ref(`blocked/${selectedChat.id}/${currentUser}`);
+    const blockedSnap = await blockedRef.once("value");
+    if (blockedSnap.exists()) { alert("You are blocked by this user."); return; }
   }
+  const msg = {
+    sender: currentUser,
+    text: text,
+    timestamp: Date.now(),
+    status: "sent"
+  };
+  if (replyTag) {
+    msg.replyTo = replyTag.id;
+    msg.replyText = replyTag.text;
+    replyTag = null;
+    tagReplyBar.innerHTML = '';
+  }
+  const ref = db.ref(getChatPath()).push();
+  await ref.set(msg);
+  messageInput.value = "";
+  sendTyping(false);
+  if (!selectedChat.isGroup) {
+    const statusRef = db.ref(`users/${selectedChat.id}/online`);
+    statusRef.once("value", snap => { if (snap.val()) ref.update({ status: "delivered" }); });
+  }
+};
+
+attachBtn.onclick = () => fileInput.click();
+fileInput.onchange = async () => {
+  const file = fileInput.files[0];
+  if (!file || !selectedChat) return;
+  if (file.size > 10 * 1024 * 1024) { alert("File is too large (max 10MB)."); return; }
+  const ref = storage.ref().child(`attachments/${Date.now()}_${file.name}`);
+  await ref.put(file);
+  const url = await ref.getDownloadURL();
+  const msg = { sender: currentUser, fileUrl: url, fileName: file.name, timestamp: Date.now() };
+  await db.ref(getChatPath()).push(msg);
+};
+
+createGroupBtn.onclick = () => {
+  groupModal.classList.remove("hidden");
+  groupNameInput.value = "";
+  groupPasswordEl.value = "";
+  groupType = "public";
+  privateFields.style.display = "none";
+  groupUsers.innerHTML = "";
+  db.ref("users").once("value", snap => {
+    const usersObj = snap.val();
+    if (!usersObj) return;
+    Object.keys(usersObj).forEach(username => {
+      if (username === currentUser) return;
+      const div = document.createElement("div");
+      div.className = "flex items-center gap-2 p-1";
+      const checkbox = document.createElement("input");
+      checkbox.type = "checkbox";
+      checkbox.value = username;
+      div.appendChild(checkbox);
+      div.appendChild(document.createTextNode(usersObj[username].name || username));
+      groupUsers.appendChild(div);
+    });
+  });
+};
+publicBtn.onclick = () => {
+  groupType = "public";
+  privateFields.style.display = "none";
+};
+privateBtn.onclick = () => {
+  groupType = "private";
+  privateFields.style.display = "block";
+};
+closeModal.onclick = () => groupModal.classList.add("hidden");
+createGroup.onclick = () => {
+  const name = groupNameInput.value.trim();
+  if (!name) return alert("Group name required!");
+  const memberCheckboxes = groupUsers.querySelectorAll("input[type=checkbox]:checked");
+  if (memberCheckboxes.length < 1) return alert("Select at least one member.");
+  let password = groupType === "private" ? groupPasswordEl.value.trim() : "";
+  if (groupType === "private" && !password) return alert("Password required for private group.");
+  const members = { [currentUser]: true };
+  memberCheckboxes.forEach(cb => members[cb.value] = true);
+  const groupId = "group_" + Date.now();
+  db.ref(`groups/${groupId}`).set({ id: groupId, name, type: groupType, password, members });
+  groupModal.classList.add("hidden");
+  openChat(groupId, true, name);
+};
+
+window.addEventListener("beforeunload", () => { db.ref(`users/${currentUser}/lastSeen`).set(Date.now()); });
+db.ref(`users/${currentUser}/online`).set(true);
+db.ref(`users/${currentUser}/online`).onDisconnect().set(false);
+db.ref(`users/${currentUser}/lastSeen`).onDisconnect().set(Date.now());
+
+// Context Menu
+function showContextMenu(actions, x, y) {
+  let menuHtml = "";
+  actions.forEach(({ label, action }) => {
+    menuHtml += `<div class="p-2 hover:bg-gray-200 cursor-pointer" data-action="${action}">${label}</div>`;
+  });
+  contextMenu.innerHTML = menuHtml;
+  contextMenu.classList.remove("hidden");
+  contextMenuOpen = true;
+  const menuWidth = 180, menuHeight = 40 * actions.length, padding = 8;
+  let left = x, top = y;
+  if (left + menuWidth > window.innerWidth) left = window.innerWidth - menuWidth - padding;
+  if (top + menuHeight > window.innerHeight) top = window.innerHeight - menuHeight - padding;
+  if (left < 0) left = padding;
+  if (top < 0) top = padding;
+  contextMenu.style.left = left + "px";
+  contextMenu.style.top = top + "px";
+  contextMenu.style.transform = "";
+}
+function hideContextMenu() {
+  contextMenu.classList.add("hidden");
+  contextMenuOpen = false;
+}
+contextMenu.onclick = e => {
+  const action = e.target.dataset.action;
+  if (!action || !contextMsgId || !contextMsg) return;
+  if (action === "reply") setReplyTag(contextMsg, contextMsgId);
+  if (action === "edit") editMessage(contextMsgId, contextMsg.text);
+  if (action === "deleteMe") deleteForMe(contextMsgId);
+  if (action === "deleteEveryone") deleteForEveryone(contextMsgId);
+  if (action === "react") addReaction(contextMsgId);
+  hideContextMenu();
+};
+document.body.addEventListener("click", () => { if (contextMenuOpen) hideContextMenu(); });
+window.addEventListener("scroll", hideContextMenu);
+window.addEventListener("resize", hideContextMenu);
+
+function editMessage(id, oldText) {
+  const newText = prompt("Edit your message:", oldText);
+  if (newText && newText.trim() && newText !== oldText) {
+    db.ref(`${getChatPath()}/${id}`).update({ text: newText + " (edited)" });
+  }
+}
+function addReaction(msgId) {
+  const emoji = prompt("React with an emoji:");
+  if (!emoji) return;
+  db.ref(`${getChatPath()}/${msgId}/reactions/${currentUser}`).set(emoji);
+}
+function deleteForMe(id) {
+  const bubble = document.querySelector(`[data-id="${id}"]`);
+  if (bubble) bubble.remove();
+}
+function deleteForEveryone(id) {
+  db.ref(`${getChatPath()}/${id}`).update({
+    text: "🚫 This message was deleted.",
+    fileUrl: null,
+    fileName: null,
+    deleted: true
+  });
+}
+function showGroupInfoModal(group) {
+  let html = `<h2 class="text-xl font-bold mb-2">${group.name}</h2>`;
+  html += `<div class="mb-2">Type: <strong>${group.type || "public"}</strong></div>`;
+  if (group.type === "private" && group.password) {
+    html += `<div class="mb-2">Password: <span id="groupPwdText">${group.password}</span>
+      <button class="copy-btn" onclick="navigator.clipboard.writeText('${group.password}')">Copy</button></div>`;
+  }
+  html += `<div class="mb-2">Members:</div><ul>`;
+  for (const member in group.members) {
+    html += `<li class="pl-2">${member}</li>`;
+  }
+  html += `</ul>`;
+  html += `<div class="mt-4 flex gap-2">
+    <button id="leaveGroupBtn" class="bg-red-500 text-white px-4 py-2 rounded">Leave Group</button>
+    <button id="closeInfoBtn" class="bg-gray-500 text-white px-4 py-2 rounded">Close</button>
+  </div>`;
+  groupInfoContent.innerHTML = html;
+  groupInfoModal.style.display = "flex";
+  document.getElementById("closeInfoBtn").onclick = () => groupInfoModal.style.display = "none";
+  document.getElementById("leaveGroupBtn").onclick = async () => {
+    await db.ref(`groups/${group.id}/members/${currentUser}`).remove();
+    groupInfoModal.style.display = "none";
+    showSidebar();
+    alert("You have left this group.");
+  };
+}
 </script>
+</body>
+</html>
+
+
+
 </body>
 </html>
