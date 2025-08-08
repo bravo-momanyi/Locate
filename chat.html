@@ -286,6 +286,9 @@ const contextMenu = document.getElementById("contextMenu");
 const groupInfoModal = document.getElementById("groupInfoModal");
 const groupInfoContent = document.getElementById("groupInfoContent");
 const tagReplyBar = document.getElementById("tagReplyBar");
+const MESSAGE_DELETION_WINDOW = 60000; // 1 minute window for message deletion
+const TYPING_INDICATOR_TIMEOUT = 2000; // 2 seconds timeout for typing indicator
+
 
 let selectedChat = null, typingTimer;
 let allUsers = {}, allGroups = {}, recentsData = [];
@@ -712,7 +715,7 @@ function renderMessagesFiltered(query) {
 function renderMessage(msg, id, lastDateDiv) {
   const isSender = msg.sender === currentUser;
   const timeElapsed = Date.now() - msg.timestamp;
-  const showEditDeleteForEveryone = isSender && timeElapsed <= 60000;
+  const showEditDeleteForEveryone = isSender && timeElapsed <= MESSAGE_DELETION_WINDOW;
   const lightBg = document.documentElement.classList.contains("dark") ? "msg-dark" : "msg-light";
   const div = document.createElement("div");
   div.dataset.id = id;
@@ -735,20 +738,20 @@ function renderMessage(msg, id, lastDateDiv) {
 
   div.innerHTML += msg.text || (msg.fileUrl ? `<a href="${msg.fileUrl}" target="_blank" class="underline text-blue-700">${msg.fileName}</a>` : "");
 
-  function getMenuActions() {
-    const actions = [{ label: "Reply", action: "reply" }];
-    if (isSender) {
-      actions.push({ label: "Edit", action: "edit" });
-      actions.push({ label: "Delete for Me", action: "deleteMe" });
-      if (showEditDeleteForEveryone) {
-        actions.push({ label: "Delete for Everyone", action: "deleteEveryone" });
-      }
-    } else {
-      actions.push({ label: "Delete for Me", action: "deleteMe" });
+   function getMenuActions() {
+        const actions = [{ label: "Reply", action: "reply" }];
+        if (isSender) {
+            if (timeElapsed <= MESSAGE_DELETION_WINDOW) {
+                actions.push({ label: "Edit", action: "edit" });
+                actions.push({ label: "Delete for Everyone", action: "deleteEveryone" });
+            }
+            actions.push({ label: "Delete for Me", action: "deleteMe" });
+        } else {
+            actions.push({ label: "Delete for Me", action: "deleteMe" });
+        }
+        actions.push({ label: "React", action: "react" });
+        return actions;
     }
-    actions.push({ label: "React", action: "react" });
-    return actions;
-  }
   div.oncontextmenu = e => {
     e.preventDefault();
     contextMsgId = id;
@@ -820,6 +823,10 @@ function renderMessage(msg, id, lastDateDiv) {
       icon: "/assets/whatsapp-icon.png"
     });
   }
+  div.addEventListener("touchstart", e => {
+    startX = e.touches[0].clientX;
+});
+div.addEventListener("touchend", handleSwipeReply.bind(null, msg, id));
 }
 
 messageInput.oninput = () => {
@@ -835,7 +842,11 @@ function sendTyping(isTyping) {
   if (!selectedChat || selectedChat.isGroup) return;
   db.ref(`typing/${selectedChat.id}`).set(isTyping ? currentUser : "");
 }
-
+function handleSwipeReply(e, msg, id) {
+    if (Math.abs(e.changedTouches[0].clientX - startX) > 60) {
+        setReplyTag(msg, id);
+    }
+}
 messageForm.onsubmit = async e => {
     e.preventDefault();
     const text = messageInput.value.trim();
