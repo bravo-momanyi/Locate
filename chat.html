@@ -637,17 +637,28 @@ async function openChat(id, isGroup = false, groupName = "") {
   messagesListener = db.ref(path);
   messagesListener.off();
   messagesListener.on("child_added", snap => {
-    const msg = snap.val();
-    msg._id = snap.key;
+    const msgData = snap.val();
+    if (!msgData) return;
+
+    const msg = {
+        ...msgData,
+        _id: snap.key,
+        timestamp: msgData.timestamp || Date.now()
+    };
     if (!allMessages.find(m => m._id === msg._id)) {
-      if (!isGroup && msg.sender !== currentUser) {
-        if (allMessages.some(m => m.text === msg.text && m.timestamp === msg.timestamp && m.sender === currentUser)) return;
-      }
-      allMessages.push(msg);
-      allMessages.sort((a, b) => a.timestamp - b.timestamp);
-      renderMessagesFiltered(chatSearchBar.value);
+        if (!selectedChat.isGroup && msg.sender !== currentUser) {
+            if (allMessages.some(m => 
+                m.text === msg.text && 
+                m.timestamp === msg.timestamp && 
+                m.sender === currentUser
+            )) return;
+        }
+        
+        allMessages.push(msg);
+        allMessages.sort((a, b) => a.timestamp - b.timestamp);
+        renderMessagesFiltered(chatSearchBar.value);
     }
-  });
+});
   messagesListener.on("child_changed", snap => {
     const msg = snap.val();
     msg._id = snap.key;
@@ -682,63 +693,69 @@ function setReplyTag(msg, id) {
 }
 
 function renderMessagesFiltered(query) {
-  messagesEl.innerHTML = "";
-  let lastDate = "";
-  let lastDateDiv = null;
-  const lower = (query||"").toLowerCase();
-  allMessages
-    .filter(msg =>
-      !query || (msg.text && msg.text.toLowerCase().includes(lower)) ||
-      (msg.fileName && msg.fileName.toLowerCase().includes(lower))
-    )
-    .forEach((msg, idx, arr) => {
-      const dateStr = formatDate(msg.timestamp);
-      if (dateStr !== lastDate) {
-        lastDate = dateStr;
-        lastDateDiv = document.createElement("div");
-        lastDateDiv.className = "date-sticky";
-        lastDateDiv.textContent = dateStr;
-        messagesEl.appendChild(lastDateDiv);
-      }
-      renderMessage(msg, msg._id, lastDateDiv);
-    });
-  // Typing indicator message
-  if (typingOtherUser) {
-    const typingDiv = document.createElement("div");
-    typingDiv.className = `max-w-xs px-4 py-2 rounded shadow text-sm break-words msg-light ml-auto flex items-center`;
-    typingDiv.innerHTML = `<span class="typing-dots"><span></span><span></span><span></span></span>`;
-    messagesEl.appendChild(typingDiv);
-    messagesEl.scrollTop = messagesEl.scrollHeight;
-  }
+    messagesEl.innerHTML = "";
+    let lastDate = "";
+    let lastDateDiv = null;
+    const lower = (query || "").toLowerCase();
+
+    allMessages
+        .filter(msg => {
+            if (!msg) return false;
+            return !query || 
+                (msg.text && msg.text.toLowerCase().includes(lower)) ||
+                (msg.fileName && msg.fileName.toLowerCase().includes(lower));
+        })
+        .forEach((msg, idx, arr) => {
+            const dateStr = formatDate(msg.timestamp);
+            if (dateStr !== lastDate) {
+                lastDate = dateStr;
+                lastDateDiv = document.createElement("div");
+                lastDateDiv.className = "date-sticky";
+                lastDateDiv.textContent = dateStr;
+                messagesEl.appendChild(lastDateDiv);
+            }
+            renderMessage(msg, msg._id, lastDateDiv);
+        });
+
+    // Typing indicator message
+    if (typingOtherUser) {
+        const typingDiv = document.createElement("div");
+        typingDiv.className = `max-w-xs px-4 py-2 rounded shadow text-sm break-words msg-light ml-auto flex items-center`;
+        typingDiv.innerHTML = `<span class="typing-dots"><span></span><span></span><span></span></span>`;
+        messagesEl.appendChild(typingDiv);
+        messagesEl.scrollTop = messagesEl.scrollHeight;
+    }
 }
 
 function renderMessage(msg, id, lastDateDiv) {
-  const isSender = msg.sender === currentUser;
-  const timeElapsed = Date.now() - msg.timestamp;
-  const showEditDeleteForEveryone = isSender && timeElapsed <= MESSAGE_DELETION_WINDOW;
-  const lightBg = document.documentElement.classList.contains("dark") ? "msg-dark" : "msg-light";
-  const div = document.createElement("div");
-  div.dataset.id = id;
-  div.className = `relative max-w-xs px-4 py-2 rounded shadow text-sm break-words ${lightBg} ${isSender ? "ml-auto" : ""}`;
+    if (!msg) return;
 
-  if (msg.replyTo) {
-    const replyDiv = document.createElement("div");
-    replyDiv.className = "reply-tag";
-    replyDiv.textContent = msg.replyText || "Replied message";
-    replyDiv.onclick = () => {
-      const el = document.querySelector(`[data-id="${msg.replyTo}"]`);
-      if (el) {
-        el.scrollIntoView({ behavior: "smooth", block: "center" });
-        el.classList.add("ring", "ring-blue-500");
-        setTimeout(()=>el.classList.remove("ring","ring-blue-500"), 1200);
-      }
-    };
-    div.appendChild(replyDiv);
-  }
-
-  div.innerHTML += msg.text || (msg.fileUrl ? `<a href="${msg.fileUrl}" target="_blank" class="underline text-blue-700">${msg.fileName}</a>` : "");
-
-   function getMenuActions() {
+    const isSender = msg.sender === currentUser;
+    const timeElapsed = Date.now() - msg.timestamp;
+    const showEditDeleteForEveryone = isSender && timeElapsed <= MESSAGE_DELETION_WINDOW;
+    
+    const div = document.createElement("div");
+    div.dataset.id = id;
+    div.className = `relative max-w-xs px-4 py-2 rounded shadow text-sm break-words ${lightBg} ${isSender ? "ml-auto" : ""}`;
+    
+    if (msg.replyTo) {
+        const replyDiv = document.createElement("div");
+        replyDiv.className = "reply-tag";
+        replyDiv.textContent = msg.replyText || "Replied message";
+        replyDiv.onclick = () => {
+            const el = document.querySelector(`[data-id="${msg.replyTo}"]`);
+            if (el) {
+                el.scrollIntoView({ behavior: "smooth", block: "center" });
+                el.classList.add("ring", "ring-blue-500");
+                setTimeout(() => el.classList.remove("ring", "ring-blue-500"), 1200);
+            }
+        };
+        div.appendChild(replyDiv);
+    }
+    
+    div.innerHTML += msg.text || (msg.fileUrl ? `<a href="${msg.fileUrl}" target="_blank" class="underline text-blue-700">${msg.fileName}</a>` : "");
+    
+    function getMenuActions() {
         const actions = [{ label: "Reply", action: "reply" }];
         if (isSender) {
             if (timeElapsed <= MESSAGE_DELETION_WINDOW) {
@@ -752,81 +769,82 @@ function renderMessage(msg, id, lastDateDiv) {
         actions.push({ label: "React", action: "react" });
         return actions;
     }
-  div.oncontextmenu = e => {
-    e.preventDefault();
-    contextMsgId = id;
-    contextMsg = msg;
-    showContextMenu(getMenuActions(), e.clientX, e.clientY);
-  };
 
-  let startX = null;
-  div.addEventListener("touchstart", e => { startX = e.touches[0].clientX; });
-  div.addEventListener("touchend", e => {
-    if (!startX) return;
-    const endX = e.changedTouches[0].clientX;
-    if (startX !== null && endX - startX > 60) {
-      setReplyTag(msg, id);
+    div.oncontextmenu = e => {
+        e.preventDefault();
+        contextMsgId = id;
+        contextMsg = msg;
+        showContextMenu(getMenuActions(), e.clientX, e.clientY);
+    };
+
+    let startX = null;
+    div.addEventListener("touchstart", e => {
+        startX = e.touches[0].clientX;
+    });
+    div.addEventListener("touchend", e => {
+        if (!startX) return;
+        const endX = e.changedTouches[0].clientX;
+        if (startX !== null && endX - startX > 60) {
+            setReplyTag(msg, id);
+        }
+        startX = null;
+    });
+
+    let longPressTimer;
+    div.addEventListener("touchstart", e => {
+        longPressTimer = setTimeout(() => {
+            contextMsgId = id;
+            contextMsg = msg;
+            showContextMenu(getMenuActions(), e.touches[0].clientX, e.touches[0].clientY);
+        }, 400);
+    });
+    div.addEventListener("touchend", () => clearTimeout(longPressTimer));
+    div.addEventListener("touchmove", () => clearTimeout(longPressTimer));
+
+    if (msg.sender !== currentUser && selectedChat && !selectedChat.isGroup) {
+        db.ref(`${getChatPath()}/${id}/status`).set("read");
     }
-    startX = null;
-  });
 
-  let longPressTimer;
-  div.addEventListener("touchstart", e => {
-    longPressTimer = setTimeout(() => {
-      contextMsgId = id;
-      contextMsg = msg;
-      showContextMenu(getMenuActions(), e.touches[0].clientX, e.touches[0].clientY);
-    }, 400);
-  });
-  div.addEventListener("touchend", () => clearTimeout(longPressTimer));
-  div.addEventListener("touchmove", () => clearTimeout(longPressTimer));
-
-  if (msg.sender !== currentUser && selectedChat && !selectedChat.isGroup) {
-    db.ref(`${getChatPath()}/${id}/status`).set("read");
-  }
-  if (isSender) {
-    const ticks = document.createElement("span");
-    ticks.className = "absolute bottom-1 right-2 text-xs";
-    if (msg.status === "read") {
-      ticks.textContent = "✓✓";
-      ticks.classList.add("text-green-700");
-    } else if (msg.status === "delivered") {
-      ticks.textContent = "✓✓";
-    } else {
-      ticks.textContent = "✓";
+    if (isSender) {
+        const ticks = document.createElement("span");
+        ticks.className = "absolute bottom-1 right-2 text-xs";
+        if (msg.status === "read") {
+            ticks.textContent = "✓✓";
+            ticks.classList.add("text-green-700");
+        } else if (msg.status === "delivered") {
+            ticks.textContent = "✓✓";
+        } else {
+            ticks.textContent = "✓";
+        }
+        div.appendChild(ticks);
     }
-    div.appendChild(ticks);
-  }
-  // Reactions bar
-  if (msg.reactions) {
-    const reactionBar = document.createElement("div");
-    reactionBar.className = "flex gap-1 mt-1";
-    for (const [user, emoji] of Object.entries(msg.reactions)) {
-      const span = document.createElement("span");
-      span.textContent = emoji;
-      span.className = "inline-block px-2 py-1 rounded bg-gray-200 dark:bg-gray-700 text-lg";
-      reactionBar.appendChild(span);
+
+    // Reactions bar
+    if (msg.reactions) {
+        const reactionBar = document.createElement("div");
+        reactionBar.className = "flex gap-1 mt-1";
+        for (const [user, emoji] of Object.entries(msg.reactions)) {
+            const span = document.createElement("span");
+            span.textContent = emoji;
+            span.className = "inline-block px-2 py-1 rounded bg-gray-200 dark:bg-gray-700 text-lg";
+            reactionBar.appendChild(span);
+        }
+        div.appendChild(reactionBar);
     }
-    div.appendChild(reactionBar);
-  }
 
-  const timeDiv = document.createElement("div");
-  timeDiv.className = "text-xs text-gray-500 mt-1";
-  timeDiv.textContent = formatTime(msg.timestamp);
-  div.appendChild(timeDiv);
+    const timeDiv = document.createElement("div");
+    timeDiv.className = "text-xs text-gray-500 mt-1";
+    timeDiv.textContent = formatTime(msg.timestamp);
+    div.appendChild(timeDiv);
 
-  messagesEl.appendChild(div);
-  messagesEl.scrollTop = messagesEl.scrollHeight;
+    messagesEl.appendChild(div);
+    messagesEl.scrollTop = messagesEl.scrollHeight;
   if (msg.sender !== currentUser && document.hidden && Notification.permission === "granted") {
     new Notification(`New message from ${msg.sender}`, {
       body: msg.text,
       icon: "/assets/whatsapp-icon.png"
     });
   }
-  div.addEventListener("touchstart", e => {
-    startX = e.touches[0].clientX;
-});
-div.addEventListener("touchend", handleSwipeReply.bind(null, msg, id));
 }
 
 messageInput.oninput = () => {
