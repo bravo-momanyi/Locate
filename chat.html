@@ -162,7 +162,7 @@
 <div id="mainContainer">
   <aside id="sidebar">
     <div class="sidebar-header flex items-center justify-between p-4 bg-emerald-700 text-white">
-      <span class="font-bold text-lg">WhatsApp Clone</span>
+      <span class="font-bold text-lg">Chat and Connect</span>
       <span>Welcome, <span id="welcomeUserSidebar"></span></span>
       <button id="dashboardBtn" class="dashboard-btn ml-2">Dashboard</button>
       <button id="toggleTheme" class="theme-btn ml-2">🌓</button>
@@ -610,11 +610,12 @@ async function openChat(id, isGroup = false, groupName = "") {
     }
     allMessages = [];
     snap.forEach(child => {
-      const msg = child.val();
-      msg._id = child.key;
-      allMessages.push(msg);
+        const msg = child.val();
+        msg._id = child.key;
+        allMessages.push(msg);
     });
-    allMessages.sort((a, b) => a.timestamp - b.timestamp);
+    allMessages.sort((a,b) => a.timestamp - b.timestamp);
+    renderMessagesFiltered(chatSearchBar.value);
 
     // DEDUPLICATE: In private chats, remove any message that is a received duplicate of a sent one
     const msgData = snap.val();
