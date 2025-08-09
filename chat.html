@@ -372,65 +372,15 @@ function refreshGroupList() {
   });
 }
 db.ref("groups").on("value", refreshGroupList);
-
-function loadRecents() {
-  recentsData = [];
-  const seenChats = {};
-  db.ref("messages").once("value").then(snapshot => {
-    snapshot.forEach(child => {
-      const chatId = child.key;
-      const users = chatId.split('_');
-      if (users.includes(currentUser)) {
-        let lastMsg = null, unreadCount = 0;
-        child.forEach(msgSnap => {
-          const msg = msgSnap.val();
-          if (!lastMsg || msg.timestamp > lastMsg.timestamp) lastMsg = { ...msg, _id: msgSnap.key };
-          if (msg.sender !== currentUser && msg.status !== "read") unreadCount++;
-        });
-        const otherUser = users.find(u => u !== currentUser);
-        if (otherUser && !seenChats[otherUser]) {
-          recentsData.push({
-            type: "user",
-            id: otherUser,
-            name: allUsers[otherUser]?.name || otherUser,
-            email: allUsers[otherUser]?.email || "",
-            phone: allUsers[otherUser]?.phone || "",
-            timestamp: lastMsg?.timestamp || 0,
-            unread: unreadCount
-          });
-          seenChats[otherUser] = true;
-        }
-      }
-    });
-    db.ref("groupMessages").once("value").then(groupSnap => {
-      groupSnap.forEach(child => {
-        const groupId = child.key;
-        if (allGroups[groupId]?.members?.[currentUser] && !seenChats[groupId]) {
-          let lastMsg = null, unreadCount = 0;
-          child.forEach(msgSnap => {
-            const msg = msgSnap.val();
-            if (!lastMsg || msg.timestamp > lastMsg.timestamp) lastMsg = { ...msg, _id: msgSnap.key };
-            if (msg.sender !== currentUser && (!msg.status || msg.status !== "read")) unreadCount++;
-          });
-          recentsData.push({
-            type: "group",
-            id: groupId,
-            name: allGroups[groupId]?.name || groupId,
-            email: "",
-            phone: "",
-            timestamp: lastMsg?.timestamp || 0,
-            unread: unreadCount
-          });
-          seenChats[groupId] = true;
-        }
-      });
-      recentsData.sort((a, b) => b.timestamp - a.timestamp);
-      renderRecents();
-      filterSidebarLists();
-    });
+function setupRecentsListener() {
+  db.ref(`recents/${currentUser}`).on("value", snap => {
+    let recentsArr = [];
+    snap.forEach(child => recentsArr.push(child.val()));
+    recentsArr.sort((a, b) => b.timestamp - a.timestamp);
+    renderRecents(recentsArr);
   });
 }
-
+setupRecentsListener();
 function renderRecents() {
   recentsList.innerHTML = "";
   recentsData.forEach(item => {
@@ -443,11 +393,6 @@ function renderRecents() {
     recentsList.appendChild(li);
   });
 }
-function reloadRecents() { recentsData = []; loadRecents(); }
-db.ref("users").on("value", reloadRecents);
-db.ref("groups").on("value", reloadRecents);
-db.ref("messages").on("value", reloadRecents);
-db.ref("groupMessages").on("value", reloadRecents);
 
 function filterSidebarLists() {
   const query = (sidebarSearch.value || "").toLowerCase();
