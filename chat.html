@@ -504,11 +504,11 @@ function openChat(id, isGroup = false, groupName = "") {
       allMessages = [];
       return;
     }
-    allMessages = [];
-    snap.forEach(child => {
-      const msg = child.val();
-      msg._id = child.key;
-      allMessages.push(msg);
+    //allMessages = [];
+    //snap.forEach(child => {
+     // const msg = child.val();
+      //msg._id = child.key;
+      //allMessages.push(msg);
     });
     allMessages.sort((a,b) => a.timestamp - b.timestamp);
     renderMessagesFiltered(chatSearchBar.value);
