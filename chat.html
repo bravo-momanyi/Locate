@@ -799,7 +799,7 @@ messageForm.onsubmit = async e => {
   await ref.set(msg);
   messageInput.value = "";
   sendTyping(false);
-  updateRecentsOnSend(chatId, isGroup, text);
+  updateRecentsOnSend(selectedChat.id, selectedChat.isGroup, text);
 };
 
 attachBtn.onclick = () => fileInput.click();
@@ -953,7 +953,7 @@ function promptGroupJoin(group) {
   }
   return true;
 }
-  function updateRecentsOnSend(chatId, isGroup, text) {
+  updateRecentsOnSend(selectedChat.id, selectedChat.isGroup, text); {
   const recRef = db.ref(`recents/${currentUser}/${chatId}`);
   recRef.set({
     id: chatId,
