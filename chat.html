@@ -455,13 +455,17 @@ function openChat(id, isGroup = false, groupName = "") {
   selectedChat = { id, isGroup, groupName };
   allMessages = [];
   messagesEl.innerHTML = "";
+
   if (messagesListener) messagesListener.off();
   clearInterval(onlineLastSeenPoller);
+
   markMessagesAsRead(id, isGroup);
 
-  // Typing indicator + online / last seen
-  function updateOnlineLastSeenTyping() {
-    // --- Online / last seen ---
+  let typingListener = null;
+
+  // Typing + online status handler
+  function setupOnlineLastSeenTyping() {
+    // ONLINE / LAST SEEN
     db.ref(`users/${id}/online`).once("value", snap => {
       if (snap.val()) {
         document.getElementById("onlineLastSeenIndicator").textContent = "Online";
@@ -481,26 +485,44 @@ function openChat(id, isGroup = false, groupName = "") {
       }
     });
 
-    // --- Typing indicator ---
-    // Listen for typing activity directed at *this* user
-    db.ref(`typing/${currentUser}`).on("value", snap => {
-      const typingUserId = snap.val();
-      const typingOtherUser = (typingUserId === id); // Only show if other user is typing to current user
-      document.getElementById("typingIndicator").textContent = typingOtherUser ? "Typing..." : "";
-      renderMessagesFiltered(chatSearchBar.value); // Show typing dots as last message
+    // Remove old typing listener if exists
+    if (typingListener) typingListener.off();
+
+    // TYPING — detect if other user is typing to me
+    typingListener = db.ref(`typing/${id}`); // listen to THEIR typing status
+    typingListener.on("value", snap => {
+      const typ = snap.val();
+      const typingToMe = (typ === currentUser);
+
+      // Remove old "typing dots" fake message
+      allMessages = allMessages.filter(m => !m._typingIndicator);
+
+      if (typingToMe) {
+        // Push a fake typing message
+        allMessages.push({
+          _id: "__typing__", // fake ID
+          _typingIndicator: true,
+          sender: id,
+          text: "...", // the dots
+          timestamp: Date.now()
+        });
+      }
+
+      renderMessagesFiltered(chatSearchBar.value);
     });
   }
 
+  // Set up typing + online
   if (!isGroup) {
-    updateOnlineLastSeenTyping();
-    onlineLastSeenPoller = setInterval(updateOnlineLastSeenTyping, 1000);
+    setupOnlineLastSeenTyping();
+    onlineLastSeenPoller = setInterval(setupOnlineLastSeenTyping, 1000);
   } else {
     document.getElementById("onlineLastSeenIndicator").textContent = "";
     document.getElementById("typingIndicator").textContent = "";
     clearInterval(onlineLastSeenPoller);
   }
 
-  // --- Group or private chat title setup ---
+  // GROUP OR USER TITLE
   if (isGroup) {
     const group = allGroups[id];
     if (!group) return alert("Group not found.");
@@ -518,7 +540,7 @@ function openChat(id, isGroup = false, groupName = "") {
   showChatArea();
   updateBlockButton();
 
-  // --- Load existing messages ---
+  // LOAD MESSAGES
   const path = getChatPath();
   db.ref(path).once("value", snap => {
     if (!snap.exists()) {
@@ -532,11 +554,11 @@ function openChat(id, isGroup = false, groupName = "") {
       msg._id = child.key;
       allMessages.push(msg);
     });
-    allMessages.sort((a,b) => a.timestamp - b.timestamp);
+    allMessages.sort((a, b) => a.timestamp - b.timestamp);
     renderMessagesFiltered(chatSearchBar.value);
   });
 
-  // --- Real-time message listeners ---
+  // REALTIME MESSAGES
   messagesListener = db.ref(path);
   messagesListener.off();
 
@@ -549,7 +571,6 @@ function openChat(id, isGroup = false, groupName = "") {
       renderMessagesFiltered(chatSearchBar.value);
     }
   });
-
   messagesListener.on("child_changed", snap => {
     const msg = snap.val();
     msg._id = snap.key;
@@ -559,13 +580,13 @@ function openChat(id, isGroup = false, groupName = "") {
       renderMessagesFiltered(chatSearchBar.value);
     }
   });
-
   messagesListener.on("child_removed", snap => {
     const _id = snap.key;
     allMessages = allMessages.filter(m => m._id !== _id);
     renderMessagesFiltered(chatSearchBar.value);
   });
 }
+
 
 chatSearchBar.oninput = () => renderMessagesFiltered(chatSearchBar.value);
 
