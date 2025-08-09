@@ -520,6 +520,11 @@ function openChat(id, isGroup = false, groupName = "") {
   messagesListener.on("child_added", snap => {
     const msg = snap.val();
     msg._id = snap.key;
+    if (!allMessages.find(m => m._id === msg._id)) {
+      allMessages.push(msg);
+      allMessages.sort((a, b) => a.timestamp - b.timestamp);
+      renderMessagesFiltered(chatSearchBar.value);
+    }
   });
   messagesListener.on("child_changed", snap => {
     const msg = snap.val();
