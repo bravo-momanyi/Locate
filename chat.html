@@ -478,12 +478,18 @@ function openChat(id, isGroup = false, groupName = "") {
         });
       }
     });
-    db.ref(`typing/${id}`).once("value", snap => {
-      const typ = snap.val();
-      typingOtherUser = (typ === currentUser);
-      document.getElementById("typingIndicator").textContent = typingOtherUser ? "Typing..." : "";
-      renderMessagesFiltered(chatSearchBar.value); // Show typing dots as last message
-    });
+    db.ref(`typing/${currentUser}`).once("value", snap => {
+        const typ = snap.val();
+        // Typing indicator is true if the other user is currently sending typing status as currentUser
+        typingOtherUser = (typ === id); // THEY are typing to ME
+        document.getElementById("typingIndicator").textContent = typingOtherUser ? "Typing..." : "";
+        renderMessagesFiltered(chatSearchBar.value); // Show typing dots as last message
+      });
+    } else {
+      document.getElementById("onlineLastSeenIndicator").textContent = "";
+      document.getElementById("typingIndicator").textContent = "";
+      clearInterval(onlineLastSeenPoller);
+    }
   }
   if (!isGroup) {
     updateOnlineLastSeenTyping();
