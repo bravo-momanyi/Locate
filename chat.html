@@ -293,6 +293,7 @@ const tagReplyBar = document.getElementById("tagReplyBar");
 const MESSAGE_DELETION_WINDOW = 60000; // 1 minute for delete/edit
 let selectedChat = null, typingTimer;
 let allUsers = {}, allGroups = {};
+let messagesListener = null;
 let allMessages = [];
 let groupType = "public";
 let replyTag = null;
