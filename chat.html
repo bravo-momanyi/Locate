@@ -444,7 +444,7 @@ function openChat(id, isGroup = false, groupName = "") {
   messagesEl.innerHTML = "";
   if (messagesListener) messagesListener.off();
   clearInterval(onlineLastSeenPoller);
-
+  markMessagesAsRead(id, isGroup);
   // Typing indicator (other user, last message and chat title)
   function updateOnlineLastSeenTyping() {
     db.ref(`users/${id}/online`).once("value", snap => {
@@ -949,16 +949,57 @@ function promptGroupJoin(group) {
   }
   return true;
 }
-  updateRecentsOnSend(selectedChat.id, selectedChat.isGroup, text); {
-  const recRef = db.ref(`recents/${currentUser}/${chatId}`);
-  recRef.set({
-    id: chatId,
-    name: isGroup ? allGroups[chatId]?.name || chatId : allUsers[chatId]?.name || chatId,
-    type: isGroup ? "group" : "user",
-    lastMessage: text,
-    timestamp: Date.now(),
-    unread: 0
-  });
+function updateRecentsOnSend(chatId, isGroup, text) {
+  const now = Date.now();
+  if (isGroup) {
+    // Update recents for all group members
+    const group = allGroups[chatId];
+    if (!group || !group.members) return;
+
+    Object.keys(group.members).forEach(member => {
+      // If sender, unread = 0, else increment unread
+      const unreadRef = db.ref(`recents/${member}/${chatId}/unread`);
+      if (member === currentUser) {
+        unreadRef.set(0);
+      } else {
+        // Increment unread for all other group members
+        unreadRef.transaction(curr => (curr || 0) + 1);
+      }
+      db.ref(`recents/${member}/${chatId}`).update({
+        id: chatId,
+        name: group.name || chatId,
+        type: "group",
+        lastMessage: text,
+        timestamp: now
+      });
+    });
+  } else {
+    // 1:1 chat: update for both users
+    const users = [currentUser, chatId];
+    users.forEach(user => {
+      const otherUser = users.find(u => u !== user);
+      const unreadRef = db.ref(`recents/${user}/${otherUser}/unread`);
+      if (user === currentUser) {
+        unreadRef.set(0);
+      } else {
+        unreadRef.transaction(curr => (curr || 0) + 1);
+      }
+      db.ref(`recents/${user}/${otherUser}`).update({
+        id: otherUser,
+        name: allUsers[otherUser]?.name || otherUser,
+        type: "user",
+        lastMessage: text,
+        timestamp: now
+      });
+    });
+  }
+}
+function markMessagesAsRead(chatId, isGroup) {
+  if (isGroup) {
+    db.ref(`recents/${currentUser}/${chatId}/unread`).set(0);
+  } else {
+    db.ref(`recents/${currentUser}/${chatId}/unread`).set(0);
+  }
 }
 </script>
 </body>
