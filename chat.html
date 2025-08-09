@@ -379,7 +379,19 @@ db.ref("groups").on("value", refreshGroupList);
 function setupRecentsListener() {
   db.ref(`recents/${currentUser}`).on("value", snap => {
     let recentsArr = [];
-    snap.forEach(child => recentsArr.push(child.val()));
+    // If recents is an object, use Object.values; if it's a list, use snap.forEach
+    const val = snap.val();
+    if (val) {
+      // This handles both object and array cases in Firebase
+      recentsArr = Object.values(val).filter(Boolean);
+    } else {
+      // Defensive: if for some reason it's a list, fallback to forEach
+      snap.forEach(child => {
+        const item = child.val();
+        if (item) recentsArr.push(item);
+      });
+    }
+    // Sort by timestamp descending
     recentsArr.sort((a, b) => b.timestamp - a.timestamp);
     renderRecents(recentsArr);
   });
@@ -389,6 +401,7 @@ setupRecentsListener();
 function renderRecents(arr) {
   recentsList.innerHTML = "";
   arr.forEach(item => {
+    if (!item || !item.id) return; // skip empty items
     const li = document.createElement("li");
     li.className = "p-3 hover:bg-gray-100 cursor-pointer flex justify-between items-center";
     const badgeClass = item.type === "group" ? "badge-green" : "badge-blue";
