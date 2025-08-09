@@ -379,14 +379,7 @@ db.ref("groups").on("value", refreshGroupList);
 function setupRecentsListener() {
   db.ref(`recents/${currentUser}`).on("value", snap => {
     let recentsArr = [];
-    // Use snap.val() if you want all recents at once (object)
-    const val = snap.val();
-    if (val) {
-      // If val is an object, use Object.values to get all recent chats
-      recentsArr = Object.values(val);
-    }
-    // If you want to guarantee uniqueness and sort by time, do this:
-    recentsArr = recentsArr.filter(Boolean); // remove nulls if any
+    snap.forEach(child => recentsArr.push(child.val()));
     recentsArr.sort((a, b) => b.timestamp - a.timestamp);
     renderRecents(recentsArr);
   });
@@ -396,7 +389,6 @@ setupRecentsListener();
 function renderRecents(arr) {
   recentsList.innerHTML = "";
   arr.forEach(item => {
-    if (!item || !item.id) return; // skip empty items
     const li = document.createElement("li");
     li.className = "p-3 hover:bg-gray-100 cursor-pointer flex justify-between items-center";
     const badgeClass = item.type === "group" ? "badge-green" : "badge-blue";
@@ -405,6 +397,7 @@ function renderRecents(arr) {
     li.onclick = () => openChat(item.id, item.type === "group", item.name);
     recentsList.appendChild(li);
   });
+}
 function filterSidebarLists() {
   const query = (sidebarSearch.value || "").toLowerCase();
   function filterList(list, items, getFields) {
@@ -1008,6 +1001,6 @@ function markMessagesAsRead(chatId, isGroup) {
     db.ref(`recents/${currentUser}/${chatId}/unread`).set(0);
   }
 }
-
+</script>
 </body>
 </html>
