@@ -478,14 +478,13 @@ function openChat(id, isGroup = false, groupName = "") {
         });
       }
     });
-    db.ref(`typing/${currentUser}`).once("value", snap => {
-        const typ = snap.val();
-        // Typing indicator is true if the other user is currently sending typing status as currentUser
-        typingOtherUser = (typ === id); // THEY are typing to ME
-        document.getElementById("typingIndicator").textContent = typingOtherUser ? "Typing..." : "";
-        renderMessagesFiltered(chatSearchBar.value); // Show typing dots as last message
-      });
-    
+    db.ref(`typing/${id}`).once("value", snap => {
+      const typ = snap.val();
+      typingOtherUser = (typ === currentUser);
+      document.getElementById("typingIndicator").textContent = typingOtherUser ? "Typing..." : "";
+      renderMessagesFiltered(chatSearchBar.value); // Show typing dots as last message
+    });
+  }
   if (!isGroup) {
     updateOnlineLastSeenTyping();
     onlineLastSeenPoller = setInterval(updateOnlineLastSeenTyping, 1000);
@@ -534,7 +533,7 @@ function openChat(id, isGroup = false, groupName = "") {
   messagesListener.on("child_added", snap => {
     const msg = snap.val();
     msg._id = snap.key;
-    if (!allMessages.some(m => m._id === msg._id)) {
+    if (!allMessages.find(m => m._id === msg._id)) {
       allMessages.push(msg);
       allMessages.sort((a, b) => a.timestamp - b.timestamp);
       renderMessagesFiltered(chatSearchBar.value);
@@ -1017,4 +1016,4 @@ function markMessagesAsRead(chatId, isGroup) {
 }
 </script>
 </body>
-</html>
+</html>DEBUG THE TYPING INDICATOR IT APPEARS ON THE DIRENT USER IT SHOULD APPEAR ON THE RECIEVERS END NOT THE SENDERS END
