@@ -145,7 +145,7 @@
     .copy-btn:hover { background:#065f46; color:#fff;}
   </style>
 </head>
-<body class="bg-white text-black transition-colors duration-300">
+<body>
 <div id="mainContainer">
   <aside id="sidebar">
     <div class="sidebar-header flex items-center justify-between p-4 bg-emerald-700 text-white">
@@ -198,9 +198,7 @@
   </main>
 </div>
 <!-- Group Info Modal -->
-<div id="groupInfoModal">
-  <div id="groupInfoContent"></div>
-</div>
+<div id="groupInfoModal"><div id="groupInfoContent"></div></div>
 <!-- Group Create Modal -->
 <div id="groupModal" class="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center hidden z-40">
   <div class="bg-white p-4 rounded-lg w-96 space-y-4">
@@ -273,15 +271,11 @@ const groupInfoContent = document.getElementById("groupInfoContent");
 const tagReplyBar = document.getElementById("tagReplyBar");
 
 let selectedChat = null, typingTimer;
-let allUsers = {}, allGroups = {}, recentsData = [];
+let allUsers = {}, allGroups = {}, allMessages = [];
 let messagesListener = null;
-let allMessages = [];
-let groupType = "public";
-let lastGroupPassword = "";
-let replyTag = null;
-let typingOtherUser = false;
-let onlineLastSeenPoller = null;
+let replyTag = null, typingOtherUser = false, onlineLastSeenPoller = null;
 
+// --- Theme ---
 function setTheme(theme) {
   if (theme === "dark") {
     document.documentElement.classList.add("dark");
@@ -293,21 +287,16 @@ function setTheme(theme) {
     toggleThemeBtn.innerText = "🌓";
   }
   localStorage.setItem("theme", theme);
-  document.querySelectorAll("#sidebar, #chatArea, .sidebar-header").forEach(e => {
-    e.classList.toggle("dark", theme === "dark");
-  });
-  Array.from(messagesEl.children).forEach(el => {
-    el.classList.remove("msg-light", "msg-dark");
-    el.classList.add(theme === "dark" ? "msg-dark" : "msg-light");
-  });
 }
 toggleThemeBtn.onclick = () => setTheme(document.documentElement.classList.contains("dark") ? "light" : "dark");
 setTheme(localStorage.getItem("theme") || "light");
 dashboardBtn.onclick = () => window.location.href = "app.html";
 
+// --- Date formatting ---
 function formatDate(ts) {
   if (!ts) return '';
   const d = new Date(ts);
+  if (isNaN(d.getTime())) return '';
   const msgDay = d.toDateString(), nowDay = (new Date()).toDateString();
   if (msgDay === nowDay) return "Today";
   const yesterday = new Date();
@@ -317,10 +306,10 @@ function formatDate(ts) {
 }
 function formatTime(ts) {
   const d = new Date(ts);
-  return d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
+  return isNaN(d.getTime()) ? '' : d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
 }
 
-// Sidebar lists
+// --- User/Group lists ---
 function refreshUserList() {
   db.ref("users").once("value", snapshot => {
     userList.innerHTML = "";
@@ -329,7 +318,7 @@ function refreshUserList() {
       if (username === currentUser) return;
       const li = document.createElement("li");
       li.className = "p-3 hover:bg-gray-100 cursor-pointer flex justify-between items-center";
-      li.innerHTML = `<span>${allUsers[username].name || username}</span><span class="badge badge-gray" id="badge-user-${username}">0</span>`;
+      li.innerHTML = `<span>${allUsers[username].name || username}</span>`;
       li.onclick = () => openChat(username, false);
       userList.appendChild(li);
     });
@@ -345,7 +334,7 @@ function refreshGroupList() {
     Object.values(allGroups).forEach(group => {
       const li = document.createElement("li");
       li.className = "p-3 hover:bg-green-100 cursor-pointer text-green-700 font-semibold flex justify-between items-center";
-      li.innerHTML = `<span># ${group.name}</span><span class="badge badge-green" id="badge-group-${group.id}">0</span>`;
+      li.innerHTML = `<span># ${group.name}</span>`;
       li.onclick = () => openChat(group.id, true, group.name);
       groupList.appendChild(li);
     });
@@ -354,85 +343,29 @@ function refreshGroupList() {
 }
 db.ref("groups").on("value", refreshGroupList);
 
-// Real-time Recents with deduplication
-function setupRecentsListeners() {
-  db.ref("messages").on("value", function(snapshot) {
-    updateRecentsFromSnapshot(snapshot, null);
+// --- Real-time Recents from Database ---
+function setupRecentsListener() {
+  db.ref(`recents/${currentUser}`).on("value", snap => {
+    let recentsArr = [];
+    snap.forEach(child => recentsArr.push(child.val()));
+    recentsArr.sort((a, b) => b.timestamp - a.timestamp);
+    renderRecents(recentsArr);
   });
-  db.ref("groupMessages").on("value", function(snapshot) {
-    updateRecentsFromSnapshot(null, snapshot);
-  });
-  db.ref("users").on("value", reloadRecents);
-  db.ref("groups").on("value", reloadRecents);
 }
-function updateRecentsFromSnapshot(privSnap, groupSnap) {
-  recentsData = [];
-  const seenChats = {};
-  if (privSnap) privSnap.forEach(child => {
-    const chatId = child.key;
-    const users = chatId.split('_');
-    if (users.includes(currentUser)) {
-      let lastMsg = null, unreadCount = 0;
-      child.forEach(msgSnap => {
-        const msg = msgSnap.val();
-        if (!lastMsg || msg.timestamp > lastMsg.timestamp) lastMsg = { ...msg, _id: msgSnap.key };
-        if (msg.sender !== currentUser && msg.status !== "read") unreadCount++;
-      });
-      const otherUser = users.find(u => u !== currentUser);
-      if (otherUser && !seenChats[otherUser]) {
-        recentsData.push({
-          type: "user",
-          id: otherUser,
-          name: allUsers[otherUser]?.name || otherUser,
-          email: allUsers[otherUser]?.email || "",
-          phone: allUsers[otherUser]?.phone || "",
-          timestamp: lastMsg?.timestamp || 0,
-          unread: unreadCount
-        });
-        seenChats[otherUser] = true;
-      }
-    }
-  });
-  if (groupSnap) groupSnap.forEach(child => {
-    const groupId = child.key;
-    if (allGroups[groupId]?.members?.[currentUser] && !seenChats[groupId]) {
-      let lastMsg = null, unreadCount = 0;
-      child.forEach(msgSnap => {
-        const msg = msgSnap.val();
-        if (!lastMsg || msg.timestamp > lastMsg.timestamp) lastMsg = { ...msg, _id: msgSnap.key };
-        if (msg.sender !== currentUser && (!msg.status || msg.status !== "read")) unreadCount++;
-      });
-      recentsData.push({
-        type: "group",
-        id: groupId,
-        name: allGroups[groupId]?.name || groupId,
-        email: "",
-        phone: "",
-        timestamp: lastMsg?.timestamp || 0,
-        unread: unreadCount
-      });
-      seenChats[groupId] = true;
-    }
-  });
-  recentsData.sort((a, b) => b.timestamp - a.timestamp);
-  renderRecents();
-  filterSidebarLists();
-}
-function reloadRecents() { recentsData = []; }
-setupRecentsListeners();
-
-function renderRecents() {
+function renderRecents(arr) {
   recentsList.innerHTML = "";
-  recentsData.forEach(item => {
+  arr.forEach(item => {
     const li = document.createElement("li");
     li.className = "p-3 hover:bg-gray-100 cursor-pointer flex justify-between items-center";
     const badgeClass = item.type === "group" ? "badge-green" : "badge-blue";
     li.innerHTML = `<span>${item.type === "group" ? "# " : ""}${item.name}</span>
-      <span class="badge ${badgeClass}">${item.unread}</span>`;
+      <span class="badge ${badgeClass}">${item.unread || 0}</span>`;
     li.onclick = () => openChat(item.id, item.type === "group", item.name);
     recentsList.appendChild(li);
   });
 }
+setupRecentsListener();
+
 function filterSidebarLists() {
   const query = (sidebarSearch.value || "").toLowerCase();
   function filterList(list, items, getFields) {
@@ -458,60 +391,19 @@ function filterSidebarLists() {
 }
 sidebarSearch.oninput = filterSidebarLists;
 
-function showSidebar() {
-  chatListEl.classList.remove("hide");
-  chatWindowEl.classList.add("hide");
-}
-backBtn.onclick = showSidebar;
-
-function promptGroupJoin(group) {
-  if (group.type === "private" && !group.members?.[currentUser]) {
-    const pwd = prompt("This is a private group. Enter password to join:");
-    if (pwd !== group.password) { alert("Wrong password."); return false; }
-    db.ref(`groups/${group.id}/members/${currentUser}`).set(true);
-    alert("You have joined this group!");
-    return true;
-  }
-  if (!group.members?.[currentUser]) {
-    if (!confirm("Join this group?")) return false;
-    db.ref(`groups/${group.id}/members/${currentUser}`).set(true);
-    alert("You have joined this group!");
-    return true;
-  }
-  return true;
+// --- Update recents in DB on send ---
+function updateRecentsOnSend(chatId, isGroup, text) {
+  const recRef = db.ref(`recents/${currentUser}/${chatId}`);
+  recRef.set({
+    id: chatId,
+    name: isGroup ? allGroups[chatId]?.name || chatId : allUsers[chatId]?.name || chatId,
+    type: isGroup ? "group" : "user",
+    lastMessage: text,
+    timestamp: Date.now()
+  });
 }
 
-async function updateBlockButton() {
-  if (!selectedChat || selectedChat.isGroup) {
-    blockUserBtn.textContent = "🚫 Block";
-    blockUserBtn.disabled = true;
-    return;
-  }
-  const otherUser = selectedChat.id;
-  const userBlockedSnap = await db.ref(`blocked/${currentUser}/${otherUser}`).once("value");
-  const otherBlockedSnap = await db.ref(`blocked/${otherUser}/${currentUser}`).once("value");
-  if (userBlockedSnap.exists()) {
-    blockUserBtn.textContent = "✅ Unblock";
-    blockUserBtn.disabled = false;
-  } else if (otherBlockedSnap.exists()) {
-    blockUserBtn.textContent = "🚫 Blocked";
-    blockUserBtn.disabled = false;
-  } else {
-    blockUserBtn.textContent = "🚫 Block";
-    blockUserBtn.disabled = false;
-  }
-}
-
-async function enforceBlock() {
-  if (!selectedChat || selectedChat.isGroup) return false;
-  const otherUser = selectedChat.id;
-  const userBlockedSnap = await db.ref(`blocked/${currentUser}/${otherUser}`).once("value");
-  const otherBlockedSnap = await db.ref(`blocked/${otherUser}/${currentUser}`).once("value");
-  return userBlockedSnap.exists() || otherBlockedSnap.exists();
-}
-
-let contextMsgId = null, contextMsg = null, contextMenuOpen = false;
-
+// --- Chat logic and deduplication ---
 function getChatPath() {
   if (!selectedChat) return "";
   if (selectedChat.isGroup) return `groupMessages/${selectedChat.id}`;
@@ -526,91 +418,60 @@ function openChat(id, isGroup = false, groupName = "") {
   if (messagesListener) messagesListener.off();
   clearInterval(onlineLastSeenPoller);
 
-  // --- Typing indicator (other user, last message and chat title) ---
-  function updateOnlineLastSeenTyping() {
-    db.ref(`users/${id}/online`).once("value", snap => {
-      if (snap.val()) {
-        document.getElementById("onlineLastSeenIndicator").textContent = "Online";
-      } else {
-        db.ref(`users/${id}/lastSeen`).once("value", snap2 => {
-          const v = snap2.val();
-          if (!v) {
-            document.getElementById("onlineLastSeenIndicator").textContent = "";
-            return;
-          }
-          const d = new Date(v);
-          document.getElementById("onlineLastSeenIndicator").textContent =
-            "Last seen " +
-            d.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" }) +
-            " " + d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", second: "2-digit" });
-        });
-      }
-    });
-    db.ref(`typing/${id}`).once("value", snap => {
-      const typ = snap.val();
-      typingOtherUser = (typ === currentUser);
+  // Typing indicator (for receiver only)
+  function pollTyping() {
+    db.ref(`typing/${currentUser}`).once("value", snap => {
+      typingOtherUser = (snap.val() === id);
       document.getElementById("typingIndicator").textContent = typingOtherUser ? "Typing..." : "";
-      renderMessagesFiltered(chatSearchBar.value); // Show typing dots as last message
+      renderMessagesFiltered(chatSearchBar.value);
     });
   }
   if (!isGroup) {
-    updateOnlineLastSeenTyping();
-    onlineLastSeenPoller = setInterval(updateOnlineLastSeenTyping, 1000);
+    pollTyping();
+    onlineLastSeenPoller = setInterval(pollTyping, 1000);
+    db.ref(`users/${id}/online`).once("value", snap => {
+      document.getElementById("onlineLastSeenIndicator").textContent = snap.val() ? "Online" : "";
+    });
   } else {
     document.getElementById("onlineLastSeenIndicator").textContent = "";
     document.getElementById("typingIndicator").textContent = "";
     clearInterval(onlineLastSeenPoller);
   }
+  chatTitle.textContent = isGroup ? `# ${allGroups[id]?.name || id}` : allUsers[id]?.name || id;
 
-  if (isGroup) {
-    const group = allGroups[id];
-    if (!group) return alert("Group not found.");
-    if (!group.members || !group.members[currentUser]) {
-      const joined = promptGroupJoin(group);
-      if (!joined) { showSidebar(); return; }
-    }
-    chatTitle.textContent = `# ${group.name}`;
-    lastGroupPassword = group.password || "";
-    chatTitle.onclick = () => showGroupInfoModal(group);
-  } else {
-    chatTitle.textContent = allUsers[id]?.name || id;
-    chatTitle.onclick = null;
-  }
-  showChatArea();
-  updateBlockButton();
-
+  // Message Listener
   const path = getChatPath();
   db.ref(path).once("value", snap => {
-    if (!snap.exists()) {
-      messagesEl.innerHTML = "<div class='text-gray-500 text-center'>No messages yet.</div>";
-      allMessages = [];
-      return;
-    }
     allMessages = [];
     snap.forEach(child => {
       const msg = child.val();
       msg._id = child.key;
-      allMessages.push(msg);
+      if (msg.timestamp && !isNaN(new Date(msg.timestamp).getTime())) {
+        allMessages.push(msg);
+      }
     });
     allMessages.sort((a,b) => a.timestamp - b.timestamp);
     renderMessagesFiltered(chatSearchBar.value);
   });
 
   messagesListener = db.ref(path);
-  messagesListener.off();
-
-  // Real-time deduplication
   messagesListener.on("child_added", snap => {
     const msg = snap.val();
     msg._id = snap.key;
-    // Deduplicate: do not add duplicate received messages
+    // Deduplication: strict, never show duplicates
     if (!allMessages.find(m => m._id === msg._id)) {
       if (!selectedChat.isGroup && msg.sender !== currentUser) {
-        if (allMessages.some(m => m.text === msg.text && m.timestamp === msg.timestamp && m.sender === currentUser)) return;
+        if (allMessages.some(m =>
+          m.text === msg.text &&
+          m.timestamp === msg.timestamp &&
+          m.sender === currentUser
+        )) return;
       }
-      allMessages.push(msg);
-      allMessages.sort((a, b) => a.timestamp - b.timestamp);
-      renderMessagesFiltered(chatSearchBar.value);
+      if (msg.timestamp && !isNaN(new Date(msg.timestamp).getTime())) {
+        allMessages.push(msg);
+        allMessages.sort((a, b) => a.timestamp - b.timestamp);
+        renderMessagesFiltered(chatSearchBar.value);
+      }
     }
   });
   messagesListener.on("child_changed", snap => {
@@ -631,44 +492,24 @@ function openChat(id, isGroup = false, groupName = "") {
 
 chatSearchBar.oninput = () => renderMessagesFiltered(chatSearchBar.value);
 
-function setReplyTag(msg, id) {
-  replyTag = { id, text: msg.text };
-  let tagBar = document.getElementById("tagReplyBar");
-  if (tagBar) {
-    tagBar.innerHTML = `<div class="input-tag-bar">
-      <span>Replying to: ${msg.text.slice(0,60)}${msg.text.length>60?'...':''}</span>
-      <span class="remove-tag" onclick="removeReplyTag()">×</span>
-    </div>`;
-    window.removeReplyTag = function() {
-      replyTag = null;
-      tagBar.innerHTML = '';
-    };
-  }
-}
-
 function renderMessagesFiltered(query) {
   messagesEl.innerHTML = "";
-  let lastDate = "";
-  let lastDateDiv = null;
-  const lower = (query||"").toLowerCase();
-  let filtered = allMessages
-    .filter(msg =>
-      !query || (msg.text && msg.text.toLowerCase().includes(lower)) ||
-      (msg.fileName && msg.fileName.toLowerCase().includes(lower))
-    );
   let dateSet = new Set();
-  filtered.forEach((msg, idx, arr) => {
+  let filtered = allMessages.filter(msg =>
+    !query || (msg.text && msg.text.toLowerCase().includes(query.toLowerCase())) ||
+    (msg.fileName && msg.fileName.toLowerCase().includes(query.toLowerCase()))
+  );
+  filtered.forEach((msg) => {
     const dateStr = formatDate(msg.timestamp);
-    if (!dateSet.has(dateStr)) {
-      lastDateDiv = document.createElement("div");
+    if (dateStr && !dateSet.has(dateStr)) {
+      let lastDateDiv = document.createElement("div");
       lastDateDiv.className = "date-sticky";
       lastDateDiv.textContent = dateStr;
       messagesEl.appendChild(lastDateDiv);
       dateSet.add(dateStr);
     }
-    renderMessage(msg, msg._id, lastDateDiv);
+    renderMessage(msg, msg._id);
   });
-  // Typing indicator dots as last message
   if (typingOtherUser && selectedChat && !selectedChat.isGroup) {
     const typingDiv = document.createElement("div");
     typingDiv.className = `max-w-xs px-4 py-2 rounded shadow text-sm break-words msg-light ml-auto flex items-center`;
@@ -678,138 +519,35 @@ function renderMessagesFiltered(query) {
   }
 }
 
-function renderMessage(msg, id, lastDateDiv) {
+function renderMessage(msg, id) {
   const isSender = msg.sender === currentUser;
-  const timeElapsed = Date.now() - msg.timestamp;
-  const showEditDeleteForEveryone = isSender && timeElapsed <= 60000;
-  const lightBg = document.documentElement.classList.contains("dark") ? "msg-dark" : "msg-light";
   const div = document.createElement("div");
   div.dataset.id = id;
-  div.className = `relative max-w-xs px-4 py-2 rounded shadow text-sm break-words ${lightBg} ${isSender ? "ml-auto" : ""}`;
-
-  if (msg.replyTo) {
-    const replyDiv = document.createElement("div");
-    replyDiv.className = "reply-tag";
-    replyDiv.textContent = msg.replyText || "Replied message";
-    replyDiv.onclick = () => {
-      const el = document.querySelector(`[data-id="${msg.replyTo}"]`);
-      if (el) {
-        el.scrollIntoView({ behavior: "smooth", block: "center" });
-        el.classList.add("ring", "ring-blue-500");
-        setTimeout(()=>el.classList.remove("ring","ring-blue-500"), 1200);
-      }
-    };
-    div.appendChild(replyDiv);
-  }
-
+  div.className = `relative max-w-xs px-4 py-2 rounded shadow text-sm break-words msg-light ${isSender ? "ml-auto" : ""}`;
   div.innerHTML += msg.text || (msg.fileUrl ? `<a href="${msg.fileUrl}" target="_blank" class="underline text-blue-700">${msg.fileName}</a>` : "");
-
-  function getMenuActions() {
-    const actions = [{ label: "Reply", action: "reply" }];
-    if (isSender) {
-      actions.push({ label: "Edit", action: "edit" });
-      actions.push({ label: "Delete for Me", action: "deleteMe" });
-      if (showEditDeleteForEveryone) {
-        actions.push({ label: "Delete for Everyone", action: "deleteEveryone" });
-      }
-    } else {
-      actions.push({ label: "Delete for Me", action: "deleteMe" });
-    }
-    actions.push({ label: "React", action: "react" });
-    return actions;
-  }
-  div.oncontextmenu = e => {
-    e.preventDefault();
-    contextMsgId = id;
-    contextMsg = msg;
-    showContextMenu(getMenuActions(), e.clientX, e.clientY);
-  };
-
-  let startX = null;
-  div.addEventListener("touchstart", e => { startX = e.touches[0].clientX; });
-  div.addEventListener("touchend", e => {
-    if (!startX) return;
-    const endX = e.changedTouches[0].clientX;
-    if (startX !== null && endX - startX > 60) {
-      setReplyTag(msg, id);
-    }
-    startX = null;
-  });
-
-  let longPressTimer;
-  div.addEventListener("touchstart", e => {
-    longPressTimer = setTimeout(() => {
-      contextMsgId = id;
-      contextMsg = msg;
-      showContextMenu(getMenuActions(), e.touches[0].clientX, e.touches[0].clientY);
-    }, 400);
-  });
-  div.addEventListener("touchend", () => clearTimeout(longPressTimer));
-  div.addEventListener("touchmove", () => clearTimeout(longPressTimer));
-
-  if (msg.sender !== currentUser && selectedChat && !selectedChat.isGroup) {
-    db.ref(`${getChatPath()}/${id}/status`).set("read");
-  }
-  if (isSender) {
-    const ticks = document.createElement("span");
-    ticks.className = "absolute bottom-1 right-2 text-xs";
-    if (msg.status === "read") {
-      ticks.textContent = "✓✓";
-      ticks.classList.add("text-green-700");
-    } else if (msg.status === "delivered") {
-      ticks.textContent = "✓✓";
-    } else {
-      ticks.textContent = "✓";
-    }
-    div.appendChild(ticks);
-  }
-  if (msg.reactions) {
-    const reactionBar = document.createElement("div");
-    reactionBar.className = "flex gap-1 mt-1";
-    for (const [user, emoji] of Object.entries(msg.reactions)) {
-      const span = document.createElement("span");
-      span.textContent = emoji;
-      span.className = "inline-block px-2 py-1 rounded bg-gray-200 dark:bg-gray-700 text-lg";
-      reactionBar.appendChild(span);
-    }
-    div.appendChild(reactionBar);
-  }
-  const timeDiv = document.createElement("div");
-  timeDiv.className = "text-xs text-gray-500 mt-1";
-  timeDiv.textContent = formatTime(msg.timestamp);
-  div.appendChild(timeDiv);
-
   messagesEl.appendChild(div);
   messagesEl.scrollTop = messagesEl.scrollHeight;
 }
 
+// --- Typing indicator logic ---
 messageInput.oninput = () => {
   sendTyping(true);
   clearTimeout(typingTimer);
   typingTimer = setTimeout(() => sendTyping(false), 2000);
 };
-function showChatArea() {
-  chatListEl.classList.add("hide");
-  chatWindowEl.classList.remove("hide");
-}
 function sendTyping(isTyping) {
   if (!selectedChat || selectedChat.isGroup) return;
   db.ref(`typing/${selectedChat.id}`).set(isTyping ? currentUser : "");
+}
+function showChatArea() {
+  chatListEl.classList.add("hide");
+  chatWindowEl.classList.remove("hide");
 }
 
 messageForm.onsubmit = async e => {
   e.preventDefault();
   const text = messageInput.value.trim();
   if (!text || !selectedChat) return;
-  if (!selectedChat.isGroup) {
-    if (await enforceBlock()) {
-      alert("You or the other user have blocked each other. Messaging is not allowed.");
-      return;
-    }
-    const blockedRef = db.ref(`blocked/${selectedChat.id}/${currentUser}`);
-    const blockedSnap = await blockedRef.once("value");
-    if (blockedSnap.exists()) { alert("You are blocked by this user."); return; }
-  }
   const msg = {
     sender: currentUser,
     text: text,
@@ -826,10 +564,7 @@ messageForm.onsubmit = async e => {
   await ref.set(msg);
   messageInput.value = "";
   sendTyping(false);
-  if (!selectedChat.isGroup) {
-    const statusRef = db.ref(`users/${selectedChat.id}/online`);
-    statusRef.once("value", snap => { if (snap.val()) ref.update({ status: "delivered" }); });
-  }
+  updateRecentsOnSend(selectedChat.id, selectedChat.isGroup, text);
 };
 
 attachBtn.onclick = () => fileInput.click();
@@ -842,146 +577,8 @@ fileInput.onchange = async () => {
   const url = await ref.getDownloadURL();
   const msg = { sender: currentUser, fileUrl: url, fileName: file.name, timestamp: Date.now() };
   await db.ref(getChatPath()).push(msg);
+  updateRecentsOnSend(selectedChat.id, selectedChat.isGroup, file.name);
 };
-
-createGroupBtn.onclick = () => {
-  groupModal.classList.remove("hidden");
-  groupNameInput.value = "";
-  groupPasswordEl.value = "";
-  groupType = "public";
-  privateFields.style.display = "none";
-  groupUsers.innerHTML = "";
-  db.ref("users").once("value", snap => {
-    const usersObj = snap.val();
-    if (!usersObj) return;
-    Object.keys(usersObj).forEach(username => {
-      if (username === currentUser) return;
-      const div = document.createElement("div");
-      div.className = "flex items-center gap-2 p-1";
-      const checkbox = document.createElement("input");
-      checkbox.type = "checkbox";
-      checkbox.value = username;
-      div.appendChild(checkbox);
-      div.appendChild(document.createTextNode(usersObj[username].name || username));
-      groupUsers.appendChild(div);
-    });
-  });
-};
-publicBtn.onclick = () => {
-  groupType = "public";
-  privateFields.style.display = "none";
-};
-privateBtn.onclick = () => {
-  groupType = "private";
-  privateFields.style.display = "block";
-};
-closeModal.onclick = () => groupModal.classList.add("hidden");
-createGroup.onclick = () => {
-  const name = groupNameInput.value.trim();
-  if (!name) return alert("Group name required!");
-  const memberCheckboxes = groupUsers.querySelectorAll("input[type=checkbox]:checked");
-  if (memberCheckboxes.length < 1) return alert("Select at least one member.");
-  let password = groupType === "private" ? groupPasswordEl.value.trim() : "";
-  if (groupType === "private" && !password) return alert("Password required for private group.");
-  const members = { [currentUser]: true };
-  memberCheckboxes.forEach(cb => members[cb.value] = true);
-  const groupId = "group_" + Date.now();
-  db.ref(`groups/${groupId}`).set({ id: groupId, name, type: groupType, password, members });
-  groupModal.classList.add("hidden");
-  openChat(groupId, true, name);
-};
-
-window.addEventListener("beforeunload", () => { db.ref(`users/${currentUser}/lastSeen`).set(Date.now()); });
-db.ref(`users/${currentUser}/online`).set(true);
-db.ref(`users/${currentUser}/online`).onDisconnect().set(false);
-db.ref(`users/${currentUser}/lastSeen`).onDisconnect().set(Date.now());
-
-// Context Menu
-function showContextMenu(actions, x, y) {
-  let menuHtml = "";
-  actions.forEach(({ label, action }) => {
-    menuHtml += `<div class="p-2 hover:bg-gray-200 cursor-pointer" data-action="${action}">${label}</div>`;
-  });
-  contextMenu.innerHTML = menuHtml;
-  contextMenu.classList.remove("hidden");
-  contextMenuOpen = true;
-  const menuWidth = 180, menuHeight = 40 * actions.length, padding = 8;
-  let left = x, top = y;
-  if (left + menuWidth > window.innerWidth) left = window.innerWidth - menuWidth - padding;
-  if (top + menuHeight > window.innerHeight) top = window.innerHeight - menuHeight - padding;
-  if (left < 0) left = padding;
-  if (top < 0) top = padding;
-  contextMenu.style.left = left + "px";
-  contextMenu.style.top = top + "px";
-  contextMenu.style.transform = "";
-}
-function hideContextMenu() {
-  contextMenu.classList.add("hidden");
-  contextMenuOpen = false;
-}
-contextMenu.onclick = e => {
-  const action = e.target.dataset.action;
-  if (!action || !contextMsgId || !contextMsg) return;
-  if (action === "reply") setReplyTag(contextMsg, contextMsgId);
-  if (action === "edit") editMessage(contextMsgId, contextMsg.text);
-  if (action === "deleteMe") deleteForMe(contextMsgId);
-  if (action === "deleteEveryone") deleteForEveryone(contextMsgId);
-  if (action === "react") addReaction(contextMsgId);
-  hideContextMenu();
-};
-document.body.addEventListener("click", () => { if (contextMenuOpen) hideContextMenu(); });
-window.addEventListener("scroll", hideContextMenu);
-window.addEventListener("resize", hideContextMenu);
-
-function editMessage(id, oldText) {
-  const newText = prompt("Edit your message:", oldText);
-  if (newText && newText.trim() && newText !== oldText) {
-    db.ref(`${getChatPath()}/${id}`).update({ text: newText + " (edited)" });
-  }
-}
-function addReaction(msgId) {
-  const emoji = prompt("React with an emoji:");
-  if (!emoji) return;
-  db.ref(`${getChatPath()}/${msgId}/reactions/${currentUser}`).set(emoji);
-}
-function deleteForMe(id) {
-  const bubble = document.querySelector(`[data-id="${id}"]`);
-  if (bubble) bubble.remove();
-}
-function deleteForEveryone(id) {
-  db.ref(`${getChatPath()}/${id}`).update({
-    text: "🚫 This message was deleted.",
-    fileUrl: null,
-    fileName: null,
-    deleted: true
-  });
-}
-function showGroupInfoModal(group) {
-  let html = `<h2 class="text-xl font-bold mb-2">${group.name}</h2>`;
-  html += `<div class="mb-2">Type: <strong>${group.type || "public"}</strong></div>`;
-  if (group.type === "private" && group.password) {
-    html += `<div class="mb-2">Password: <span id="groupPwdText">${group.password}</span>
-      <button class="copy-btn" onclick="navigator.clipboard.writeText('${group.password}')">Copy</button></div>`;
-  }
-  html += `<div class="mb-2">Members:</div><ul>`;
-  for (const member in group.members) {
-    html += `<li class="pl-2">${member}</li>`;
-  }
-  html += `</ul>`;
-  html += `<div class="mt-4 flex gap-2">
-    <button id="leaveGroupBtn" class="bg-red-500 text-white px-4 py-2 rounded">Leave Group</button>
-    <button id="closeInfoBtn" class="bg-gray-500 text-white px-4 py-2 rounded">Close</button>
-  </div>`;
-  groupInfoContent.innerHTML = html;
-  groupInfoModal.style.display = "flex";
-  document.getElementById("closeInfoBtn").onclick = () => groupInfoModal.style.display = "none";
-  document.getElementById("leaveGroupBtn").onclick = async () => {
-    await db.ref(`groups/${group.id}/members/${currentUser}`).remove();
-    groupInfoModal.style.display = "none";
-    showSidebar();
-    alert("You have left this group.");
-  };
-}
 </script>
 </body>
 </html>
