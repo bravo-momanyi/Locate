@@ -804,14 +804,14 @@ messageForm.onsubmit = async e => {
 
 attachBtn.onclick = () => fileInput.click();
 fileInput.onchange = async () => {
-  const file = fileInput.files[0];
-  if (!file || !selectedChat) return;
-  if (file.size > 10 * 1024 * 1024) { alert("File is too large (max 10MB)."); return; }
-  const ref = storage.ref().child(`attachments/${Date.now()}_${file.name}`);
-  await ref.put(file);
-  const url = await ref.getDownloadURL();
-  const msg = { sender: currentUser, fileUrl: url, fileName: file.name, timestamp: Date.now() };
-  await db.ref(getChatPath()).push(msg);
+ // const file = fileInput.files[0];
+ // if (!file || !selectedChat) return;
+  //if (file.size > 10 * 1024 * 1024) { alert("File is too large (max 10MB)."); return; }
+ // const ref = storage.ref().child(`attachments/${Date.now()}_${file.name}`);
+  //await ref.put(file);
+ // const url = await ref.getDownloadURL();
+  //const msg = { sender: currentUser, fileUrl: url, fileName: file.name, timestamp: Date.now() };
+  //await db.ref(getChatPath()).push(msg);
 };
 
 // --- Group creation ---
