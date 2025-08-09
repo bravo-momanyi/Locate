@@ -485,12 +485,7 @@ function openChat(id, isGroup = false, groupName = "") {
         document.getElementById("typingIndicator").textContent = typingOtherUser ? "Typing..." : "";
         renderMessagesFiltered(chatSearchBar.value); // Show typing dots as last message
       });
-    } else {
-      document.getElementById("onlineLastSeenIndicator").textContent = "";
-      document.getElementById("typingIndicator").textContent = "";
-      clearInterval(onlineLastSeenPoller);
-    }
-  }
+    
   if (!isGroup) {
     updateOnlineLastSeenTyping();
     onlineLastSeenPoller = setInterval(updateOnlineLastSeenTyping, 1000);
