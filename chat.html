@@ -520,15 +520,6 @@ function openChat(id, isGroup = false, groupName = "") {
   messagesListener.on("child_added", snap => {
     const msg = snap.val();
     msg._id = snap.key;
-    // Deduplicate
-    if (!allMessages.find(m => m._id === msg._id)) {
-      if (!selectedChat.isGroup && msg.sender !== currentUser) {
-        if (allMessages.some(m => m.text === msg.text && m.timestamp === msg.timestamp && m.sender === currentUser)) return;
-      }
-      allMessages.push(msg);
-      allMessages.sort((a, b) => a.timestamp - b.timestamp);
-      renderMessagesFiltered(chatSearchBar.value);
-    }
   });
   messagesListener.on("child_changed", snap => {
     const msg = snap.val();
