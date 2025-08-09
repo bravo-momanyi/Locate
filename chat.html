@@ -281,8 +281,6 @@ let lastGroupPassword = "";
 let replyTag = null;
 let typingOtherUser = false;
 let onlineLastSeenPoller = null;
-let typingTimeout = null;
-let typingActive = false;
 
 function setTheme(theme) {
   if (theme === "dark") {
@@ -359,7 +357,7 @@ db.ref("groups").on("value", refreshGroupList);
 // Real-time Recents with deduplication
 function setupRecentsListeners() {
   db.ref("messages").on("value", function(snapshot) {
-    updateRecentsFromSnapshot(snapshot);
+    updateRecentsFromSnapshot(snapshot, null);
   });
   db.ref("groupMessages").on("value", function(snapshot) {
     updateRecentsFromSnapshot(null, snapshot);
@@ -528,9 +526,7 @@ function openChat(id, isGroup = false, groupName = "") {
   if (messagesListener) messagesListener.off();
   clearInterval(onlineLastSeenPoller);
 
-  // --- Typing indicator (other user, as last message and chat title) ---
-  let otherUserTyping = false;
-  let typingChecker = null;
+  // --- Typing indicator (other user, last message and chat title) ---
   function updateOnlineLastSeenTyping() {
     db.ref(`users/${id}/online`).once("value", snap => {
       if (snap.val()) {
@@ -552,9 +548,8 @@ function openChat(id, isGroup = false, groupName = "") {
     });
     db.ref(`typing/${id}`).once("value", snap => {
       const typ = snap.val();
-      otherUserTyping = (typ === currentUser);
-      typingOtherUser = otherUserTyping;
-      document.getElementById("typingIndicator").textContent = otherUserTyping ? "Typing..." : "";
+      typingOtherUser = (typ === currentUser);
+      document.getElementById("typingIndicator").textContent = typingOtherUser ? "Typing..." : "";
       renderMessagesFiltered(chatSearchBar.value); // Show typing dots as last message
     });
   }
@@ -661,14 +656,15 @@ function renderMessagesFiltered(query) {
       !query || (msg.text && msg.text.toLowerCase().includes(lower)) ||
       (msg.fileName && msg.fileName.toLowerCase().includes(lower))
     );
+  let dateSet = new Set();
   filtered.forEach((msg, idx, arr) => {
     const dateStr = formatDate(msg.timestamp);
-    if (dateStr !== lastDate) {
-      lastDate = dateStr;
+    if (!dateSet.has(dateStr)) {
       lastDateDiv = document.createElement("div");
       lastDateDiv.className = "date-sticky";
       lastDateDiv.textContent = dateStr;
       messagesEl.appendChild(lastDateDiv);
+      dateSet.add(dateStr);
     }
     renderMessage(msg, msg._id, lastDateDiv);
   });
@@ -785,12 +781,6 @@ function renderMessage(msg, id, lastDateDiv) {
 
   messagesEl.appendChild(div);
   messagesEl.scrollTop = messagesEl.scrollHeight;
-  if (msg.sender !== currentUser && document.hidden && Notification.permission === "granted") {
-    new Notification(`New message from ${msg.sender}`, {
-      body: msg.text,
-      icon: "/assets/whatsapp-icon.png"
-    });
-  }
 }
 
 messageInput.oninput = () => {
