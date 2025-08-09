@@ -478,7 +478,7 @@ function openChat(id, isGroup = false, groupName = "") {
         });
       }
     });
-    db.ref(`typing/${id}`).once("value", snap => {
+    db.ref(`typing/${currentUser}`).on("value", snap => {
       const typ = snap.val();
       typingOtherUser = (typ === currentUser);
       document.getElementById("typingIndicator").textContent = typingOtherUser ? "Typing..." : "";
