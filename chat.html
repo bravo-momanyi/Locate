@@ -272,8 +272,7 @@ const groupInfoModal = document.getElementById("groupInfoModal");
 const groupInfoContent = document.getElementById("groupInfoContent");
 const tagReplyBar = document.getElementById("tagReplyBar");
 
-let selectedChat = null;
-let typingTimer;
+let selectedChat = null, typingTimer;
 let allUsers = {}, allGroups = {}, recentsData = [];
 let messagesListener = null;
 let allMessages = [];
@@ -283,7 +282,6 @@ let replyTag = null;
 let typingOtherUser = false;
 let onlineLastSeenPoller = null;
 
-// --- Theme ---
 function setTheme(theme) {
   if (theme === "dark") {
     document.documentElement.classList.add("dark");
@@ -307,15 +305,13 @@ toggleThemeBtn.onclick = () => setTheme(document.documentElement.classList.conta
 setTheme(localStorage.getItem("theme") || "light");
 dashboardBtn.onclick = () => window.location.href = "app.html";
 
-// --- Date formatting ---
 function formatDate(ts) {
   if (!ts) return '';
   const d = new Date(ts);
-  const now = new Date();
-  const msgDay = d.toDateString(), nowDay = now.toDateString();
+  const msgDay = d.toDateString(), nowDay = (new Date()).toDateString();
   if (msgDay === nowDay) return "Today";
   const yesterday = new Date();
-  yesterday.setDate(now.getDate() - 1);
+  yesterday.setDate(yesterday.getDate() - 1);
   if (msgDay === yesterday.toDateString()) return "Yesterday";
   return d.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
 }
@@ -324,7 +320,7 @@ function formatTime(ts) {
   return d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
 }
 
-// --- Sidebar lists and real-time recents ---
+// Sidebar lists
 function refreshUserList() {
   db.ref("users").once("value", snapshot => {
     userList.innerHTML = "";
@@ -358,6 +354,7 @@ function refreshGroupList() {
 }
 db.ref("groups").on("value", refreshGroupList);
 
+// Real-time Recents with deduplication
 function setupRecentsListeners() {
   db.ref("messages").on("value", function(snapshot) {
     updateRecentsFromSnapshot(snapshot, null);
@@ -467,7 +464,54 @@ function showSidebar() {
 }
 backBtn.onclick = showSidebar;
 
-// --- Chat logic ---
+function promptGroupJoin(group) {
+  if (group.type === "private" && !group.members?.[currentUser]) {
+    const pwd = prompt("This is a private group. Enter password to join:");
+    if (pwd !== group.password) { alert("Wrong password."); return false; }
+    db.ref(`groups/${group.id}/members/${currentUser}`).set(true);
+    alert("You have joined this group!");
+    return true;
+  }
+  if (!group.members?.[currentUser]) {
+    if (!confirm("Join this group?")) return false;
+    db.ref(`groups/${group.id}/members/${currentUser}`).set(true);
+    alert("You have joined this group!");
+    return true;
+  }
+  return true;
+}
+
+async function updateBlockButton() {
+  if (!selectedChat || selectedChat.isGroup) {
+    blockUserBtn.textContent = "🚫 Block";
+    blockUserBtn.disabled = true;
+    return;
+  }
+  const otherUser = selectedChat.id;
+  const userBlockedSnap = await db.ref(`blocked/${currentUser}/${otherUser}`).once("value");
+  const otherBlockedSnap = await db.ref(`blocked/${otherUser}/${currentUser}`).once("value");
+  if (userBlockedSnap.exists()) {
+    blockUserBtn.textContent = "✅ Unblock";
+    blockUserBtn.disabled = false;
+  } else if (otherBlockedSnap.exists()) {
+    blockUserBtn.textContent = "🚫 Blocked";
+    blockUserBtn.disabled = false;
+  } else {
+    blockUserBtn.textContent = "🚫 Block";
+    blockUserBtn.disabled = false;
+  }
+}
+
+async function enforceBlock() {
+  if (!selectedChat || selectedChat.isGroup) return false;
+  const otherUser = selectedChat.id;
+  const userBlockedSnap = await db.ref(`blocked/${currentUser}/${otherUser}`).once("value");
+  const otherBlockedSnap = await db.ref(`blocked/${otherUser}/${currentUser}`).once("value");
+  return userBlockedSnap.exists() || otherBlockedSnap.exists();
+}
+
+let contextMsgId = null, contextMsg = null, contextMenuOpen = false;
+
 function getChatPath() {
   if (!selectedChat) return "";
   if (selectedChat.isGroup) return `groupMessages/${selectedChat.id}`;
@@ -482,8 +526,7 @@ function openChat(id, isGroup = false, groupName = "") {
   if (messagesListener) messagesListener.off();
   clearInterval(onlineLastSeenPoller);
 
-  let typingPoller = null;
-
+  // --- Typing indicator (other user, last message and chat title) ---
   function updateOnlineLastSeenTyping() {
     db.ref(`users/${id}/online`).once("value", snap => {
       if (snap.val()) {
@@ -504,9 +547,10 @@ function openChat(id, isGroup = false, groupName = "") {
       }
     });
     db.ref(`typing/${id}`).once("value", snap => {
-      typingOtherUser = (snap.val() === currentUser);
+      const typ = snap.val();
+      typingOtherUser = (typ === currentUser);
       document.getElementById("typingIndicator").textContent = typingOtherUser ? "Typing..." : "";
-      renderMessagesFiltered(chatSearchBar.value);
+      renderMessagesFiltered(chatSearchBar.value); // Show typing dots as last message
     });
   }
   if (!isGroup) {
@@ -555,17 +599,14 @@ function openChat(id, isGroup = false, groupName = "") {
   messagesListener = db.ref(path);
   messagesListener.off();
 
+  // Real-time deduplication
   messagesListener.on("child_added", snap => {
     const msg = snap.val();
     msg._id = snap.key;
-    // Deduplication: only add if not present and not a sent duplicate
+    // Deduplicate: do not add duplicate received messages
     if (!allMessages.find(m => m._id === msg._id)) {
       if (!selectedChat.isGroup && msg.sender !== currentUser) {
-        if (allMessages.some(m =>
-          m.text === msg.text &&
-          m.timestamp === msg.timestamp &&
-          m.sender === currentUser
-        )) return;
+        if (allMessages.some(m => m.text === msg.text && m.timestamp === msg.timestamp && m.sender === currentUser)) return;
       }
       allMessages.push(msg);
       allMessages.sort((a, b) => a.timestamp - b.timestamp);
@@ -607,22 +648,25 @@ function setReplyTag(msg, id) {
 
 function renderMessagesFiltered(query) {
   messagesEl.innerHTML = "";
-  let dateSet = new Set();
+  let lastDate = "";
+  let lastDateDiv = null;
+  const lower = (query||"").toLowerCase();
   let filtered = allMessages
     .filter(msg =>
-      !query || (msg.text && msg.text.toLowerCase().includes(query.toLowerCase())) ||
-      (msg.fileName && msg.fileName.toLowerCase().includes(query.toLowerCase()))
+      !query || (msg.text && msg.text.toLowerCase().includes(lower)) ||
+      (msg.fileName && msg.fileName.toLowerCase().includes(lower))
     );
+  let dateSet = new Set();
   filtered.forEach((msg, idx, arr) => {
     const dateStr = formatDate(msg.timestamp);
     if (!dateSet.has(dateStr)) {
-      let lastDateDiv = document.createElement("div");
+      lastDateDiv = document.createElement("div");
       lastDateDiv.className = "date-sticky";
       lastDateDiv.textContent = dateStr;
       messagesEl.appendChild(lastDateDiv);
       dateSet.add(dateStr);
     }
-    renderMessage(msg, msg._id);
+    renderMessage(msg, msg._id, lastDateDiv);
   });
   // Typing indicator dots as last message
   if (typingOtherUser && selectedChat && !selectedChat.isGroup) {
@@ -634,7 +678,7 @@ function renderMessagesFiltered(query) {
   }
 }
 
-function renderMessage(msg, id) {
+function renderMessage(msg, id, lastDateDiv) {
   const isSender = msg.sender === currentUser;
   const timeElapsed = Date.now() - msg.timestamp;
   const showEditDeleteForEveryone = isSender && timeElapsed <= 60000;
@@ -739,19 +783,18 @@ function renderMessage(msg, id) {
   messagesEl.scrollTop = messagesEl.scrollHeight;
 }
 
-// --- Typing indicator logic
 messageInput.oninput = () => {
   sendTyping(true);
   clearTimeout(typingTimer);
   typingTimer = setTimeout(() => sendTyping(false), 2000);
 };
-function sendTyping(isTyping) {
-  if (!selectedChat || selectedChat.isGroup) return;
-  db.ref(`typing/${selectedChat.id}`).set(isTyping ? currentUser : "");
-}
 function showChatArea() {
   chatListEl.classList.add("hide");
   chatWindowEl.classList.remove("hide");
+}
+function sendTyping(isTyping) {
+  if (!selectedChat || selectedChat.isGroup) return;
+  db.ref(`typing/${selectedChat.id}`).set(isTyping ? currentUser : "");
 }
 
 messageForm.onsubmit = async e => {
@@ -853,8 +896,7 @@ db.ref(`users/${currentUser}/online`).set(true);
 db.ref(`users/${currentUser}/online`).onDisconnect().set(false);
 db.ref(`users/${currentUser}/lastSeen`).onDisconnect().set(Date.now());
 
-// --- Context Menu ---
-let contextMsgId = null, contextMsg = null, contextMenuOpen = false;
+// Context Menu
 function showContextMenu(actions, x, y) {
   let menuHtml = "";
   actions.forEach(({ label, action }) => {
