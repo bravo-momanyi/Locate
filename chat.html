@@ -520,35 +520,30 @@ function openChat(id, isGroup = false, groupName = "") {
 
   // --- Load existing messages ---
   const path = getChatPath();
-  db.ref(path).once("value", snap => {
-    if (!snap.exists()) {
-      messagesEl.innerHTML = "<div class='text-gray-500 text-center'>No messages yet.</div>";
-      allMessages = [];
-      return;
-    }
-    allMessages = [];
-    snap.forEach(child => {
-      const msg = child.val();
-      msg._id = child.key;
-      allMessages.push(msg);
-    });
-    allMessages.sort((a,b) => a.timestamp - b.timestamp);
+  let loadedIds = new Set();
+
+db.ref(path).once("value", snap => {
+  snap.forEach(child => {
+    const msg = child.val();
+    msg._id = child.key;
+    allMessages.push(msg);
+    loadedIds.add(msg._id); // mark as loaded
+  });
+  renderMessagesFiltered(chatSearchBar.value);
+});
+
+messagesListener = db.ref(path);
+messagesListener.off();
+
+messagesListener.on("child_added", snap => {
+  const msg = snap.val();
+  msg._id = snap.key;
+  if (!loadedIds.has(msg._id) && !allMessages.find(m => m._id === msg._id)) {
+    allMessages.push(msg);
     renderMessagesFiltered(chatSearchBar.value);
-  });
+  }
+});
 
-  // --- Real-time message listeners ---
-  messagesListener = db.ref(path);
-  messagesListener.off();
-
-  messagesListener.on("child_added", snap => {
-    const msg = snap.val();
-    msg._id = snap.key;
-    if (!allMessages.find(m => m._id === msg._id)) {
-      allMessages.push(msg);
-      allMessages.sort((a, b) => a.timestamp - b.timestamp);
-      renderMessagesFiltered(chatSearchBar.value);
-    }
-  });
 
   messagesListener.on("child_changed", snap => {
     const msg = snap.val();
