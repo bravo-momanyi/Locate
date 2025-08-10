@@ -517,19 +517,30 @@ function openChat(id, isGroup = false, groupName = "") {
 
   showChatArea();
   updateBlockButton();
-  allMessages = [];
-messagesEl.innerHTML = "";
+  let loadedIds = new Set();
+
+db.ref(path).once("value", snap => {
+  snap.forEach(child => {
+    const msg = child.val();
+    msg._id = child.key;
+    allMessages.push(msg);
+    loadedIds.add(msg._id); // mark as loaded
+  });
+  renderMessagesFiltered(chatSearchBar.value);
+});
+
 messagesListener = db.ref(path);
 messagesListener.off();
 
 messagesListener.on("child_added", snap => {
   const msg = snap.val();
   msg._id = snap.key;
-  if (!allMessages.find(m => m._id === msg._id)) {
+  if (!loadedIds.has(msg._id) && !allMessages.find(m => m._id === msg._id)) {
     allMessages.push(msg);
     renderMessagesFiltered(chatSearchBar.value);
   }
 });
+
 
   messagesListener.on("child_changed", snap => {
     const msg = snap.val();
