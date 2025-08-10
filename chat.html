@@ -303,7 +303,7 @@ let contextMsgId = null, contextMsg = null, contextMenuOpen = false;
 let blockedListenerRef = null;
 let otherBlockedListenerRef = null;
 let isBlockedByMe = false;
-let isBlockedByOther = false;
+let isBlockedByThem = false;
 
 
 // --- Theme ---
@@ -1015,7 +1015,7 @@ async function updateBlockButton() {
     blockUserBtn.textContent = "✅ Unblock";
     blockUserBtn.disabled = false;
     messageInput.disabled = true; // you blocked them -> can't send
-  } else if (isBlockedByOther) {
+  } else if (isBlockedByThem) {
     blockUserBtn.textContent = "🚫 Blocked";
     blockUserBtn.disabled = true; // optionally disable the block button since other blocked you
     messageInput.disabled = true; // you're blocked -> can't send
