@@ -455,40 +455,49 @@ function openChat(id, isGroup = false, groupName = "") {
   selectedChat = { id, isGroup, groupName };
   allMessages = [];
   messagesEl.innerHTML = "";
+  
   if (messagesListener) messagesListener.off();
   clearInterval(onlineLastSeenPoller);
+
   markMessagesAsRead(id, isGroup);
 
-  // Typing indicator + online / last seen
+  // Typing indicator + online/last seen
   function updateOnlineLastSeenTyping() {
-    // --- Online / last seen ---
-    db.ref(`users/${id}/online`).once("value", snap => {
-      if (snap.val()) {
-        document.getElementById("onlineLastSeenIndicator").textContent = "Online";
-      } else {
-        db.ref(`users/${id}/lastSeen`).once("value", snap2 => {
-          const v = snap2.val();
-          if (!v) {
-            document.getElementById("onlineLastSeenIndicator").textContent = "";
-            return;
-          }
-          const d = new Date(v);
-          document.getElementById("onlineLastSeenIndicator").textContent =
-            "Last seen " +
-            d.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" }) +
-            " " + d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", second: "2-digit" });
-        });
-      }
-    });
+    if (!isGroup) {
+      db.ref(`users/${id}/online`).once("value", snap => {
+        if (snap.val()) {
+          document.getElementById("onlineLastSeenIndicator").textContent = "Online";
+        } else {
+          db.ref(`users/${id}/lastSeen`).once("value", snap2 => {
+            const v = snap2.val();
+            if (!v) {
+              document.getElementById("onlineLastSeenIndicator").textContent = "";
+              return;
+            }
+            const d = new Date(v);
+            document.getElementById("onlineLastSeenIndicator").textContent =
+              "Last seen " +
+              d.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" }) +
+              " " + d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+          });
+        }
+      });
 
-    // --- Typing indicator ---
-    // Listen for typing activity directed at *this* user
-    db.ref(`typing/${currentUser}`).on("value", snap => {
-      const typingUserId = snap.val();
-      const typingOtherUser = (typingUserId === id); // Only show if other user is typing to current user
-      document.getElementById("typingIndicator").textContent = typingOtherUser ? "Typing..." : "";
-      renderMessagesFiltered(chatSearchBar.value); // Show typing dots as last message
-    });
+      // Listen for typing from the other user
+      db.ref(`typing/${id}`).on("value", snap => {
+        const isTyping = snap.val() === true; // make sure your typing status sets true/false
+        document.getElementById("typingIndicator").textContent = isTyping ? "Typing..." : "";
+
+        // Show as last "message" like WhatsApp
+        if (isTyping) {
+          renderMessagesFiltered(chatSearchBar.value, {
+            typingIndicator: true
+          });
+        } else {
+          renderMessagesFiltered(chatSearchBar.value);
+        }
+      });
+    }
   }
 
   if (!isGroup) {
@@ -500,7 +509,7 @@ function openChat(id, isGroup = false, groupName = "") {
     clearInterval(onlineLastSeenPoller);
   }
 
-  // --- Group or private chat title setup ---
+  // Set chat title
   if (isGroup) {
     const group = allGroups[id];
     if (!group) return alert("Group not found.");
@@ -517,30 +526,21 @@ function openChat(id, isGroup = false, groupName = "") {
 
   showChatArea();
   updateBlockButton();
-  let loadedIds = new Set();
 
-db.ref(path).once("value", snap => {
-  snap.forEach(child => {
-    const msg = child.val();
-    msg._id = child.key;
-    allMessages.push(msg);
-    loadedIds.add(msg._id); // mark as loaded
+  const path = getChatPath();
+  messagesListener = db.ref(path);
+  messagesListener.off();
+
+  // Single source of truth: load + listen here (no duplication)
+  messagesListener.on("child_added", snap => {
+    const msg = snap.val();
+    msg._id = snap.key;
+    if (!allMessages.find(m => m._id === msg._id)) {
+      allMessages.push(msg);
+      allMessages.sort((a, b) => a.timestamp - b.timestamp);
+      renderMessagesFiltered(chatSearchBar.value);
+    }
   });
-  renderMessagesFiltered(chatSearchBar.value);
-});
-
-messagesListener = db.ref(path);
-messagesListener.off();
-
-messagesListener.on("child_added", snap => {
-  const msg = snap.val();
-  msg._id = snap.key;
-  if (!loadedIds.has(msg._id) && !allMessages.find(m => m._id === msg._id)) {
-    allMessages.push(msg);
-    renderMessagesFiltered(chatSearchBar.value);
-  }
-});
-
 
   messagesListener.on("child_changed", snap => {
     const msg = snap.val();
