@@ -843,11 +843,6 @@ function showChatArea() {
   chatWindowEl.classList.remove("hide");
 }
 
-let isBlockedByMe = false;
-let isBlockedByThem = false;
-let blockListener1 = null;
-let blockListener2 = null;
-
 // --- Listen for block status changes in realtime ---
 function listenForBlockStatus() {
   if (!selectedChat || selectedChat.isGroup) return;
