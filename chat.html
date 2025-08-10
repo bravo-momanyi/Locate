@@ -455,6 +455,43 @@ function openChat(id, isGroup = false, groupName = "") {
   selectedChat = { id, isGroup, groupName };
   allMessages = [];
   messagesEl.innerHTML = "";
+  let blockListener1 = null;
+let blockListener2 = null;
+
+function listenForBlockStatus() {
+  if (!selectedChat || selectedChat.isGroup) return;
+
+  const otherUser = selectedChat.id;
+
+  // Remove old listeners
+  if (blockListener1) db.ref(`blocked/${currentUser}/${otherUser}`).off("value", blockListener1);
+  if (blockListener2) db.ref(`blocked/${otherUser}/${currentUser}`).off("value", blockListener2);
+
+  blockListener1 = db.ref(`blocked/${currentUser}/${otherUser}`).on("value", snap => {
+    updateBlockUI(snap.exists(), null);
+  });
+
+  blockListener2 = db.ref(`blocked/${otherUser}/${currentUser}`).on("value", snap => {
+    updateBlockUI(null, snap.exists());
+  });
+}
+
+function updateBlockUI(iBlockedThem, theyBlockedMe) {
+  const blockByMe = iBlockedThem ?? false;
+  const blockByThem = theyBlockedMe ?? false;
+
+  if (blockByMe) {
+    messageInput.disabled = true;
+    messageInput.placeholder = "You have blocked this user.";
+  } else if (blockByThem) {
+    messageInput.disabled = true;
+    messageInput.placeholder = "You have been blocked by this user.";
+  } else {
+    messageInput.disabled = false;
+    messageInput.placeholder = "Type a message...";
+  }
+}
+
   if (messagesListener) messagesListener.off();
   clearInterval(onlineLastSeenPoller);
   markMessagesAsRead(id, isGroup);
@@ -798,29 +835,61 @@ function showChatArea() {
   chatWindowEl.classList.remove("hide");
 }
 
-// --- Message send logic ---
+// --- Message send logic with block check ---
 messageForm.onsubmit = async e => {
   e.preventDefault();
+
   const text = messageInput.value.trim();
   if (!text || !selectedChat) return;
-  const msg = {
-    sender: currentUser,
-    text: text,
-    timestamp: Date.now(),
-    status: "sent"
-  };
-  if (replyTag) {
-    msg.replyTo = replyTag.id;
-    msg.replyText = replyTag.text;
-    replyTag = null;
-    tagReplyBar.innerHTML = '';
+
+  const otherUser = selectedChat.id;
+
+  try {
+    // Check if blocked
+    const [iBlockedSnap, theyBlockedSnap] = await Promise.all([
+      db.ref(`blocked/${currentUser}/${otherUser}`).once("value"),
+      db.ref(`blocked/${otherUser}/${currentUser}`).once("value")
+    ]);
+
+    if (iBlockedSnap.exists()) {
+      alert("You have blocked this user. Unblock to send messages.");
+      return;
+    }
+    if (theyBlockedSnap.exists()) {
+      alert("This user has blocked you. You cannot send messages.");
+      return;
+    }
+
+    // Build message object
+    const msg = {
+      sender: currentUser,
+      text: text,
+      timestamp: Date.now(),
+      status: "sent"
+    };
+
+    if (replyTag) {
+      msg.replyTo = replyTag.id;
+      msg.replyText = replyTag.text;
+      replyTag = null;
+      tagReplyBar.innerHTML = '';
+    }
+
+    // Push message to database
+    const ref = db.ref(getChatPath()).push();
+    await ref.set(msg);
+
+    // Clear input
+    messageInput.value = "";
+    sendTyping(false);
+    updateRecentsOnSend(selectedChat.id, selectedChat.isGroup, text);
+
+  } catch (err) {
+    console.error("Error sending message:", err);
+    alert("Failed to send message. Please try again.");
   }
-  const ref = db.ref(getChatPath()).push();
-  await ref.set(msg);
-  messageInput.value = "";
-  sendTyping(false);
-  updateRecentsOnSend(selectedChat.id, selectedChat.isGroup, text);
 };
+
 
 attachBtn.onclick = () => fileInput.click();
 fileInput.onchange = async () => {
@@ -939,20 +1008,26 @@ async function updateBlockButton() {
   if (!selectedChat || selectedChat.isGroup) {
     blockUserBtn.textContent = "🚫 Block";
     blockUserBtn.disabled = true;
+    messageInput.disabled = false;
     return;
   }
+
   const otherUser = selectedChat.id;
   const userBlockedSnap = await db.ref(`blocked/${currentUser}/${otherUser}`).once("value");
   const otherBlockedSnap = await db.ref(`blocked/${otherUser}/${currentUser}`).once("value");
+
   if (userBlockedSnap.exists()) {
     blockUserBtn.textContent = "✅ Unblock";
     blockUserBtn.disabled = false;
+    messageInput.disabled = true; // disable typing
   } else if (otherBlockedSnap.exists()) {
     blockUserBtn.textContent = "🚫 Blocked";
     blockUserBtn.disabled = false;
+    messageInput.disabled = true; // disable typing
   } else {
     blockUserBtn.textContent = "🚫 Block";
     blockUserBtn.disabled = false;
+    messageInput.disabled = false;
   }
 }
 
