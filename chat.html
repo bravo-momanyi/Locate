@@ -843,14 +843,57 @@ function showChatArea() {
   chatWindowEl.classList.remove("hide");
 }
 
-// --- Message send logic with block checks ---
+let isBlockedByMe = false;
+let isBlockedByThem = false;
+let blockListener1 = null;
+let blockListener2 = null;
+
+// --- Listen for block status changes in realtime ---
+function listenForBlockStatus() {
+  if (!selectedChat || selectedChat.isGroup) return;
+
+  const otherUser = selectedChat.id;
+
+  // Remove old listeners if they exist
+  if (blockListener1) db.ref(`blocked/${currentUser}/${otherUser}`).off("value", blockListener1);
+  if (blockListener2) db.ref(`blocked/${otherUser}/${currentUser}`).off("value", blockListener2);
+
+  // Listen for "I blocked them"
+  blockListener1 = db.ref(`blocked/${currentUser}/${otherUser}`).on("value", snap => {
+    updateBlockUI(snap.exists(), null);
+  });
+
+  // Listen for "They blocked me"
+  blockListener2 = db.ref(`blocked/${otherUser}/${currentUser}`).on("value", snap => {
+    updateBlockUI(null, snap.exists());
+  });
+}
+
+// --- Update UI & variables when block status changes ---
+function updateBlockUI(iBlockedThem, theyBlockedMe) {
+  if (iBlockedThem !== null) isBlockedByMe = iBlockedThem;
+  if (theyBlockedMe !== null) isBlockedByThem = theyBlockedMe;
+
+  if (isBlockedByMe) {
+    messageInput.disabled = true;
+    messageInput.placeholder = "You have blocked this user.";
+  } else if (isBlockedByThem) {
+    messageInput.disabled = true;
+    messageInput.placeholder = "You have been blocked by this user.";
+  } else {
+    messageInput.disabled = false;
+    messageInput.placeholder = "Type a message...";
+  }
+}
+
+// --- Send Message Logic ---
 messageForm.onsubmit = async e => {
   e.preventDefault();
-  
+
   const text = messageInput.value.trim();
   if (!text || !selectedChat) return;
 
-  // Don't send if blocked
+  // Prevent sending if blocked
   if (isBlockedByMe) {
     alert("You have blocked this user. Unblock them to send messages.");
     return;
@@ -868,7 +911,7 @@ messageForm.onsubmit = async e => {
     status: "sent"
   };
 
-  // Handle replies
+  // Handle reply messages
   if (replyTag) {
     msg.replyTo = replyTag.id;
     msg.replyText = replyTag.text;
@@ -880,14 +923,13 @@ messageForm.onsubmit = async e => {
   const chatRef = db.ref(getChatPath()).push();
   await chatRef.set(msg);
 
-  // Reset input
+  // Clear input and stop typing indicator
   messageInput.value = "";
   sendTyping(false);
 
-  // Update recents
+  // Update "recents" list
   updateRecentsOnSend(selectedChat.id, selectedChat.isGroup, text);
 };
-
 
 attachBtn.onclick = () => fileInput.click();
 fileInput.onchange = async () => {
