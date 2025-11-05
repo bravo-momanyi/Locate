@@ -3,72 +3,130 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>CampusHub | Sign In / Sign Up</title>
-  <link rel="stylesheet" href="style.css" />
+  <title>Campus Hub | Sign Up / Sign In</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap">
+  <style>
+    body {
+      font-family: 'Poppins', sans-serif;
+      background: #f4f8ff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      margin: 0;
+    }
+
+    .container {
+      background: #fff;
+      padding: 2rem;
+      border-radius: 12px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+      width: 350px;
+      text-align: center;
+    }
+
+    h2 {
+      color: #004080;
+      margin-bottom: 1rem;
+    }
+
+    form {
+      display: flex;
+      flex-direction: column;
+      gap: 0.8rem;
+    }
+
+    input {
+      padding: 0.7rem;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      font-size: 1rem;
+    }
+
+    button {
+      background: #004080;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      padding: 0.7rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: 0.3s;
+    }
+
+    button:hover {
+      background: #0059b3;
+    }
+
+    .switch {
+      margin-top: 1rem;
+      color: #555;
+      font-size: 0.9rem;
+    }
+
+    .switch span {
+      color: #004080;
+      cursor: pointer;
+      font-weight: 600;
+    }
+
+    #message {
+      margin-top: 1rem;
+      color: green;
+      font-size: 0.9rem;
+    }
+
+    .forgot {
+      text-align: right;
+      font-size: 0.85rem;
+      color: #004080;
+      cursor: pointer;
+    }
+  </style>
 </head>
 <body>
-  <div class="auth-container">
-    <h1 id="form-title">Create an Account</h1>
+  <div class="container">
+    <h2 id="formTitle">Create Account</h2>
 
-    <form id="auth-form">
-      <div id="name-field" class="form-group">
-        <input type="text" id="name" placeholder="Full Name" required />
-      </div>
-
-      <div id="phone-field" class="form-group">
-        <input type="text" id="phone" placeholder="Phone Number" required />
-      </div>
-
-      <div class="form-group">
-        <input type="email" id="email" placeholder="Email" required />
-      </div>
-
-      <div id="confirm-email-field" class="form-group">
-        <input type="email" id="confirm-email" placeholder="Confirm Email" required />
-      </div>
-
-      <div class="form-group">
-        <input type="password" id="password" placeholder="Password" required />
-      </div>
-
-      <div id="forgot-password-link" class="forgot-link">
-        <a href="#" id="forgotPassword">Forgot Password?</a>
-      </div>
-
-      <button type="submit" id="submit-btn">Sign Up</button>
+    <!-- Signup Form -->
+    <form id="signupForm">
+      <input type="text" id="name" placeholder="Full Name" required />
+      <input type="email" id="signupEmail" placeholder="Email" required />
+      <input type="tel" id="phone" placeholder="Phone Number" required />
+      <input type="password" id="signupPassword" placeholder="Password" required />
+      <input type="password" id="confirmPassword" placeholder="Confirm Password" required />
+      <button type="submit">Sign Up</button>
     </form>
 
-    <div class="divider">OR</div>
+    <!-- Login Form -->
+    <form id="loginForm" style="display: none;">
+      <input type="email" id="loginEmail" placeholder="Email" required />
+      <input type="password" id="loginPassword" placeholder="Password" required />
+      <div class="forgot" id="forgotPassword">Forgot Password?</div>
+      <button type="submit">Sign In</button>
+    </form>
 
-    <button id="google-btn" class="google-btn">
-      <img src="https://www.svgrepo.com/show/475656/google-color.svg" alt="Google logo" />
-      Continue with Google
-    </button>
-
-    <p id="toggle-text">
-      Already have an account?
-      <a href="#" id="toggle-link">Sign In</a>
+    <p class="switch" id="toggleForm">
+      Already have an account? <span>Sign In</span>
     </p>
+
+    <p id="message"></p>
   </div>
 
   <script type="module">
+    // ---------- Firebase Setup ----------
     import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
-    import {
-      getAuth,
-      createUserWithEmailAndPassword,
-      signInWithEmailAndPassword,
+    import { 
+      getAuth, 
+      createUserWithEmailAndPassword, 
+      sendEmailVerification, 
+      signInWithEmailAndPassword, 
       sendPasswordResetEmail,
-      GoogleAuthProvider,
-      signInWithPopup,
-      sendEmailVerification
+      onAuthStateChanged 
     } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-auth.js";
-    import {
-      getFirestore,
-      doc,
-      setDoc
-    } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
+    import { getFirestore, setDoc, doc } 
+      from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
 
-    // 🔥 Firebase Config
     const firebaseConfig = {
       apiKey: "AIzaSyBdylCZumZk-YrN9Fn13qQ6XRTN5WGsi54",
       authDomain: "campus-hub-c621e.firebaseapp.com",
@@ -79,103 +137,99 @@
       measurementId: "G-YQGNYWFV0L"
     };
 
-    // ⚙️ Initialize Firebase
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
     const db = getFirestore(app);
-    const provider = new GoogleAuthProvider();
 
-    // Elements
-    const form = document.getElementById("auth-form");
-    const toggleLink = document.getElementById("toggle-link");
-    const formTitle = document.getElementById("form-title");
-    const submitBtn = document.getElementById("submit-btn");
-    const googleBtn = document.getElementById("google-btn");
-    const forgotPassword = document.getElementById("forgotPassword");
+    const signupForm = document.getElementById("signupForm");
+    const loginForm = document.getElementById("loginForm");
+    const toggleForm = document.getElementById("toggleForm");
+    const message = document.getElementById("message");
+    const formTitle = document.getElementById("formTitle");
 
-    let isSignUp = true;
+    let isSignup = true;
 
-    // 🧩 Toggle Sign Up / Sign In
-    toggleLink.addEventListener("click", (e) => {
-      e.preventDefault();
-      isSignUp = !isSignUp;
-
-      document.getElementById("name-field").style.display = isSignUp ? "block" : "none";
-      document.getElementById("phone-field").style.display = isSignUp ? "block" : "none";
-      document.getElementById("confirm-email-field").style.display = isSignUp ? "block" : "none";
-      document.getElementById("forgot-password-link").style.display = isSignUp ? "none" : "block";
-
-      formTitle.textContent = isSignUp ? "Create an Account" : "Sign In";
-      submitBtn.textContent = isSignUp ? "Sign Up" : "Sign In";
-      toggleLink.textContent = isSignUp ? "Sign In" : "Sign Up";
+    // ---------- Switch Between Forms ----------
+    toggleForm.addEventListener("click", () => {
+      isSignup = !isSignup;
+      if (isSignup) {
+        signupForm.style.display = "flex";
+        loginForm.style.display = "none";
+        formTitle.textContent = "Create Account";
+        toggleForm.innerHTML = `Already have an account? <span>Sign In</span>`;
+      } else {
+        signupForm.style.display = "none";
+        loginForm.style.display = "flex";
+        formTitle.textContent = "Sign In";
+        toggleForm.innerHTML = `Don't have an account? <span>Sign Up</span>`;
+      }
+      message.textContent = "";
     });
 
-    // 🧾 Form Submission
-    form.addEventListener("submit", async (e) => {
+    // ---------- Sign Up ----------
+    signupForm.addEventListener("submit", async (e) => {
       e.preventDefault();
-      const email = document.getElementById("email").value.trim();
-      const confirmEmail = document.getElementById("confirm-email").value.trim();
-      const password = document.getElementById("password").value.trim();
+      const name = document.getElementById("name").value.trim();
+      const email = document.getElementById("signupEmail").value.trim();
+      const phone = document.getElementById("phone").value.trim();
+      const password = document.getElementById("signupPassword").value;
+      const confirmPassword = document.getElementById("confirmPassword").value;
 
-      if (isSignUp) {
-        const name = document.getElementById("name").value.trim();
-        const phone = document.getElementById("phone").value.trim();
+      if (password !== confirmPassword) {
+        message.textContent = "⚠️ Passwords do not match!";
+        message.style.color = "red";
+        return;
+      }
 
-        if (email !== confirmEmail) {
-          alert("⚠️ Emails do not match!");
-          return;
-        }
+      try {
+        const userCred = await createUserWithEmailAndPassword(auth, email, password);
+        const user = userCred.user;
 
-        try {
-          const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-          const user = userCredential.user;
+        // Save user data in Firestore
+        await setDoc(doc(db, "users", user.uid), {
+          name, email, phone, createdAt: new Date().toISOString()
+        });
 
-          await sendEmailVerification(user);
+        // Send verification email
+        await sendEmailVerification(user);
+        message.textContent = "✅ Verification email sent! Please check your inbox.";
+        message.style.color = "green";
 
-          await setDoc(doc(db, "users", user.uid), {
-            name,
-            email,
-            phone,
-            createdAt: new Date().toISOString(),
-          });
-
-          alert("✅ Account created! Please verify your email before signing in.");
-        } catch (error) {
-          if (error.code === "auth/email-already-in-use") {
-            alert("⚠️ Account already exists. Please sign in.");
-          } else {
-            alert("⚠️ " + error.message);
-          }
-        }
-      } else {
-        try {
-          const userCredential = await signInWithEmailAndPassword(auth, email, password);
-          const user = userCredential.user;
-
-          if (!user.emailVerified) {
-            alert("⚠️ Please verify your email before signing in.");
-            return;
-          }
-
-          alert("✅ Welcome back!");
-          window.location.href = "home.html";
-        } catch (error) {
-          if (error.code === "auth/user-not-found") {
-            alert("⚠️ Account not found. Please sign up instead.");
-          } else if (error.code === "auth/wrong-password") {
-            alert("⚠️ Incorrect password.");
-          } else {
-            alert("⚠️ " + error.message);
-          }
-        }
+      } catch (error) {
+        message.textContent = error.message;
+        message.style.color = "red";
       }
     });
 
-    // 🔐 Forgot Password
-    forgotPassword.addEventListener("click", async (e) => {
+    // ---------- Login ----------
+    loginForm.addEventListener("submit", async (e) => {
       e.preventDefault();
+      const email = document.getElementById("loginEmail").value.trim();
+      const password = document.getElementById("loginPassword").value;
+
+      try {
+        const userCred = await signInWithEmailAndPassword(auth, email, password);
+        const user = userCred.user;
+
+        if (!user.emailVerified) {
+          message.textContent = "⚠️ Please verify your email before signing in.";
+          message.style.color = "red";
+          return;
+        }
+
+        // Redirect to main app page
+        window.location.href = "index.html";
+      } catch (error) {
+        message.textContent = "⚠️ " + error.message;
+        message.style.color = "red";
+      }
+    });
+
+    // ---------- Password Reset ----------
+    document.getElementById("forgotPassword").addEventListener("click", async () => {
       const email = prompt("Enter your email to reset password:");
       if (!email) return;
+
       try {
         await sendPasswordResetEmail(auth, email);
         alert("📩 Password reset email sent!");
@@ -184,128 +238,12 @@
       }
     });
 
-    // 🌐 Google Sign-In
-    googleBtn.addEventListener("click", async () => {
-      try {
-        const result = await signInWithPopup(auth, provider);
-        const user = result.user;
-
-        await setDoc(doc(db, "users", user.uid), {
-          name: user.displayName,
-          email: user.email,
-          phone: user.phoneNumber || "",
-          photoURL: user.photoURL,
-          createdAt: new Date().toISOString(),
-        }, { merge: true });
-
-        alert(`✅ Welcome ${user.displayName}!`);
-        window.location.href = "home.html";
-      } catch (error) {
-        alert("⚠️ " + error.message);
+    // ---------- Redirect Logged-In Users ----------
+    onAuthStateChanged(auth, (user) => {
+      if (user && user.emailVerified) {
+        window.location.href = "index.html";
       }
     });
   </script>
 </body>
-  body {
-  font-family: 'Poppins', sans-serif;
-  background: linear-gradient(135deg, #004aad, #007bff);
-  color: #333;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  height: 100vh;
-  margin: 0;
-}
-
-.auth-container {
-  background: white;
-  padding: 2rem;
-  border-radius: 1rem;
-  width: 350px;
-  box-shadow: 0 10px 20px rgba(0,0,0,0.2);
-  text-align: center;
-}
-
-h1 {
-  color: #004aad;
-  margin-bottom: 1rem;
-}
-
-.form-group {
-  margin-bottom: 1rem;
-}
-
-input {
-  width: 100%;
-  padding: 0.8rem;
-  border: 1px solid #ccc;
-  border-radius: 8px;
-  font-size: 1rem;
-}
-
-button {
-  width: 100%;
-  padding: 0.9rem;
-  background: #004aad;
-  color: white;
-  border: none;
-  border-radius: 8px;
-  cursor: pointer;
-  font-size: 1rem;
-  font-weight: bold;
-}
-
-button:hover {
-  background: #0068d6;
-}
-
-.divider {
-  text-align: center;
-  margin: 1rem 0;
-  color: #777;
-  font-size: 0.9rem;
-}
-
-.google-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  background: #fff;
-  border: 1px solid #ccc;
-  border-radius: 8px;
-  padding: 0.7rem;
-  cursor: pointer;
-  width: 100%;
-  font-weight: 500;
-  transition: 0.3s;
-}
-
-.google-btn img {
-  width: 20px;
-  height: 20px;
-}
-
-.google-btn:hover {
-  background: #f5f5f5;
-}
-
-#toggle-text {
-  margin-top: 1rem;
-  font-size: 0.9rem;
-}
-
-.forgot-link {
-  text-align: right;
-  font-size: 0.85rem;
-}
-
-.forgot-link a {
-  color: #004aad;
-  text-decoration: none;
-}
-
-.forgot-link a:hover {
-  text-decoration: underline;
-}
 </html>
