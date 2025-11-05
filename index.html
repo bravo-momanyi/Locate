@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Campus Hub | Sales Page</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap">
+  <style>
+    body {
+      margin: 0;
+      font-family: "Poppins", sans-serif;
+      background: #f8faff;
+      color: #222;
+    }
+
+    /* ---------- Navbar ---------- */
+    header {
+      background-color: #004080;
+      color: white;
+      padding: 1rem 2rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+
+    header h1 {
+      margin: 0;
+      font-size: 1.5rem;
+    }
+
+    .user-info {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .user-name {
+      font-weight: 500;
+    }
+
+    .auth-btn {
+      background: white;
+      color: #004080;
+      padding: 0.5rem 1rem;
+      border-radius: 6px;
+      text-decoration: none;
+      font-weight: 600;
+      transition: 0.3s;
+    }
+
+    .auth-btn:hover {
+      background: #e8f0ff;
+    }
+
+    /* ---------- Product Grid ---------- */
+    .products {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+      gap: 1.5rem;
+      padding: 2rem;
+    }
+
+    .product {
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+      overflow: hidden;
+      transition: 0.3s;
+      text-align: center;
+    }
+
+    .product:hover {
+      transform: translateY(-5px);
+    }
+
+    .product img {
+      width: 100%;
+      height: 150px;
+      object-fit: cover;
+    }
+
+    .product-info {
+      padding: 1rem;
+    }
+
+    .product-info h3 {
+      margin: 0.3rem 0;
+      font-size: 1rem;
+    }
+
+    .price {
+      color: #004080;
+      font-weight: 600;
+    }
+
+    .add-btn {
+      background: #004080;
+      color: white;
+      padding: 0.5rem 1rem;
+      border: none;
+      border-radius: 6px;
+      margin-top: 0.5rem;
+      cursor: pointer;
+      transition: 0.3s;
+    }
+
+    .add-btn:hover {
+      background: #0059b3;
+    }
+
+    /* ---------- Floating Basket ---------- */
+    .basket {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      background: #004080;
+      color: white;
+      padding: 1rem;
+      border-radius: 50%;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+      cursor: pointer;
+      font-size: 1.5rem;
+      transition: 0.3s;
+    }
+
+    .basket:hover {
+      transform: scale(1.1);
+      background: #0059b3;
+    }
+
+    .basket-count {
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      background: red;
+      color: white;
+      border-radius: 50%;
+      padding: 3px 7px;
+      font-size: 0.8rem;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Header -->
+  <header>
+    <h1>Campus Hub 🏪</h1>
+    <div class="user-info">
+      <span class="user-name" id="userName">Guest</span>
+      <a href="signup.html" class="auth-btn" id="authBtn">Sign In / Sign Up</a>
+    </div>
+  </header>
+
+  <!-- Product Grid -->
+  <main class="products" id="productList">
+    <!-- Products added by JS -->
+  </main>
+
+  <!-- Floating Basket -->
+  <div class="basket" id="basketBtn">
+    🛒
+    <span class="basket-count" id="basketCount">0</span>
+  </div>
+
+  <script type="module">
+    // ---------- Firebase Imports ----------
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
+    import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-auth.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyBdylCZumZk-YrN9Fn13qQ6XRTN5WGsi54",
+      authDomain: "campus-hub-c621e.firebaseapp.com",
+      projectId: "campus-hub-c621e",
+      storageBucket: "campus-hub-c621e.firebasestorage.app",
+      messagingSenderId: "853234117468",
+      appId: "1:853234117468:web:b83b9d89c808c2ae94af99",
+      measurementId: "G-YQGNYWFV0L"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+
+    // ---------- Products ----------
+    const products = [
+      { name: "Bread", price: 60, image: "https://i.imgur.com/oCkEbrA.jpg" },
+      { name: "Milk", price: 80, image: "https://i.imgur.com/zv2Zdxo.jpg" },
+      { name: "Sugar 1kg", price: 160, image: "https://i.imgur.com/EnJRV7b.jpg" },
+      { name: "Cooking Oil 1L", price: 280, image: "https://i.imgur.com/g4lZkA7.jpg" },
+      { name: "Toothpaste", price: 150, image: "https://i.imgur.com/tU3Y5EI.jpg" },
+      { name: "Soap", price: 120, image: "https://i.imgur.com/Or2EQF8.jpg" },
+    ];
+
+    const productList = document.getElementById("productList");
+    const basketBtn = document.getElementById("basketBtn");
+    const basketCount = document.getElementById("basketCount");
+
+    // ---------- Load Products ----------
+    let basket = [];
+
+    function renderProducts() {
+      productList.innerHTML = "";
+      products.forEach((p, index) => {
+        const div = document.createElement("div");
+        div.className = "product";
+        div.innerHTML = `
+          <img src="${p.image}" alt="${p.name}">
+          <div class="product-info">
+            <h3>${p.name}</h3>
+            <p class="price">KSh ${p.price}</p>
+            <button class="add-btn" onclick="addToBasket(${index})">Add to Basket</button>
+          </div>
+        `;
+        productList.appendChild(div);
+      });
+    }
+    renderProducts();
+
+    // ---------- Basket Logic ----------
+    window.addToBasket = function (index) {
+      basket.push(products[index]);
+      basketCount.textContent = basket.length;
+    };
+
+    basketBtn.addEventListener("click", () => {
+      if (basket.length === 0) {
+        alert("Your basket is empty 🛍️");
+      } else {
+        let total = basket.reduce((sum, item) => sum + item.price, 0);
+        alert(`🛒 ${basket.length} items in basket\nTotal: KSh ${total}`);
+      }
+    });
+
+    // ---------- Auth State ----------
+    const userName = document.getElementById("userName");
+    const authBtn = document.getElementById("authBtn");
+
+    onAuthStateChanged(auth, (user) => {
+      if (user) {
+        userName.textContent = user.displayName || user.email.split("@")[0];
+        authBtn.textContent = "Sign Out";
+        authBtn.href = "#";
+        authBtn.onclick = () => {
+          auth.signOut();
+          alert("Signed out!");
+          window.location.reload();
+        };
+      } else {
+        userName.textContent = "Guest";
+        authBtn.textContent = "Sign In / Sign Up";
+        authBtn.href = "signup.html";
+      }
+    });
+  </script>
+</body>
+</htmlrelel
