@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Campus Hub | Order</title>
+  <link rel="stylesheet" href="style.css" />
+  <script src="https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/11.0.1/firebase-auth.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js"></script>
+  <style>
+    body {
+      font-family: 'Poppins', sans-serif;
+      background: #f6f9fc;
+      margin: 0;
+      padding: 0;
+    }
+    header {
+      background: #004080;
+      color: white;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 1rem 1.5rem;
+    }
+    header h1 {
+      font-size: 1.3rem;
+    }
+    .cart-container {
+      width: 90%;
+      margin: 1rem auto;
+      background: white;
+      border-radius: 10px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+      padding: 1rem;
+    }
+    .cart-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid #ddd;
+      padding: 0.8rem 0;
+    }
+    .cart-item img {
+      width: 50px;
+      border-radius: 8px;
+    }
+    .cart-item button {
+      background: #f44336;
+      border: none;
+      color: white;
+      padding: 5px 10px;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+    .total {
+      text-align: right;
+      margin-top: 1rem;
+      font-size: 1.2rem;
+      font-weight: bold;
+      color: #004080;
+    }
+    .address-section, .payment-section {
+      width: 90%;
+      margin: 1rem auto;
+      background: white;
+      border-radius: 10px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+      padding: 1rem;
+    }
+    textarea, input, select {
+      width: 100%;
+      margin-top: 8px;
+      padding: 8px;
+      border-radius: 6px;
+      border: 1px solid #ccc;
+      font-size: 1rem;
+    }
+    #map {
+      width: 100%;
+      height: 200px;
+      background: #ddd;
+      border-radius: 8px;
+      margin-top: 0.5rem;
+    }
+    .btn-complete {
+      display: block;
+      margin: 2rem auto;
+      background: #004080;
+      color: white;
+      border: none;
+      padding: 12px 30px;
+      border-radius: 8px;
+      font-size: 1.1rem;
+      cursor: pointer;
+    }
+    .btn-complete:hover {
+      background: #003366;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <h1>Campus Hub Order</h1>
+    <a href="sales.html" style="color:white;text-decoration:none;">Back to Shop</a>
+  </header>
+
+  <div class="cart-container" id="cartContainer">
+    <h2>Your Items</h2>
+    <div id="cartItems"></div>
+    <div class="total" id="totalAmount">Total: KSh 0</div>
+  </div>
+
+  <div class="address-section">
+    <h3>Delivery Address</h3>
+    <div id="map">📍 Choose delivery location on map (to be integrated)</div>
+    <textarea id="specifics" placeholder="Enter more details (e.g. Hostel name, room number)..."></textarea>
+  </div>
+
+  <div class="payment-section">
+    <h3>Payment Method</h3>
+    <select id="paymentMethod">
+      <option value="mpesa">M-Pesa (STK Push)</option>
+      <option value="cash">Cash on Delivery</option>
+    </select>
+  </div>
+
+  <button class="btn-complete" id="completeOrderBtn">Complete Order</button>
+
+  <script type="module">
+    // Firebase setup
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
+    import { getFirestore, addDoc, collection } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
+    import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-auth.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyBdylCZumZk-YrN9Fn13qQ6XRTN5WGsi54",
+      authDomain: "campus-hub-c621e.firebaseapp.com",
+      projectId: "campus-hub-c621e",
+      storageBucket: "campus-hub-c621e.firebasestorage.app",
+      messagingSenderId: "853234117468",
+      appId: "1:853234117468:web:b83b9d89c808c2ae94af99",
+      measurementId: "G-YQGNYWFV0L"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+    const auth = getAuth(app);
+
+    let cart = JSON.parse(localStorage.getItem("cart")) || [];
+
+    const cartContainer = document.getElementById("cartItems");
+    const totalAmount = document.getElementById("totalAmount");
+
+    function renderCart() {
+      cartContainer.innerHTML = "";
+      let total = 0;
+      cart.forEach((item, index) => {
+        total += item.price * (item.quantity || 1);
+        const div = document.createElement("div");
+        div.classList.add("cart-item");
+        div.innerHTML = `
+          <div style="display:flex;align-items:center;gap:10px;">
+            <img src="${item.image}" alt="${item.name}">
+            <span>${item.name}</span>
+          </div>
+          <div>
+            KSh ${item.price * (item.quantity || 1)}
+            <button data-index="${index}">Delete</button>
+          </div>
+        `;
+        cartContainer.appendChild(div);
+      });
+      totalAmount.textContent = `Total: KSh ${total}`;
+    }
+
+    cartContainer.addEventListener("click", (e) => {
+      if (e.target.tagName === "BUTTON") {
+        const index = e.target.dataset.index;
+        cart.splice(index, 1);
+        localStorage.setItem("cart", JSON.stringify(cart));
+        renderCart();
+      }
+    });
+
+    renderCart();
+
+    const completeOrderBtn = document.getElementById("completeOrderBtn");
+    completeOrderBtn.addEventListener("click", async () => {
+      const specifics = document.getElementById("specifics").value.trim();
+      const paymentMethod = document.getElementById("paymentMethod").value;
+
+      if (cart.length === 0) return alert("Your cart is empty.");
+      if (!specifics) return alert("Please enter delivery details.");
+
+      onAuthStateChanged(auth, async (user) => {
+        if (!user) {
+          alert("Please sign in first.");
+          window.location.href = "signup.html";
+          return;
+        }
+
+        try {
+          const order = {
+            userId: user.uid,
+            items: cart,
+            total: cart.reduce((sum, i) => sum + i.price * (i.quantity || 1), 0),
+            paymentMethod,
+            specifics,
+            date: new Date().toISOString(),
+            status: "Pending"
+          };
+
+          await addDoc(collection(db, "orders"), order);
+          alert("✅ Order placed successfully!");
+          localStorage.removeItem("cart");
+          window.location.href = "sales.html";
+        } catch (err) {
+          console.error(err);
+          alert("❌ Failed to place order.");
+        }
+      });
+    });
+  </script>
+</body>
+</html>
