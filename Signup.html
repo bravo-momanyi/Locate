@@ -5,82 +5,75 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Campus Hub | Sign Up / Sign In</title>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap">
+  <script src="https://cdn.jsdelivr.net/npm/emailjs-com@3/dist/email.min.js"></script>
   <style>
     body {
-      font-family: 'Poppins', sans-serif;
-      background: #f4f8ff;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      height: 100vh;
       margin: 0;
+      font-family: "Poppins", sans-serif;
+      background: #f8faff;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
     }
 
     .container {
-      background: #fff;
+      width: 360px;
+      background: white;
       padding: 2rem;
       border-radius: 12px;
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-      width: 350px;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.1);
       text-align: center;
     }
 
     h2 {
       color: #004080;
-      margin-bottom: 1rem;
-    }
-
-    form {
-      display: flex;
-      flex-direction: column;
-      gap: 0.8rem;
+      margin-bottom: 1.5rem;
     }
 
     input {
-      padding: 0.7rem;
+      width: 100%;
+      padding: 0.8rem;
+      margin: 0.6rem 0;
       border: 1px solid #ccc;
-      border-radius: 8px;
+      border-radius: 6px;
       font-size: 1rem;
     }
 
     button {
+      width: 100%;
       background: #004080;
       color: white;
       border: none;
-      border-radius: 8px;
-      padding: 0.7rem;
+      padding: 0.8rem;
+      margin-top: 0.8rem;
+      border-radius: 6px;
       font-weight: 600;
       cursor: pointer;
-      transition: 0.3s;
     }
 
     button:hover {
       background: #0059b3;
     }
 
-    .switch {
+    .toggle {
       margin-top: 1rem;
-      color: #555;
+      color: #004080;
+      cursor: pointer;
       font-size: 0.9rem;
     }
 
-    .switch span {
-      color: #004080;
-      cursor: pointer;
-      font-weight: 600;
+    #verificationSection {
+      display: none;
     }
 
-    #message {
-      margin-top: 1rem;
-      color: green;
-      font-size: 0.9rem;
+    .google-btn {
+      background: #DB4437;
+      margin-top: 0.8rem;
     }
 
-    .forgot {
-      text-align: right;
-      font-size: 0.85rem;
-      color: #004080;
-      cursor: pointer;
+    .google-btn:hover {
+      background: #c23321;
     }
   </style>
 </head>
@@ -88,45 +81,41 @@
   <div class="container">
     <h2 id="formTitle">Create Account</h2>
 
-    <!-- Signup Form -->
-    <form id="signupForm">
+    <!-- Sign Up Section -->
+    <div id="signupSection">
       <input type="text" id="name" placeholder="Full Name" required />
-      <input type="email" id="signupEmail" placeholder="Email" required />
-      <input type="tel" id="phone" placeholder="Phone Number" required />
-      <input type="password" id="signupPassword" placeholder="Password" required />
-      <input type="password" id="confirmPassword" placeholder="Confirm Password" required />
-      <button type="submit">Sign Up</button>
-    </form>
+      <input type="email" id="email" placeholder="Email" required />
+      <input type="text" id="phone" placeholder="Phone Number" required />
+      <input type="password" id="password" placeholder="Password" required />
+      <button id="sendCodeBtn">Send Verification Code</button>
+      <p class="toggle" id="toggleToLogin">Already have an account? Sign In</p>
+    </div>
 
-    <!-- Login Form -->
-    <form id="loginForm" style="display: none;">
+    <!-- Email Verification Section -->
+    <div id="verificationSection">
+      <h4>Enter the 6-digit code sent to your email</h4>
+      <input type="text" id="verifyCodeInput" placeholder="Enter Code" />
+      <button id="verifyBtn">Verify and Sign Up</button>
+    </div>
+
+    <!-- Login Section -->
+    <div id="loginSection" style="display:none;">
       <input type="email" id="loginEmail" placeholder="Email" required />
       <input type="password" id="loginPassword" placeholder="Password" required />
-      <div class="forgot" id="forgotPassword">Forgot Password?</div>
-      <button type="submit">Sign In</button>
-    </form>
-
-    <p class="switch" id="toggleForm">
-      Already have an account? <span>Sign In</span>
-    </p>
-
-    <p id="message"></p>
+      <button id="loginBtn">Sign In</button>
+      <p class="toggle" id="toggleToSignup">Don't have an account? Sign Up</p>
+      <button class="google-btn" id="googleLoginBtn">Sign In with Google</button>
+    </div>
   </div>
 
   <script type="module">
-    // ---------- Firebase Setup ----------
     import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
     import { 
-      getAuth, 
-      createUserWithEmailAndPassword, 
-      sendEmailVerification, 
-      signInWithEmailAndPassword, 
-      sendPasswordResetEmail,
-      onAuthStateChanged 
+      getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, 
+      GoogleAuthProvider, signInWithPopup 
     } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-auth.js";
-    import { getFirestore, setDoc, doc } 
-      from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
 
+    // ---------- Firebase Configuration ----------
     const firebaseConfig = {
       apiKey: "AIzaSyBdylCZumZk-YrN9Fn13qQ6XRTN5WGsi54",
       authDomain: "campus-hub-c621e.firebaseapp.com",
@@ -139,111 +128,101 @@
 
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
-    const db = getFirestore(app);
 
-    const signupForm = document.getElementById("signupForm");
-    const loginForm = document.getElementById("loginForm");
-    const toggleForm = document.getElementById("toggleForm");
-    const message = document.getElementById("message");
-    const formTitle = document.getElementById("formTitle");
+    // ---------- Initialize EmailJS ----------
+    emailjs.init("NuLLYSNdHyhKlSFe0");
 
-    let isSignup = true;
+    const nameInput = document.getElementById("name");
+    const emailInput = document.getElementById("email");
+    const phoneInput = document.getElementById("phone");
+    const passwordInput = document.getElementById("password");
+    const sendCodeBtn = document.getElementById("sendCodeBtn");
+    const verifySection = document.getElementById("verificationSection");
+    const signupSection = document.getElementById("signupSection");
+    const verifyCodeInput = document.getElementById("verifyCodeInput");
+    const verifyBtn = document.getElementById("verifyBtn");
 
-    // ---------- Switch Between Forms ----------
-    toggleForm.addEventListener("click", () => {
-      isSignup = !isSignup;
-      if (isSignup) {
-        signupForm.style.display = "flex";
-        loginForm.style.display = "none";
-        formTitle.textContent = "Create Account";
-        toggleForm.innerHTML = `Already have an account? <span>Sign In</span>`;
-      } else {
-        signupForm.style.display = "none";
-        loginForm.style.display = "flex";
-        formTitle.textContent = "Sign In";
-        toggleForm.innerHTML = `Don't have an account? <span>Sign Up</span>`;
-      }
-      message.textContent = "";
-    });
+    let verificationCode = "";
 
-    // ---------- Sign Up ----------
-    signupForm.addEventListener("submit", async (e) => {
-      e.preventDefault();
-      const name = document.getElementById("name").value.trim();
-      const email = document.getElementById("signupEmail").value.trim();
-      const phone = document.getElementById("phone").value.trim();
-      const password = document.getElementById("signupPassword").value;
-      const confirmPassword = document.getElementById("confirmPassword").value;
+    // ---------- Step 1: Send Verification Code ----------
+    sendCodeBtn.onclick = async () => {
+      const email = emailInput.value.trim();
+      const name = nameInput.value.trim();
+      if (!email || !name) return alert("Please enter all required fields.");
 
-      if (password !== confirmPassword) {
-        message.textContent = "⚠️ Passwords do not match!";
-        message.style.color = "red";
-        return;
-      }
+      verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
+      alert("Sending code to your email...");
 
       try {
-        const userCred = await createUserWithEmailAndPassword(auth, email, password);
-        const user = userCred.user;
-
-        // Save user data in Firestore
-        await setDoc(doc(db, "users", user.uid), {
-          name, email, phone, createdAt: new Date().toISOString()
+        await emailjs.send("service_p7hwdj9", "template_9ooaehi", {
+          to_email: email,
+          code: verificationCode,
+          name: name,
         });
-
-        // Send verification email
-        await sendEmailVerification(user);
-        message.textContent = "✅ Verification email sent! Please check your inbox.";
-        message.style.color = "green";
-
+        alert("Verification code sent successfully!");
+        signupSection.style.display = "none";
+        verifySection.style.display = "block";
       } catch (error) {
-        message.textContent = error.message;
-        message.style.color = "red";
+        alert("Failed to send code. Please check EmailJS setup.");
+        console.error(error);
       }
-    });
+    };
 
-    // ---------- Login ----------
-    loginForm.addEventListener("submit", async (e) => {
-      e.preventDefault();
-      const email = document.getElementById("loginEmail").value.trim();
+    // ---------- Step 2: Verify Code & Create Account ----------
+    verifyBtn.onclick = async () => {
+      const code = verifyCodeInput.value.trim();
+      if (code !== verificationCode) return alert("Incorrect verification code!");
+
+      try {
+        const userCredential = await createUserWithEmailAndPassword(
+          auth,
+          emailInput.value,
+          passwordInput.value
+        );
+        alert("Account created successfully!");
+        window.location.href = "index.html";
+      } catch (error) {
+        alert("Error creating account: " + error.message);
+      }
+    };
+
+    // ---------- Login Toggle ----------
+    const loginSection = document.getElementById("loginSection");
+    document.getElementById("toggleToLogin").onclick = () => {
+      signupSection.style.display = "none";
+      loginSection.style.display = "block";
+      verifySection.style.display = "none";
+    };
+
+    document.getElementById("toggleToSignup").onclick = () => {
+      signupSection.style.display = "block";
+      loginSection.style.display = "none";
+      verifySection.style.display = "none";
+    };
+
+    // ---------- Sign In ----------
+    document.getElementById("loginBtn").onclick = async () => {
+      const email = document.getElementById("loginEmail").value;
       const password = document.getElementById("loginPassword").value;
-
       try {
-        const userCred = await signInWithEmailAndPassword(auth, email, password);
-        const user = userCred.user;
-
-        if (!user.emailVerified) {
-          message.textContent = "⚠️ Please verify your email before signing in.";
-          message.style.color = "red";
-          return;
-        }
-
-        // Redirect to main app page
+        await signInWithEmailAndPassword(auth, email, password);
+        alert("Login successful!");
         window.location.href = "index.html";
       } catch (error) {
-        message.textContent = "⚠️ " + error.message;
-        message.style.color = "red";
+        alert("Login failed: " + error.message);
       }
-    });
+    };
 
-    // ---------- Password Reset ----------
-    document.getElementById("forgotPassword").addEventListener("click", async () => {
-      const email = prompt("Enter your email to reset password:");
-      if (!email) return;
-
+    // ---------- Google Sign In ----------
+    const googleProvider = new GoogleAuthProvider();
+    document.getElementById("googleLoginBtn").onclick = async () => {
       try {
-        await sendPasswordResetEmail(auth, email);
-        alert("📩 Password reset email sent!");
-      } catch (error) {
-        alert("⚠️ " + error.message);
-      }
-    });
-
-    // ---------- Redirect Logged-In Users ----------
-    onAuthStateChanged(auth, (user) => {
-      if (user && user.emailVerified) {
+        await signInWithPopup(auth, googleProvider);
         window.location.href = "index.html";
+      } catch (error) {
+        alert("Google Sign-In failed: " + error.message);
       }
-    });
+    };
   </script>
 </body>
-</html>
+</html
