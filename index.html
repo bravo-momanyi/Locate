@@ -1,9 +1,9 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Campus Hub | Sales Page</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Campus Hub | Sales</title>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap">
   <style>
     body {
@@ -21,7 +21,7 @@
       display: flex;
       justify-content: space-between;
       align-items: center;
-      box-shadow: 0 class 8px rgba(0,0,0,0.1);
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
     }
 
     header h1 {
@@ -68,6 +68,7 @@
       overflow: hidden;
       transition: 0.3s;
       text-align: center;
+      cursor: pointer;
     }
 
     .product:hover {
@@ -92,21 +93,6 @@
     .price {
       color: #004080;
       font-weight: 600;
-    }
-
-    .add-btn {
-      background: #004080;
-      color: white;
-      padding: 0.5rem 1rem;
-      border: none;
-      border-radius: 6px;
-      margin-top: 0.5rem;
-      cursor: pointer;
-      transition: 0.3s;
-    }
-
-    .add-btn:hover {
-      background: #0059b3;
     }
 
     /* ---------- Floating Basket ---------- */
@@ -139,6 +125,67 @@
       padding: 3px 7px;
       font-size: 0.8rem;
     }
+
+    /* ---------- Modal ---------- */
+    .modal {
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      background: rgba(0,0,0,0.6);
+      display: none;
+      justify-content: center;
+      align-items: center;
+      z-index: 100;
+    }
+
+    .modal-content {
+      background: #fff;
+      border-radius: 12px;
+      padding: 2rem;
+      width: 90%;
+      max-width: 400px;
+      text-align: center;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+      position: relative;
+    }
+
+    .modal-content img {
+      width: 100%;
+      height: 180px;
+      border-radius: 8px;
+      object-fit: cover;
+    }
+
+    .close-btn {
+      position: absolute;
+      top: 10px; right: 15px;
+      font-size: 1.3rem;
+      cursor: pointer;
+      color: #666;
+    }
+
+    select {
+      padding: 0.6rem;
+      border-radius: 6px;
+      border: 1px solid #ccc;
+      width: 100%;
+      margin-top: 1rem;
+    }
+
+    .order-btn {
+      margin-top: 1rem;
+      background: #004080;
+      color: white;
+      border: none;
+      padding: 0.7rem 1.2rem;
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: 600;
+    }
+
+    .order-btn:hover {
+      background: #0059b3;
+    }
   </style>
 </head>
 <body>
@@ -154,7 +201,7 @@
 
   <!-- Product Grid -->
   <main class="products" id="productList">
-    <!-- Products added by JS -->
+    <!-- JS renders products here -->
   </main>
 
   <!-- Floating Basket -->
@@ -163,10 +210,27 @@
     <span class="basket-count" id="basketCount">0</span>
   </div>
 
+  <!-- Product Modal -->
+  <div class="modal" id="productModal">
+    <div class="modal-content">
+      <span class="close-btn" id="closeModal">&times;</span>
+      <img id="modalImg" src="" alt="Product Image" />
+      <h2 id="modalName"></h2>
+      <p class="price" id="modalPrice"></p>
+      <label for="storeSelect">Choose a Store:</label>
+      <select id="storeSelect">
+        <option value="KU Mini Mart">KU Mini Mart</option>
+        <option value="Campus Plaza">Campus Plaza</option>
+        <option value="Gate Market">Gate Market</option>
+      </select>
+      <button class="order-btn" id="orderBtn">Order Now</button>
+    </div>
+  </div>
+
   <script type="module">
-    // ---------- Firebase Imports ----------
+    // ---------- Firebase Setup ----------
     import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
-    import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-auth.js";
+    import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-auth.js";
 
     const firebaseConfig = {
       apiKey: "AIzaSyBdylCZumZk-YrN9Fn13qQ6XRTN5WGsi54",
@@ -181,7 +245,7 @@
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
 
-    // ---------- Products ----------
+    // ---------- Product Data ----------
     const products = [
       { name: "Bread", price: 60, image: "https://i.imgur.com/oCkEbrA.jpg" },
       { name: "Milk", price: 80, image: "https://i.imgur.com/zv2Zdxo.jpg" },
@@ -192,15 +256,22 @@
     ];
 
     const productList = document.getElementById("productList");
+    const modal = document.getElementById("productModal");
+    const modalImg = document.getElementById("modalImg");
+    const modalName = document.getElementById("modalName");
+    const modalPrice = document.getElementById("modalPrice");
+    const storeSelect = document.getElementById("storeSelect");
+    const orderBtn = document.getElementById("orderBtn");
+    const closeModal = document.getElementById("closeModal");
     const basketBtn = document.getElementById("basketBtn");
     const basketCount = document.getElementById("basketCount");
 
-    // ---------- Load Products ----------
     let basket = [];
 
+    // ---------- Render Products ----------
     function renderProducts() {
       productList.innerHTML = "";
-      products.forEach((p, index) => {
+      products.forEach((p, i) => {
         const div = document.createElement("div");
         div.className = "product";
         div.innerHTML = `
@@ -208,30 +279,45 @@
           <div class="product-info">
             <h3>${p.name}</h3>
             <p class="price">KSh ${p.price}</p>
-            <button class="add-btn" onclick="addToBasket(${index})">Add to Basket</button>
           </div>
         `;
+        div.addEventListener("click", () => openModal(p));
         productList.appendChild(div);
       });
     }
     renderProducts();
 
-    // ---------- Basket Logic ----------
-    window.addToBasket = function (index) {
-      basket.push(products[index]);
-      basketCount.textContent = basket.length;
-    };
+    // ---------- Modal Logic ----------
+    function openModal(product) {
+      modalImg.src = product.image;
+      modalName.textContent = product.name;
+      modalPrice.textContent = "KSh " + product.price;
+      modal.style.display = "flex";
 
+      orderBtn.onclick = () => {
+        const store = storeSelect.value;
+        basket.push({ ...product, store });
+        basketCount.textContent = basket.length;
+        alert(`${product.name} ordered from ${store}!`);
+        modal.style.display = "none";
+      };
+    }
+
+    closeModal.onclick = () => modal.style.display = "none";
+    window.onclick = (e) => { if (e.target === modal) modal.style.display = "none"; };
+
+    // ---------- Basket ----------
     basketBtn.addEventListener("click", () => {
       if (basket.length === 0) {
-        alert("Your basket is empty 🛍️");
+        alert("🛍️ Your basket is empty!");
       } else {
-        let total = basket.reduce((sum, item) => sum + item.price, 0);
-        alert(`🛒 ${basket.length} items in basket\nTotal: KSh ${total}`);
+        let summary = basket.map(b => `${b.name} - ${b.store} (KSh ${b.price})`).join("\n");
+        let total = basket.reduce((sum, i) => sum + i.price, 0);
+        alert(`🛒 Basket Items:\n\n${summary}\n\nTotal: KSh ${total}`);
       }
     });
 
-    // ---------- Auth State ----------
+    // ---------- Auth ----------
     const userName = document.getElementById("userName");
     const authBtn = document.getElementById("authBtn");
 
@@ -240,9 +326,9 @@
         userName.textContent = user.displayName || user.email.split("@")[0];
         authBtn.textContent = "Sign Out";
         authBtn.href = "#";
-        authBtn.onclick = () => {
-          auth.signOut();
-          alert("Signed out!");
+        authBtn.onclick = async () => {
+          await signOut(auth);
+          alert("You have signed out.");
           window.location.reload();
         };
       } else {
@@ -253,4 +339,4 @@
     });
   </script>
 </body>
-</htmlrelel
+</html>
