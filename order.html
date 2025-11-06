@@ -158,7 +158,7 @@
       status.textContent = "Sending STK Push... please wait.";
 
       try {
-        const res = await fetch("https://campus-hub-t1oz.onrender.com/stkpush", {
+        const res = await fetch("https://campus-hub-t1oz.onrender.com", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ phone, amount: total })
