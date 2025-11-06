@@ -3,224 +3,179 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Campus Hub | Order</title>
-  <link rel="stylesheet" href="style.css" />
-  <script src="https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/11.0.1/firebase-auth.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js"></script>
+  <title>CampusHub | Order Checkout</title>
   <style>
+    * { box-sizing: border-box; font-family: 'Poppins', sans-serif; }
     body {
-      font-family: 'Poppins', sans-serif;
-      background: #f6f9fc;
       margin: 0;
-      padding: 0;
+      background: #f5f7fa;
+      color: #222;
     }
     header {
-      background: #004080;
-      color: white;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 1rem 1.5rem;
-    }
-    header h1 {
-      font-size: 1.3rem;
-    }
-    .cart-container {
-      width: 90%;
-      margin: 1rem auto;
-      background: white;
-      border-radius: 10px;
-      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+      background: #1e3a8a;
+      color: #fff;
+      text-align: center;
       padding: 1rem;
+      font-size: 1.4rem;
+      font-weight: 600;
     }
-    .cart-item {
+    .container {
+      max-width: 700px;
+      margin: 30px auto;
+      background: #fff;
+      border-radius: 12px;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+      padding: 20px;
+    }
+    h2 { color: #1e3a8a; }
+    .order-list { margin-top: 15px; }
+    .order-item {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      border-bottom: 1px solid #ddd;
-      padding: 0.8rem 0;
+      padding: 10px 0;
+      border-bottom: 1px solid #eee;
     }
-    .cart-item img {
-      width: 50px;
-      border-radius: 8px;
-    }
-    .cart-item button {
-      background: #f44336;
+    .remove-btn {
+      background: none;
       border: none;
-      color: white;
-      padding: 5px 10px;
-      border-radius: 6px;
+      color: #e11d48;
       cursor: pointer;
-    }
-    .total {
-      text-align: right;
-      margin-top: 1rem;
-      font-size: 1.2rem;
       font-weight: bold;
-      color: #004080;
     }
-    .address-section, .payment-section {
-      width: 90%;
-      margin: 1rem auto;
-      background: white;
-      border-radius: 10px;
-      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
-      padding: 1rem;
-    }
-    textarea, input, select {
-      width: 100%;
-      margin-top: 8px;
-      padding: 8px;
-      border-radius: 6px;
-      border: 1px solid #ccc;
-      font-size: 1rem;
-    }
-    #map {
-      width: 100%;
-      height: 200px;
-      background: #ddd;
-      border-radius: 8px;
-      margin-top: 0.5rem;
-    }
-    .btn-complete {
-      display: block;
-      margin: 2rem auto;
-      background: #004080;
-      color: white;
-      border: none;
-      padding: 12px 30px;
-      border-radius: 8px;
+    .summary {
+      text-align: right;
       font-size: 1.1rem;
-      cursor: pointer;
+      margin-top: 10px;
     }
-    .btn-complete:hover {
-      background: #003366;
+    .form-section { margin-top: 25px; }
+    label { display: block; font-weight: 500; margin-top: 10px; }
+    input, select, textarea {
+      width: 100%;
+      padding: 10px;
+      margin-top: 5px;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+    }
+    .pay-button {
+      background: #34b233;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      padding: 12px;
+      width: 100%;
+      font-weight: 600;
+      margin-top: 25px;
+      cursor: pointer;
+      transition: 0.3s;
+    }
+    .pay-button:hover { background: #2d8a2a; }
+    #paymentStatus {
+      text-align: center;
+      margin-top: 15px;
+      font-weight: 500;
     }
   </style>
 </head>
 <body>
+  <header>CampusHub – Complete Your Order</header>
+  <div class="container">
+    <h2>Items in Your Basket</h2>
+    <div class="order-list" id="orderList">
+      <!-- Example items -->
+      <div class="order-item">
+        <span>Wireless Mouse</span>
+        <span>KSh <span class="price">800</span></span>
+        <button class="remove-btn" onclick="removeItem(this)">✕</button>
+      </div>
+      <div class="order-item">
+        <span>Notebook</span>
+        <span>KSh <span class="price">250</span></span>
+        <button class="remove-btn" onclick="removeItem(this)">✕</button>
+      </div>
+    </div>
+    <div class="summary">Total: KSh <span id="totalAmount">1050</span></div>
 
-  <header>
-    <h1>Campus Hub Order</h1>
-    <a href="sales.html" style="color:white;text-decoration:none;">Back to Shop</a>
-  </header>
+    <div class="form-section">
+      <h2>Delivery Details</h2>
+      <label>Delivery Address</label>
+      <textarea id="address" placeholder="e.g., Kenyatta University Hostel C, Room 24" required></textarea>
 
-  <div class="cart-container" id="cartContainer">
-    <h2>Your Items</h2>
-    <div id="cartItems"></div>
-    <div class="total" id="totalAmount">Total: KSh 0</div>
+      <label>Location Pin (optional)</label>
+      <input type="text" id="mapPin" placeholder="Paste Google Maps link or coordinates" />
+    </div>
+
+    <div class="form-section">
+      <h2>Payment Method</h2>
+      <select id="paymentMethod">
+        <option value="mpesa">M-Pesa (STK Push)</option>
+        <option value="cash">Cash on Delivery</option>
+      </select>
+    </div>
+
+    <button class="pay-button" id="payBtn">Complete Order</button>
+    <p id="paymentStatus"></p>
   </div>
 
-  <div class="address-section">
-    <h3>Delivery Address</h3>
-    <div id="map">📍 Choose delivery location on map (to be integrated)</div>
-    <textarea id="specifics" placeholder="Enter more details (e.g. Hostel name, room number)..."></textarea>
-  </div>
-
-  <div class="payment-section">
-    <h3>Payment Method</h3>
-    <select id="paymentMethod">
-      <option value="mpesa">M-Pesa (STK Push)</option>
-      <option value="cash">Cash on Delivery</option>
-    </select>
-  </div>
-
-  <button class="btn-complete" id="completeOrderBtn">Complete Order</button>
-
-  <script type="module">
-    // Firebase setup
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
-    import { getFirestore, addDoc, collection } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
-    import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-auth.js";
-
-    const firebaseConfig = {
-      apiKey: "AIzaSyBdylCZumZk-YrN9Fn13qQ6XRTN5WGsi54",
-      authDomain: "campus-hub-c621e.firebaseapp.com",
-      projectId: "campus-hub-c621e",
-      storageBucket: "campus-hub-c621e.firebasestorage.app",
-      messagingSenderId: "853234117468",
-      appId: "1:853234117468:web:b83b9d89c808c2ae94af99",
-      measurementId: "G-YQGNYWFV0L"
-    };
-
-    const app = initializeApp(firebaseConfig);
-    const db = getFirestore(app);
-    const auth = getAuth(app);
-
-    let cart = JSON.parse(localStorage.getItem("cart")) || [];
-
-    const cartContainer = document.getElementById("cartItems");
-    const totalAmount = document.getElementById("totalAmount");
-
-    function renderCart() {
-      cartContainer.innerHTML = "";
-      let total = 0;
-      cart.forEach((item, index) => {
-        total += item.price * (item.quantity || 1);
-        const div = document.createElement("div");
-        div.classList.add("cart-item");
-        div.innerHTML = `
-          <div style="display:flex;align-items:center;gap:10px;">
-            <img src="${item.image}" alt="${item.name}">
-            <span>${item.name}</span>
-          </div>
-          <div>
-            KSh ${item.price * (item.quantity || 1)}
-            <button data-index="${index}">Delete</button>
-          </div>
-        `;
-        cartContainer.appendChild(div);
-      });
-      totalAmount.textContent = `Total: KSh ${total}`;
+  <script>
+    function removeItem(button) {
+      button.parentElement.remove();
+      calculateTotal();
     }
 
-    cartContainer.addEventListener("click", (e) => {
-      if (e.target.tagName === "BUTTON") {
-        const index = e.target.dataset.index;
-        cart.splice(index, 1);
-        localStorage.setItem("cart", JSON.stringify(cart));
-        renderCart();
+    function calculateTotal() {
+      const prices = document.querySelectorAll(".price");
+      let total = 0;
+      prices.forEach(p => total += parseInt(p.textContent));
+      document.getElementById("totalAmount").textContent = total;
+    }
+
+    calculateTotal();
+
+    document.getElementById("payBtn").addEventListener("click", async () => {
+      const total = document.getElementById("totalAmount").textContent;
+      const method = document.getElementById("paymentMethod").value;
+      const address = document.getElementById("address").value.trim();
+      const status = document.getElementById("paymentStatus");
+
+      if (!address) {
+        alert("Please enter your delivery address.");
+        return;
       }
-    });
 
-    renderCart();
+      if (method === "cash") {
+        status.textContent = "Order confirmed! Pay on delivery.";
+        status.style.color = "green";
+        return;
+      }
 
-    const completeOrderBtn = document.getElementById("completeOrderBtn");
-    completeOrderBtn.addEventListener("click", async () => {
-      const specifics = document.getElementById("specifics").value.trim();
-      const paymentMethod = document.getElementById("paymentMethod").value;
+      const phone = prompt("Enter your M-Pesa phone number (format 2547XXXXXXXX):");
+      if (!phone || !phone.startsWith("2547") || phone.length !== 12) {
+        alert("Invalid number. Please use format 2547XXXXXXXX.");
+        return;
+      }
 
-      if (cart.length === 0) return alert("Your cart is empty.");
-      if (!specifics) return alert("Please enter delivery details.");
+      status.textContent = "Sending STK Push... please wait.";
 
-      onAuthStateChanged(auth, async (user) => {
-        if (!user) {
-          alert("Please sign in first.");
-          window.location.href = "signup.html";
-          return;
+      try {
+        const res = await fetch("https://campus-hub-t1oz.onrender.com/stkpush", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ phone, amount: total })
+        });
+        const data = await res.json();
+
+        if (data.success) {
+          status.textContent = "STK Push sent! Check your phone to complete payment.";
+          status.style.color = "green";
+        } else {
+          status.textContent = "Payment failed: " + data.error;
+          status.style.color = "red";
         }
-
-        try {
-          const order = {
-            userId: user.uid,
-            items: cart,
-            total: cart.reduce((sum, i) => sum + i.price * (i.quantity || 1), 0),
-            paymentMethod,
-            specifics,
-            date: new Date().toISOString(),
-            status: "Pending"
-          };
-
-          await addDoc(collection(db, "orders"), order);
-          alert("✅ Order placed successfully!");
-          localStorage.removeItem("cart");
-          window.location.href = "sales.html";
-        } catch (err) {
-          console.error(err);
-          alert("❌ Failed to place order.");
-        }
-      });
+      } catch (err) {
+        status.textContent = "Error: " + err.message;
+        status.style.color = "red";
+      }
     });
   </script>
 </body>
