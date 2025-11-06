@@ -56,7 +56,7 @@
     /* ---------- Product Grid ---------- */
     .products {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
       gap: 1.5rem;
       padding: 2rem;
     }
@@ -66,9 +66,8 @@
       border-radius: 12px;
       box-shadow: 0 2px 6px rgba(0,0,0,0.1);
       overflow: hidden;
-      transition: 0.3s;
       text-align: center;
-      cursor: pointer;
+      transition: 0.3s;
     }
 
     .product:hover {
@@ -95,6 +94,23 @@
       font-weight: 600;
     }
 
+    .order-btn {
+      background: #004080;
+      color: white;
+      border: none;
+      padding: 0.6rem 1rem;
+      border-radius: 6px;
+      margin: 6px 0;
+      cursor: pointer;
+      font-weight: 600;
+      transition: 0.3s;
+      width: 90%;
+    }
+
+    .order-btn:hover {
+      background: #0059b3;
+    }
+
     /* ---------- Floating Basket ---------- */
     .basket {
       position: fixed;
@@ -108,6 +124,7 @@
       cursor: pointer;
       font-size: 1.5rem;
       transition: 0.3s;
+      z-index: 10;
     }
 
     .basket:hover {
@@ -124,67 +141,6 @@
       border-radius: 50%;
       padding: 3px 7px;
       font-size: 0.8rem;
-    }
-
-    /* ---------- Modal ---------- */
-    .modal {
-      position: fixed;
-      top: 0; left: 0;
-      width: 100%; height: 100%;
-      background: rgba(0,0,0,0.6);
-      display: none;
-      justify-content: center;
-      align-items: center;
-      z-index: 100;
-    }
-
-    .modal-content {
-      background: #fff;
-      border-radius: 12px;
-      padding: 2rem;
-      width: 90%;
-      max-width: 400px;
-      text-align: center;
-      box-shadow: 0 4px 10px rgba(0,0,0,0.2);
-      position: relative;
-    }
-
-    .modal-content img {
-      width: 100%;
-      height: 180px;
-      border-radius: 8px;
-      object-fit: cover;
-    }
-
-    .close-btn {
-      position: absolute;
-      top: 10px; right: 15px;
-      font-size: 1.3rem;
-      cursor: pointer;
-      color: #666;
-    }
-
-    select {
-      padding: 0.6rem;
-      border-radius: 6px;
-      border: 1px solid #ccc;
-      width: 100%;
-      margin-top: 1rem;
-    }
-
-    .order-btn {
-      margin-top: 1rem;
-      background: #004080;
-      color: white;
-      border: none;
-      padding: 0.7rem 1.2rem;
-      border-radius: 8px;
-      cursor: pointer;
-      font-weight: 600;
-    }
-
-    .order-btn:hover {
-      background: #0059b3;
     }
   </style>
 </head>
@@ -210,23 +166,7 @@
     <span class="basket-count" id="basketCount">0</span>
   </div>
 
-  <!-- Product Modal -->
-  <div class="modal" id="productModal">
-    <div class="modal-content">
-      <span class="close-btn" id="closeModal">&times;</span>
-      <img id="modalImg" src="" alt="Product Image" />
-      <h2 id="modalName"></h2>
-      <p class="price" id="modalPrice"></p>
-      <label for="storeSelect">Choose a Store:</label>
-      <select id="storeSelect">
-        <option value="KU Mini Mart">KU Mini Mart</option>
-        <option value="Campus Plaza">Campus Plaza</option>
-        <option value="Gate Market">Gate Market</option>
-      </select>
-      <button class="order-btn" id="orderBtn">Order Now</button>
-    </div>
-  </div>
-
+  <!-- Script -->
   <script type="module">
     // ---------- Firebase Setup ----------
     import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
@@ -256,22 +196,16 @@
     ];
 
     const productList = document.getElementById("productList");
-    const modal = document.getElementById("productModal");
-    const modalImg = document.getElementById("modalImg");
-    const modalName = document.getElementById("modalName");
-    const modalPrice = document.getElementById("modalPrice");
-    const storeSelect = document.getElementById("storeSelect");
-    const orderBtn = document.getElementById("orderBtn");
-    const closeModal = document.getElementById("closeModal");
     const basketBtn = document.getElementById("basketBtn");
     const basketCount = document.getElementById("basketCount");
 
-    let basket = [];
+    let basket = JSON.parse(localStorage.getItem("basket")) || [];
+    basketCount.textContent = basket.length;
 
     // ---------- Render Products ----------
     function renderProducts() {
       productList.innerHTML = "";
-      products.forEach((p, i) => {
+      products.forEach((p) => {
         const div = document.createElement("div");
         div.className = "product";
         div.innerHTML = `
@@ -279,41 +213,38 @@
           <div class="product-info">
             <h3>${p.name}</h3>
             <p class="price">KSh ${p.price}</p>
+            <button class="order-btn" onclick='addToBasket(${JSON.stringify(JSON.stringify(p))})'>Add to Basket</button>
+            <button class="order-btn" style="background:#00a300" onclick='orderNow(${JSON.stringify(JSON.stringify(p))})'>Order Now</button>
           </div>
         `;
-        div.addEventListener("click", () => openModal(p));
         productList.appendChild(div);
       });
     }
     renderProducts();
 
-    // ---------- Modal Logic ----------
-    function openModal(product) {
-      modalImg.src = product.image;
-      modalName.textContent = product.name;
-      modalPrice.textContent = "KSh " + product.price;
-      modal.style.display = "flex";
+    // ---------- Add to Basket ----------
+    window.addToBasket = (productStr) => {
+      const product = JSON.parse(productStr);
+      const store = "Default Store";
+      basket.push({ ...product, store });
+      localStorage.setItem("basket", JSON.stringify(basket));
+      basketCount.textContent = basket.length;
+      alert(`${product.name} added to basket.`);
+    };
 
-      orderBtn.onclick = () => {
-        const store = storeSelect.value;
-        basket.push({ ...product, store });
-        basketCount.textContent = basket.length;
-        alert(`${product.name} ordered from ${store}!`);
-        modal.style.display = "none";
-      };
-    }
+    // ---------- Order Now ----------
+    window.orderNow = (productStr) => {
+      const product = JSON.parse(productStr);
+      localStorage.setItem("basket", JSON.stringify([{ ...product, store: "Default Store" }]));
+      window.location.href = "order.html";
+    };
 
-    closeModal.onclick = () => modal.style.display = "none";
-    window.onclick = (e) => { if (e.target === modal) modal.style.display = "none"; };
-
-    // ---------- Basket ----------
+    // ---------- Basket Redirect ----------
     basketBtn.addEventListener("click", () => {
       if (basket.length === 0) {
         alert("🛍️ Your basket is empty!");
       } else {
-        let summary = basket.map(b => `${b.name} - ${b.store} (KSh ${b.price})`).join("\n");
-        let total = basket.reduce((sum, i) => sum + i.price, 0);
-        alert(`🛒 Basket Items:\n\n${summary}\n\nTotal: KSh ${total}`);
+        window.location.href = "order.html";
       }
     });
 
